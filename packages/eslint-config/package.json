@@ -1,12 +1,12 @@
 {
-  "name": "@repo/eslint-config",
+  "name": "@h1y/next-loader-eslint-config",
   "version": "0.0.0",
   "type": "module",
   "private": true,
   "exports": {
-    "./base": "./base.js",
-    "./next-js": "./next.js",
-    "./react-internal": "./react-internal.js"
+    "./base": "./eslint.base.mjs",
+    "./next": "./eslint.next.mjs",
+    "./library": "./eslint.library.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.26.0",
