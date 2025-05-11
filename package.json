@@ -2,16 +2,18 @@
   "name": "next-loader",
   "private": true,
   "scripts": {
-    "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "lint:fix": "turbo run lint --fix",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "format": "turbo run format",
     "check-types": "turbo run check-types",
+    "build": "turbo run build",
+    "release": "changeset publish",
     "commitlint": "commitlint --edit",
     "postinstall": "husky && bash init-commit-template.sh"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^0.5.1",
+    "@changesets/cli": "^2.29.3",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "@commitlint/types": "^19.8.1",
