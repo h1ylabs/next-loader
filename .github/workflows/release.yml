@@ -39,6 +39,8 @@ jobs:
       # 사전에 생성된 Changeset 정보를 이용하여 버저닝을 수행한다.
       - name: Create Semantic Versioning
         run: yarn changeset version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # 각 라이브러리의 배포를 수행한다.
       - name: Create Release Pull Request or Publish to npm
