@@ -1,19 +1,127 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# .gitignore file created for free with Tower (https://www.git-tower.com/)
+# For suggestions or improvements please contact us using support@git-tower.com
+# Generated on 2025-05-11
+# Includes: yarn, react, next_js, vscode, typescript
 
-# Dependencies
-node_modules
-.pnp
-.pnp.js
+### Universal ###
+# Common files that should be ignored in all projects
 
-# Local env files
+# Logs
+*.log
+# Temporary files
+*.tmp
+*~
+
+*.bak
+# Environment files (containing secrets, API keys, credentials)
 .env
+*.env
+.env.*
+
+# Local configuration that shouldn't be shared
+*.local
+
+### Yarn ###
+# Yarn package manager files and cache
+
+# https://yarnpkg.com/getting-started/qa#which-files-should-be-gitignored
+# Yarn
+yarn.lock
+.yarn/
+.yarnrc
+
+.yarn-integrity
+.yarn-metadata.json
+yarn-debug.log*
+yarn-error.log*
+.yarn-cache/
+
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+.yarnrc.yml
+.yarn-update-notifier
+yarn.build.json
+.yarnpath
+.yarn/build
+
+.yarn-metadata
+yarn-conditions.yml
+.yarn/install-state.gz.tmp
+!.yarn/releases
+!.yarn/patches
+
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+
+### React ###
+# React build directory and environment files
+
+build/
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# Testing
-coverage
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_*
+**/*.backup.*
+
+**/*.back.*
+*.sublime*
+psd
+thumb
+sketch
+
+coverage/
+
+### Next_js ###
+# next_js specific files
+
+.next/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+### Vscode ###
+# Visual Studio Code editor settings and workspace files
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.history/
+*.vsix
+.ionide
+
+.vs/
+*.code-workspace
+.vscode-test
+.vscodeignore
+.vscode/chrome
+
+.vscode-server/
+.vscode/sftp.json
+.vscode/tags
+.devcontainer/
+
+### Typescript ###
+# typescript specific files
+
+*.tsbuildinfo
+node_modules/
+dist/
 
 # Turbo
 .turbo
@@ -21,18 +129,5 @@ coverage
 # Vercel
 .vercel
 
-# Build Outputs
-.next/
-out/
-build
-dist
-
-
-# Debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Misc
-.DS_Store
-*.pem
+# ESLint Cache
+.eslintcache
