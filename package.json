@@ -9,7 +9,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "commitlint": "commitlint --edit",
-    "postinstall": "husky && bash init-commit-script.sh"
+    "postinstall": "husky && bash init-commit-template.sh"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
