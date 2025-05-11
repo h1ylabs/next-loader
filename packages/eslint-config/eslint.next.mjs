@@ -1,9 +1,9 @@
 import pluginNext from "@next/eslint-plugin-next";
-import reactConfig from "./eslint.react.mjs";
+import reactUIConfig from "./eslint.react-ui.mjs";
 
 // @ts-check
 export default [
-  ...reactConfig,
+  ...reactUIConfig,
   {
     plugins: {
       "@next/next": pluginNext,

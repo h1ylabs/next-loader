@@ -3,7 +3,6 @@ import ts from "typescript-eslint";
 import prettierPlugin from "eslint-config-prettier";
 import turboPlugin from "eslint-plugin-turbo";
 import onlyWarnPlugin from "eslint-plugin-only-warn";
-import importXPlugin from "eslint-plugin-import-x";
 import importSortPlugin from "eslint-plugin-simple-import-sort";
 
 // @ts-check
@@ -11,8 +10,6 @@ export default ts.config(
   // Base Plugin: ESLint, Prettier, TypeScript
   js.configs.recommended,
   ...ts.configs.recommended,
-  importXPlugin.flatConfigs.recommended,
-  importXPlugin.flatConfigs.typescript,
   prettierPlugin,
 
   // Turborepo
