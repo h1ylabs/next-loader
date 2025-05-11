@@ -1,0 +1,61 @@
+{
+  "name": "@h1y/next-loader",
+  "version": "0.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/h1ylabs/next-loader.git",
+    "directory": "packages/next-loader"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "load external resources easily in nextjs.",
+  "author": "h1ylabs",
+  "keywords": [],
+  "type": "module",
+  "exports": {
+    ".": {
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      },
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "yarn clean && tsup",
+    "format": "prettier --cache --write \"./src/**/*.{ts,tsx}\"",
+    "format:file": "prettier --cache --write",
+    "check-types": "bash -c \"tsc --skipLibCheck --noEmit\"",
+    "clean": "rimraf ./dist",
+    "lint": "eslint --cache --max-warnings=0"
+  },
+  "devDependencies": {
+    "@h1y/next-loader-eslint-config": "*",
+    "@h1y/next-loader-typescript-config": "*",
+    "@types/node": "^22.15.17",
+    "@types/react": ">=18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.2"
+  },
+  "peerDependencies": {
+    "next": ">=14.0.0",
+    "react": ">=18.2.0",
+    "react-dom": ">=18.2.0"
+  },
+  "dependencies": {
+    "server-only": "^0.0.1"
+  }
+}
