@@ -1,0 +1,20 @@
+### Header ###
+# ex. feat(credits): Add use method to Credit model
+
+
+### Body ###
+
+
+### Footer ###
+
+
+##############
+# feat: Add new features
+# fix: Bug fixes
+# refactor: Code refactoring
+# docs: Documentation updates
+# ci: Modify CI/CD scripts (ex. Github Actions)
+# build: Build-related modifications
+# perf: Performance optimization, improvement
+# test: Add or modify test code
+##############
