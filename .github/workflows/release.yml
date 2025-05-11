@@ -36,10 +36,6 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      # 사전에 생성된 Changeset 정보를 이용하여 버저닝을 수행한다.
-      - name: Create Semantic Versioning
-        run: yarn changeset version
-
       # 각 라이브러리의 배포를 수행한다.
       - name: Create Release Pull Request or Publish to npm
         id: changesets
@@ -50,3 +46,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Versioning 과정에서 Husky를 생략합니다.
+          HUSKY: 0
