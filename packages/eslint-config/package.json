@@ -6,7 +6,7 @@
   "exports": {
     "./base": "./eslint.base.mjs",
     "./next": "./eslint.next.mjs",
-    "./library": "./eslint.library.mjs"
+    "./react": "./eslint.react.mjs"
   },
   "devDependencies": {
     "@eslint/compat": "^1.2.9",

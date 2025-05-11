@@ -38,7 +38,7 @@ export default ts.config(
 
   /**
    * 코드 구성 시 무조건 경고로만 표시한다.
-   * INFO: lint 수행 시 "--max-warnings 0"를 표기해야 한다.
+   * INFO: lint 수행 시 "--max-warnings=0"를 표기해야 한다.
    */
   {
     plugins: {
