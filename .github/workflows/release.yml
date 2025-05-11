@@ -21,7 +21,10 @@ jobs:
           node-version: 20.x
 
       - name: Install Dependencies
-        run: yarn
+        run: yarn install --immutable --immutable-cache --check-cache
+
+      - name: Build Packages
+        run: yarn build
 
       # NPM에 배포하기 위해 정보를 등록한다.
       - name: Configure NPM Registry
@@ -32,6 +35,10 @@ jobs:
           EOF          
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # 사전에 생성된 Changeset 정보를 이용하여 버저닝을 수행한다.
+      - name: Create Semantic Versioning
+        run: yarn changeset version
 
       # 각 라이브러리의 배포를 수행한다.
       - name: Create Release Pull Request or Publish to npm
