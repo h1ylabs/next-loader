@@ -20,7 +20,7 @@ async function resolveTags<Options extends ResourceOptions>(
   const hash = {
     ...Object.fromEntries(
       await Promise.all(
-        currentTags.map((tag) => (async () => [tag, await convertor(tag)])()),
+        currentTags.map((tag) => convertor(tag).then((value) => [tag, value])),
       ),
     ),
     ...Object.fromEntries(

@@ -1,7 +1,12 @@
+let __NODEJS_CRYPTO_CACHE: typeof import("node:crypto");
+
 export default async function createHash(target: string) {
   // Node.JS 환경
   if (typeof window === "undefined") {
-    const crypto = await import("node:crypto");
+    const crypto =
+      __NODEJS_CRYPTO_CACHE ??
+      (__NODEJS_CRYPTO_CACHE = await import("node:crypto"));
+
     return crypto.createHash("sha256").update(target).digest("hex");
   }
 
