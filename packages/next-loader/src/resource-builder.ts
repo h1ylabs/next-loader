@@ -9,7 +9,7 @@ async function resolveTags<Options extends ResourceOptions>(
   convertor: (target: string) => Promise<string>,
 ): Promise<{
   tags: Resource<unknown, Options>["tags"];
-  hash: Resource<unknown, Options>["__tagHash"];
+  signatures: Resource<unknown, Options>["__signatures"];
 }> {
   // 상위 의존성
   const parentResources = parents ?? [];
@@ -17,15 +17,15 @@ async function resolveTags<Options extends ResourceOptions>(
   const currentTags = Array.isArray(tags) ? [...tags] : [tags];
   const tagsFromParents = parentResources.map((val) => val.tags.current).flat();
 
-  const hash = {
+  const signatures = {
     ...Object.fromEntries(
       await Promise.all(
         currentTags.map((tag) => convertor(tag).then((value) => [tag, value])),
       ),
     ),
     ...Object.fromEntries(
-      parentResources.flatMap(({ tags, __tagHash }) =>
-        tags.current.map((tag) => [tag, __tagHash[tag]!]),
+      parentResources.flatMap(({ tags, __signatures }) =>
+        tags.current.map((tag) => [tag, __signatures[tag]!]),
       ),
     ),
   };
@@ -35,7 +35,7 @@ async function resolveTags<Options extends ResourceOptions>(
       current: currentTags,
       parents: tagsFromParents,
     },
-    hash,
+    signatures,
   };
 }
 
@@ -53,19 +53,18 @@ export default function buildResource<
   return async function (request: RequestOption) {
     const options = optionResolver(request);
     const builderInfo = builder(options);
-    const { tags, hash } = await resolveTags(options, createHash);
+    const { tags, signatures } = await resolveTags(options, createHash);
 
     const load: Resource<Result, Options>["load"] = async (fetcher) => {
-      // fetch 시 특정 리소스에 대한 태그를 부여합니다.
-      const hashedTags = Object.values(hash);
-
       return builderInfo.load(
         async (...[input, init]: Parameters<typeof fetcher>) =>
           fetcher(input, {
             ...init,
             next: {
               ...init?.next,
-              tags: hashedTags,
+
+              // fetch 시 특정 리소스에 대한 태그를 부여합니다.
+              tags: Object.values(signatures),
               revalidate: options.revalidate,
             },
           }),
@@ -77,7 +76,7 @@ export default function buildResource<
 
       tags,
       __options: options,
-      __tagHash: hash,
+      __signatures: signatures,
     };
   };
 }

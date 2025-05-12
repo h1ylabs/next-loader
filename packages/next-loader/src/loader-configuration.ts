@@ -19,13 +19,13 @@ export default function configureLoader({ fetch, revalidate }: Loader) {
     ...resources: T
   ): [() => Promise<ExtractResults<T>>, () => Promise<void>] {
     // 재검증 대상인 Tag 각각에 대응하는 고유 값으로 매핑합니다.
-    const hashedTags = resources
+    const signatures = resources
       .map((resource) =>
-        resource.tags.current.map((tag) => resource.__tagHash[tag]!),
+        resource.tags.current.map((tag) => resource.__signatures[tag]!),
       )
       .flat();
 
-    const bindedRevalidate = revalidate.bind(null, hashedTags);
+    const bindedRevalidate = revalidate.bind(null, signatures);
 
     /**
      * 지정한 리소스를 한 번에 로드합니다.

@@ -2,7 +2,7 @@ import type { Loader } from "./loader";
 import type { ResourceOptions } from "./resource-options";
 
 export type ResourceBuilder<Result, Options extends ResourceOptions> = (
-  options: Options
+  options: Options,
 ) => Pick<Resource<Result, Options>, "load">;
 
 /**
@@ -10,7 +10,7 @@ export type ResourceBuilder<Result, Options extends ResourceOptions> = (
  */
 export type Resource<
   Result = unknown,
-  Options extends ResourceOptions = ResourceOptions
+  Options extends ResourceOptions = ResourceOptions,
 > = {
   /**
    * Resource를 생성할 때 사용된 Option입니다.
@@ -24,7 +24,7 @@ export type Resource<
    *
    * **경고**: 내부에서 사용되는 프로퍼티이므로 프로덕션에서 사용하지 마세요.
    */
-  __tagHash: Record<string, string>;
+  __signatures: Record<string, string>;
 
   tags: {
     parents: string[];
