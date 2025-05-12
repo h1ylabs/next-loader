@@ -1,18 +1,16 @@
-import "server-only";
-
 import React from "react";
 
 import { Resource, ResourceBuilder } from "./types/resource";
 import { ResourceOptions } from "./types/resource-options";
-import { convertToHash } from "./utils";
+import createHash from "./utils/create-hash";
 
-function resolveTags<Options extends ResourceOptions>(
+async function resolveTags<Options extends ResourceOptions>(
   { tags, parents }: Options,
-  convertor: (target: string) => string
-): {
+  convertor: (target: string) => Promise<string>,
+): Promise<{
   tags: Resource<unknown, Options>["tags"];
   hash: Resource<unknown, Options>["__tagHash"];
-} {
+}> {
   // 상위 의존성
   const parentResources = parents ?? [];
 
@@ -20,11 +18,15 @@ function resolveTags<Options extends ResourceOptions>(
   const tagsFromParents = parentResources.map((val) => val.tags.current).flat();
 
   const hash = {
-    ...Object.fromEntries(currentTags.map((tag) => [tag, convertor(tag)])),
+    ...Object.fromEntries(
+      await Promise.all(
+        currentTags.map((tag) => (async () => [tag, await convertor(tag)])()),
+      ),
+    ),
     ...Object.fromEntries(
       parentResources.flatMap(({ tags, __tagHash }) =>
-        tags.current.map((tag) => [tag, __tagHash[tag]!])
-      )
+        tags.current.map((tag) => [tag, __tagHash[tag]!]),
+      ),
     ),
   };
 
@@ -43,15 +45,15 @@ function resolveTags<Options extends ResourceOptions>(
 export default function buildResource<
   RequestOption,
   Result,
-  Options extends ResourceOptions
+  Options extends ResourceOptions,
 >(
   optionResolver: (request: RequestOption) => Options,
-  builder: ResourceBuilder<Result, Options>
-): (request: RequestOption) => Resource<Result, Options> {
-  return function (request: RequestOption) {
+  builder: ResourceBuilder<Result, Options>,
+): (request: RequestOption) => Promise<Resource<Result, Options>> {
+  return async function (request: RequestOption) {
     const options = optionResolver(request);
     const builderInfo = builder(options);
-    const { tags, hash } = resolveTags(options, convertToHash);
+    const { tags, hash } = await resolveTags(options, createHash);
 
     const load: Resource<Result, Options>["load"] = async (fetcher) => {
       // fetch 시 특정 리소스에 대한 태그를 부여합니다.
@@ -66,7 +68,7 @@ export default function buildResource<
               tags: hashedTags,
               revalidate: options.revalidate,
             },
-          })
+          }),
       );
     };
 
