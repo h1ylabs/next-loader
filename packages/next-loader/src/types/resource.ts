@@ -24,7 +24,7 @@ export type Resource<
    *
    * **경고**: 내부에서 사용되는 프로퍼티이므로 프로덕션에서 사용하지 마세요.
    */
-  __signatures: Record<string, string>;
+  __signatures: Record<string, Promise<string>>;
 
   tags: {
     parents: string[];

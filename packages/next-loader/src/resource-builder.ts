@@ -4,13 +4,13 @@ import { Resource, ResourceBuilder } from "./types/resource";
 import { ResourceOptions } from "./types/resource-options";
 import createHash from "./utils/create-hash";
 
-async function resolveTags<Options extends ResourceOptions>(
+function resolveTags<Options extends ResourceOptions>(
   { tags, parents }: Options,
   convertor: (target: string) => Promise<string>,
-): Promise<{
+): {
   tags: Resource<unknown, Options>["tags"];
   signatures: Resource<unknown, Options>["__signatures"];
-}> {
+} {
   // 상위 의존성
   const parentResources = parents ?? [];
 
@@ -18,11 +18,7 @@ async function resolveTags<Options extends ResourceOptions>(
   const tagsFromParents = parentResources.map((val) => val.tags.current).flat();
 
   const signatures = {
-    ...Object.fromEntries(
-      await Promise.all(
-        currentTags.map((tag) => convertor(tag).then((value) => [tag, value])),
-      ),
-    ),
+    ...Object.fromEntries(currentTags.map((tag) => [tag, convertor(tag)])),
     ...Object.fromEntries(
       parentResources.flatMap(({ tags, __signatures }) =>
         tags.current.map((tag) => [tag, __signatures[tag]!]),
@@ -49,11 +45,11 @@ export default function buildResource<
 >(
   optionResolver: (request: RequestOption) => Options,
   builder: ResourceBuilder<Result, Options>,
-): (request: RequestOption) => Promise<Resource<Result, Options>> {
-  return async function (request: RequestOption) {
+): (request: RequestOption) => Resource<Result, Options> {
+  return function (request: RequestOption) {
     const options = optionResolver(request);
     const builderInfo = builder(options);
-    const { tags, signatures } = await resolveTags(options, createHash);
+    const { tags, signatures } = resolveTags(options, createHash);
 
     const load: Resource<Result, Options>["load"] = async (fetcher) => {
       return builderInfo.load(
@@ -64,7 +60,7 @@ export default function buildResource<
               ...init?.next,
 
               // fetch 시 특정 리소스에 대한 태그를 부여합니다.
-              tags: Object.values(signatures),
+              tags: await Promise.all(Object.values(signatures)),
               revalidate: options.revalidate,
             },
           }),
