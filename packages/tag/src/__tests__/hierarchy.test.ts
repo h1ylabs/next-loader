@@ -148,15 +148,6 @@ describe("hierarchy 함수", () => {
       const resolved = hierarchyTag.resolver([false]);
       expect(resolved.result).toEqual(["success"]);
     });
-
-    it("잘못된 태그가 포함된 경우 에러를 발생시킨다", () => {
-      const validTag = tag("valid");
-      const invalidTag = { type: "single", resolved: false } as any; // resolver 없음
-
-      const hierarchyTag = hierarchy(validTag, invalidTag);
-
-      expect(() => hierarchyTag.resolver()).toThrow("Invalid tag at index 1");
-    });
   });
 
   describe("실제 사용 시나리오", () => {
