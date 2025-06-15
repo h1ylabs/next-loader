@@ -2,15 +2,15 @@ import {
   ResolvedSingleTag,
   SingleTag,
   SingleTagParameters,
+  SingleTagResolver,
   SingleTagResult,
-  SingleTypeResolver,
   UnresolvedSingleTag,
 } from "./types";
 
 export function tag<
   Params extends SingleTagParameters,
   Result extends SingleTagResult,
-  Resolver extends SingleTypeResolver<Params, Result>,
+  Resolver extends SingleTagResolver<Params, Result>,
 >(resolver: Resolver): UnresolvedSingleTag<Params, Result, Resolver>;
 
 export function tag<Result extends SingleTagResult>(
@@ -20,9 +20,9 @@ export function tag<Result extends SingleTagResult>(
 export function tag<
   Params extends SingleTagParameters,
   Result extends SingleTagResult,
-  Resolver extends SingleTypeResolver<Params, Result>,
+  Resolver extends SingleTagResolver<Params, Result>,
 >(value: Resolver | Result): SingleTag<Params, Result, Resolver> {
-  if (typeof value === "string") {
+  if (isSingleTagResult(value)) {
     return {
       type: "single",
       resolved: true,
@@ -30,7 +30,7 @@ export function tag<
     };
   }
 
-  if (typeof value === "function") {
+  if (isSingleTagResolver(value)) {
     return {
       type: "single",
       resolved: false,
@@ -41,4 +41,12 @@ export function tag<
   throw new Error(
     "Unexpected error: resolver is valid but doesn't match any known type.",
   );
+}
+
+function isSingleTagResult(value: unknown): value is SingleTagResult {
+  return typeof value === "string";
+}
+
+function isSingleTagResolver(value: unknown): value is SingleTagResolver {
+  return typeof value === "function";
 }
