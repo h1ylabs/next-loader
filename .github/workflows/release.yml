@@ -1,4 +1,4 @@
-name: Release
+name: Release Packages
 
 on:
   push:
@@ -23,27 +23,32 @@ jobs:
       - name: Install Dependencies
         run: yarn install --immutable --immutable-cache --check-cache
 
+      # 라이브러리를 빌드합니다.
+      # 이때, Testing, Linting, Formatting 과정이 선행됩니다.
       - name: Build Packages
         run: yarn build
 
-      # NPM에 배포하기 위해 정보를 등록한다.
+      # NPM에 배포하기 위해 정보를 등록합니다.
       - name: Configure NPM Registry
         run: |
           cat << EOF > "$HOME/.npmrc"
             email=cutehammond772@gmail.com
             //registry.npmjs.org/:_authToken=$NPM_TOKEN 
-          EOF          
+          EOF
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      # 라이브러리를 배포한다.
-      - name: Create Release Pull Request or Publish to npm
+      # 1. Versioning 정보가 존재하면 Release PR을 생성합니다.
+      # 2. Release PR을 최종적으로 Merge하면, 라이브러리 배포 과정을 수행합니다.
+      - name: Create Release PR or Publish to NPM
         id: changesets
         uses: changesets/action@v1
         with:
-          # This expects you to have a script called release which does a build for your packages and calls changeset publish
+          title: "Release PR"
+          commit: "release: version packages"
           publish: yarn release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Husky를 비활성화하여 Pre-Commit 과정을 생략합니다.
           HUSKY: 0

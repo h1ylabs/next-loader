@@ -8,6 +8,7 @@ export default {
       RuleConfigSeverity.Error,
       "always",
       [
+        /* Conventional Commits */
         "feat",
         "fix",
         "refactor",
@@ -16,6 +17,8 @@ export default {
         "build",
         "perf",
         "test",
+
+        /* Changesets Release Commit */
         "release",
       ],
     ],
