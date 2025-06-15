@@ -28,7 +28,7 @@ type Merge<
 export type SingleTag<
   Params extends SingleTagParameters = SingleTagParameters,
   Result extends SingleTagResult = SingleTagResult,
-  Resolver extends SingleTypeResolver<Params, Result> = SingleTypeResolver<
+  Resolver extends SingleTagResolver<Params, Result> = SingleTagResolver<
     Params,
     Result
   >,
@@ -39,7 +39,7 @@ export type ResolvedSingleTag<Result extends string> = Tag<"single"> &
 export type UnresolvedSingleTag<
   Params extends SingleTagParameters = SingleTagParameters,
   Result extends SingleTagResult = SingleTagResult,
-  Resolver extends SingleTypeResolver<Params, Result> = SingleTypeResolver<
+  Resolver extends SingleTagResolver<Params, Result> = SingleTagResolver<
     Params,
     Result
   >,
@@ -50,7 +50,7 @@ export type UnresolvedSingleTag<
 
 export type SingleTagParameters = any[];
 export type SingleTagResult = string;
-export type SingleTypeResolver<
+export type SingleTagResolver<
   Params extends SingleTagParameters = SingleTagParameters,
   Result extends SingleTagResult = SingleTagResult,
 > = (...args: Params) => ResolvedSingleTag<Result>;
