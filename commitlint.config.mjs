@@ -7,7 +7,20 @@ export default {
     "type-enum": [
       RuleConfigSeverity.Error,
       "always",
-      ["feat", "fix", "refactor", "docs", "ci", "build", "perf", "test"],
+      [
+        /* Conventional Commits */
+        "feat",
+        "fix",
+        "refactor",
+        "docs",
+        "ci",
+        "build",
+        "perf",
+        "test",
+
+        /* Changesets Release Commit */
+        "release",
+      ],
     ],
   },
 };
