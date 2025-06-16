@@ -1,3 +1,4 @@
+import { ERR_TAG_INVALID_INPUT } from "../errors";
 import { tag } from "../tag";
 
 describe("tag()", () => {
@@ -88,8 +89,7 @@ describe("tag()", () => {
 
   it("should throw error for invalid input types", () => {
     const invalidInputs = [123, null, undefined, [], {}];
-    const expectedError =
-      "Unexpected error: resolver is valid but doesn't match any known type.";
+    const expectedError = ERR_TAG_INVALID_INPUT;
 
     invalidInputs.forEach((input) => {
       expect(() => {
