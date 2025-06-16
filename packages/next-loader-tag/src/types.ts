@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { Join } from "./type-utils/join";
 
 // Common Tag Types
 type UnresolvedTag = {
@@ -18,12 +19,6 @@ type ResolvedMultipleTag<T extends string[] = string[]> = {
 type TagType = "single" | "composite" | "hierarchy";
 type Tag<Type extends TagType> = { type: Type };
 
-type Merge<
-  T extends string,
-  U extends string,
-  Connection extends string,
-> = T extends "" ? U : `${T}${Connection}${U}`;
-
 // Single Tag
 export type SingleTag<
   Params extends SingleTagParameters = SingleTagParameters,
@@ -34,7 +29,7 @@ export type SingleTag<
   >,
 > = UnresolvedSingleTag<Params, Result, Resolver> | ResolvedSingleTag<Result>;
 
-export type ResolvedSingleTag<Result extends string> = Tag<"single"> &
+export type ResolvedSingleTag<Result extends SingleTagResult> = Tag<"single"> &
   ResolvedTag<Result>;
 export type UnresolvedSingleTag<
   Params extends SingleTagParameters = SingleTagParameters,
@@ -109,24 +104,24 @@ export type HierarchyTagResult<
     ? U extends SingleTag
       ? U extends ResolvedTag
         ? [
-            Merge<Prefix, U["result"], "/">,
-            ...HierarchyTagResult<V, Merge<Prefix, U["result"], "/">>,
+            Join<Prefix, U["result"], "/">,
+            ...HierarchyTagResult<V, Join<Prefix, U["result"], "/">>,
           ]
         : U extends UnresolvedTag
           ? [
-              Merge<Prefix, ReturnType<U["resolver"]>["result"], "/">,
+              Join<Prefix, ReturnType<U["resolver"]>["result"], "/">,
               ...HierarchyTagResult<
                 V,
-                Merge<Prefix, ReturnType<U["resolver"]>["result"], "/">
+                Join<Prefix, ReturnType<U["resolver"]>["result"], "/">
               >,
             ]
           : never
       : never
     : U extends SingleTag
       ? U extends ResolvedTag
-        ? [Merge<Prefix, U["result"], "/">]
+        ? [Join<Prefix, U["result"], "/">]
         : U extends UnresolvedTag
-          ? [Merge<Prefix, ReturnType<U["resolver"]>["result"], "/">]
+          ? [Join<Prefix, ReturnType<U["resolver"]>["result"], "/">]
           : never
       : never
   : [];
@@ -189,19 +184,19 @@ export type CompositeTagResult<
   ? V extends readonly SingleTag[]
     ? U extends SingleTag
       ? U extends ResolvedTag
-        ? CompositeTagResult<V, Merge<Prefix, U["result"], "_">>
+        ? CompositeTagResult<V, Join<Prefix, U["result"], "_">>
         : U extends UnresolvedTag
           ? CompositeTagResult<
               V,
-              Merge<Prefix, ReturnType<U["resolver"]>["result"], "_">
+              Join<Prefix, ReturnType<U["resolver"]>["result"], "_">
             >
           : never
       : never
     : U extends SingleTag
       ? U extends ResolvedTag
-        ? Merge<Prefix, U["result"], "_">
+        ? Join<Prefix, U["result"], "_">
         : U extends UnresolvedTag
-          ? Merge<Prefix, ReturnType<U["resolver"]>["result"], "_">
+          ? Join<Prefix, ReturnType<U["resolver"]>["result"], "_">
           : never
       : never
   : Prefix;

@@ -1,3 +1,4 @@
+import { ERR_EMPTY_TAG_ARRAY } from "./errors";
 import {
   HierarchyTagParameters,
   HierarchyTagResolver,
@@ -6,6 +7,17 @@ import {
   UnresolvedHierarchyTag,
 } from "./types";
 
+/**
+ * Creates a hierarchy tag by combining multiple individual tags into a path-like structure.
+ * When resolved, the results of the individual tags are joined by a `/` to form a single hierarchical path.
+ * This is particularly useful for constructing dynamic URLs or file paths where each segment
+ * is derived from a separate tag.
+ *
+ * @param {Tags} tags - The individual `tag` instances you want to arrange hierarchically. You must provide at least one tag.
+ * @returns {UnresolvedHierarchyTag<Tags, Params, Result, Resolver>} An unresolved hierarchy tag object. When its resolver
+ *   function is called with the necessary arguments, it will produce the complete hierarchical path.
+ * @throws {Error} If you call this function without providing any tags.
+ */
 export function hierarchy<
   Tags extends readonly SingleTag[],
   Params extends HierarchyTagParameters<Tags>,
@@ -13,7 +25,7 @@ export function hierarchy<
   Resolver extends HierarchyTagResolver<Tags, Params, Result>,
 >(...tags: Tags): UnresolvedHierarchyTag<Tags, Params, Result, Resolver> {
   if (tags.length === 0) {
-    throw new Error("Error: at least a single tag required.");
+    throw new Error(ERR_EMPTY_TAG_ARRAY);
   }
 
   function resolve(...params: Params) {

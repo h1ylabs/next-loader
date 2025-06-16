@@ -1,35 +1,33 @@
 # @h1y/next-loader-tag
 
-A TypeScript library that provides a type-safe tag system. Supports static tags, dynamic tags, composite tags, and hierarchical tags.
+타입 안전한 태그 시스템을 제공하는 TypeScript 라이브러리입니다. 정적 태그, 동적 태그, 복합 태그, 계층적 태그를 지원합니다.
 
-[한국어 문서 (Korean Documentation)](./docs/README-ko.md)
-
-## Installation
+## 설치
 
 ```bash
 npm install @h1y/next-loader-tag
 ```
 
-## Usage
+## 사용법
 
-### Basic Tags
+### 기본 태그
 
 ```typescript
 import { tag } from "@h1y/next-loader-tag";
 
-// Static tag
+// 정적 태그
 const userTag = tag("user");
 console.log(userTag.result); // "user"
 
-// Dynamic tag
+// 동적 태그
 const dynamicTag = tag((id: number) => tag(`user-${id}`));
 const resolved = dynamicTag.resolver(123);
 console.log(resolved.result); // "user-123"
 ```
 
-### Composite Tags
+### 복합 태그 (Composite)
 
-Combine multiple tags with `_`.
+여러 태그를 `_`로 조합합니다.
 
 ```typescript
 import { tag, compose } from "@h1y/next-loader-tag";
@@ -43,9 +41,9 @@ const resolved = compositeTag.resolver([123]);
 console.log(resolved.result); // "app_user-123_click"
 ```
 
-### Hierarchical Tags
+### 계층적 태그 (Hierarchy)
 
-Connect multiple tags with `/` to create hierarchical structures.
+여러 태그를 `/`로 연결하여 계층 구조를 만듭니다.
 
 ```typescript
 import { tag, hierarchy } from "@h1y/next-loader-tag";
@@ -60,6 +58,6 @@ console.log(resolved.result);
 // ["api", "api/v1", "api/v1/users"]
 ```
 
-## License
+## 라이센스
 
 MIT
