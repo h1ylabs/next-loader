@@ -1,4 +1,3 @@
-import { ERR_TAG_INVALID_INPUT } from "./errors";
 import {
   ResolvedSingleTag,
   SingleTag,
@@ -68,6 +67,8 @@ export function tag<
 
   throw new Error(ERR_TAG_INVALID_INPUT);
 }
+
+export const ERR_TAG_INVALID_INPUT = `"tag" 함수에 제공된 값이 유효한 태그 결과나 리졸버 함수와 일치하지 않습니다. 내부 오류입니다.`;
 
 function isSingleTagResult(value: unknown): value is SingleTagResult {
   return typeof value === "string";

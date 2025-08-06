@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { compose } from "../compose";
-import { ERR_EMPTY_TAG_ARRAY } from "../errors";
+import { compose, ERR_EMPTY_TAG_ARRAY } from "../compose";
 import { tag } from "../tag";
 
 describe("compose()", () => {

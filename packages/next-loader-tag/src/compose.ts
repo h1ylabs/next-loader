@@ -1,4 +1,3 @@
-import { ERR_EMPTY_TAG_ARRAY } from "./errors";
 import {
   CompositeTagParameters,
   CompositeTagResolver,
@@ -50,3 +49,5 @@ export function compose<
     resolver: resolve as Resolver,
   };
 }
+
+export const ERR_EMPTY_TAG_ARRAY = `태그 배열은 비어 있을 수 없습니다. 최소 하나의 태그가 필요합니다.`;

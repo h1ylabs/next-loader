@@ -1,5 +1,4 @@
-import { ERR_TAG_INVALID_INPUT } from "../errors";
-import { tag } from "../tag";
+import { ERR_TAG_INVALID_INPUT, tag } from "../tag";
 
 describe("tag()", () => {
   it("should create static tag with string value", () => {
@@ -89,13 +88,12 @@ describe("tag()", () => {
 
   it("should throw error for invalid input types", () => {
     const invalidInputs = [123, null, undefined, [], {}];
-    const expectedError = ERR_TAG_INVALID_INPUT;
 
     invalidInputs.forEach((input) => {
       expect(() => {
         // @ts-expect-error - 의도적으로 잘못된 타입 전달
         tag(input);
-      }).toThrow(expectedError);
+      }).toThrow(ERR_TAG_INVALID_INPUT);
     });
   });
 

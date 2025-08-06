@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ERR_EMPTY_TAG_ARRAY } from "../errors";
-import { hierarchy } from "../hierarchy";
+import { ERR_EMPTY_TAG_ARRAY, hierarchy } from "../hierarchy";
 import { tag } from "../tag";
 
 describe("hierarchy()", () => {
