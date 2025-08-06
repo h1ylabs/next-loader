@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { compose, ERR_EMPTY_TAG_ARRAY } from "../compose";
-import { tag } from "../tag";
+import { compose, ERR_EMPTY_TAG_ARRAY } from "@/compose";
+import { tag } from "@/tag";
 
 describe("compose()", () => {
   it("should create unresolved composite tag object", () => {

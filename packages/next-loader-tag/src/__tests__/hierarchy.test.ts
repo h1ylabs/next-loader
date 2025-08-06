@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ERR_EMPTY_TAG_ARRAY, hierarchy } from "../hierarchy";
-import { tag } from "../tag";
+import { ERR_EMPTY_TAG_ARRAY, hierarchy } from "@/hierarchy";
+import { tag } from "@/tag";
 
 describe("hierarchy()", () => {
   it("should create unresolved hierarchy tag object", () => {

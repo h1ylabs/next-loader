@@ -1,4 +1,4 @@
-import { ERR_TAG_INVALID_INPUT, tag } from "../tag";
+import { ERR_TAG_INVALID_INPUT, tag } from "@/tag";
 
 describe("tag()", () => {
   it("should create static tag with string value", () => {
