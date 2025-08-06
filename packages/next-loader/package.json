@@ -52,8 +52,7 @@
     "lint": "eslint --cache --max-warnings=0"
   },
   "devDependencies": {
-    "@h1y/next-loader-eslint-config": "*",
-    "@h1y/next-loader-typescript-config": "*",
+    "@h1y/loader-config": "*",
     "@types/node": "^22.15.17",
     "@types/react": ">=18.2.0",
     "@types/react-dom": "^18.2.0",

@@ -1,8 +1,14 @@
 {
-  "extends": "@h1y/next-loader-typescript-config/tsconfig.react.json",
+  "extends": "@h1y/loader-config/typescript/react.json",
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    },
   },
   "include": [
     "src"
@@ -10,5 +16,5 @@
   "exclude": [
     "node_modules",
     "dist"
-  ]
+  ],
 }

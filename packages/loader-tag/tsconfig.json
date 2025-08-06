@@ -1,5 +1,5 @@
 {
-  "extends": "@h1y/next-loader-typescript-config/tsconfig.base.json",
+  "extends": "@h1y/loader-config/typescript/base.json",
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
@@ -9,10 +9,6 @@
         "./src/*"
       ]
     },
-    "types": [
-      "jest",
-      "node"
-    ]
   },
   "include": [
     "src"
@@ -20,5 +16,5 @@
   "exclude": [
     "node_modules",
     "dist"
-  ]
+  ],
 }
