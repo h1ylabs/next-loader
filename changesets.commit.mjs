@@ -1,8 +1,6 @@
-import CommitFunction from "@commitlint/cli/commit";
-
-export default {
-  ...CommitFunction,
-  getVersionMessage,
+// from: https://github.com/changesets/changesets/blob/main/packages/cli/src/commit/index.ts
+const getAddMessage = async (changeset) => {
+  return `docs(changeset): ${changeset.summary}`;
 };
 
 const getVersionMessage = async (releasePlan) => {
@@ -16,4 +14,9 @@ const getVersionMessage = async (releasePlan) => {
     .join("\n");
 
   return `release: ${numPackagesReleased} version package(s)\n\nReleases:\n${releasesLines}`;
+};
+
+export default {
+  getAddMessage,
+  getVersionMessage,
 };

@@ -4,7 +4,7 @@
     "@changesets/changelog-github",
     { "repo": "h1ylabs/next-loader" }
   ],
-  "commit": ["../changesets.commit.mjs", { "skipCI": false }],
+  "commit": ["../changesets.commit.mjs"],
   "fixed": [],
   "linked": [],
   "access": "public",
