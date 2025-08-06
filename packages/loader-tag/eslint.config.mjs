@@ -1,3 +1,1 @@
-import config from "@h1y/next-loader-eslint-config/base";
-
-export default config;
+export { default } from "@h1y/loader-config/eslint/base.mjs";
