@@ -1,36 +1,38 @@
-# @h1y/next-loader-tag
+# @h1y/loader-tag
 
-타입 안전한 태그 시스템을 제공하는 TypeScript 라이브러리입니다. 정적 태그, 동적 태그, 복합 태그, 계층적 태그를 지원합니다.
+A TypeScript library that provides a type-safe tag system. Supports static tags, dynamic tags, composite tags, and hierarchical tags.
 
-## 설치
+[한국어 문서 (Korean Documentation)](./docs/README-ko.md)
+
+## Installation
 
 ```bash
-npm install @h1y/next-loader-tag
+npm install @h1y/loader-tag
 ```
 
-## 사용법
+## Usage
 
-### 기본 태그
+### Basic Tags
 
 ```typescript
-import { tag } from "@h1y/next-loader-tag";
+import { tag } from "@h1y/loader-tag";
 
-// 정적 태그
+// Static tag
 const userTag = tag("user");
 console.log(userTag.result); // "user"
 
-// 동적 태그
+// Dynamic tag
 const dynamicTag = tag((id: number) => tag(`user-${id}`));
 const resolved = dynamicTag.resolver(123);
 console.log(resolved.result); // "user-123"
 ```
 
-### 복합 태그 (Composite)
+### Composite Tags
 
-여러 태그를 `_`로 조합합니다.
+Combine multiple tags with `_`.
 
 ```typescript
-import { tag, compose } from "@h1y/next-loader-tag";
+import { tag, compose } from "@h1y/loader-tag";
 
 const appTag = tag("app");
 const userTag = tag((id: number) => tag(`user-${id}`));
@@ -41,12 +43,12 @@ const resolved = compositeTag.resolver([123]);
 console.log(resolved.result); // "app_user-123_click"
 ```
 
-### 계층적 태그 (Hierarchy)
+### Hierarchical Tags
 
-여러 태그를 `/`로 연결하여 계층 구조를 만듭니다.
+Connect multiple tags with `/` to create hierarchical structures.
 
 ```typescript
-import { tag, hierarchy } from "@h1y/next-loader-tag";
+import { tag, hierarchy } from "@h1y/loader-tag";
 
 const rootTag = tag("api");
 const versionTag = tag("v1");
@@ -58,6 +60,6 @@ console.log(resolved.result);
 // ["api", "api/v1", "api/v1/users"]
 ```
 
-## 라이센스
+## License
 
 MIT

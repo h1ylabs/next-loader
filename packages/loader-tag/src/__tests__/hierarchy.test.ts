@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ERR_EMPTY_TAG_ARRAY } from "../errors";
-import { hierarchy } from "../hierarchy";
-import { tag } from "../tag";
+import { hierarchy, MSG_ERR_HIERARCHY_EMPTY_TAG_ARRAY } from "@/hierarchy";
+import { tag } from "@/tag";
 
 describe("hierarchy()", () => {
   it("should create unresolved hierarchy tag object", () => {
@@ -93,7 +92,7 @@ describe("hierarchy()", () => {
   it("should throw error with empty tag array", () => {
     expect(() => {
       (hierarchy as any)();
-    }).toThrow(ERR_EMPTY_TAG_ARRAY);
+    }).toThrow(MSG_ERR_HIERARCHY_EMPTY_TAG_ARRAY);
   });
 
   it("should propagate errors from dynamic tag resolvers", () => {

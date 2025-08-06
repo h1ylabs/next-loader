@@ -1,4 +1,4 @@
-# @h1y/next-loader-tag
+# @h1y/loader-tag
 
 ## 1.0.1
 

@@ -1,4 +1,3 @@
-import { ERR_EMPTY_TAG_ARRAY } from "./errors";
 import {
   CompositeTagParameters,
   CompositeTagResolver,
@@ -24,7 +23,7 @@ export function compose<
   Resolver extends CompositeTagResolver<Tags, Params, Result>,
 >(...tags: Tags): UnresolvedCompositeTag<Tags, Params, Result, Resolver> {
   if (tags.length === 0) {
-    throw new Error(ERR_EMPTY_TAG_ARRAY);
+    throw new Error(MSG_ERR_COMPOSE_EMPTY_TAG_ARRAY);
   }
 
   function resolve(...params: Params) {
@@ -50,3 +49,6 @@ export function compose<
     resolver: resolve as Resolver,
   };
 }
+
+export const MSG_ERR_COMPOSE_EMPTY_TAG_ARRAY =
+  "The tag array cannot be empty. At least one tag is required.";

@@ -1,4 +1,3 @@
-import { ERR_EMPTY_TAG_ARRAY } from "./errors";
 import {
   HierarchyTagParameters,
   HierarchyTagResolver,
@@ -25,7 +24,7 @@ export function hierarchy<
   Resolver extends HierarchyTagResolver<Tags, Params, Result>,
 >(...tags: Tags): UnresolvedHierarchyTag<Tags, Params, Result, Resolver> {
   if (tags.length === 0) {
-    throw new Error(ERR_EMPTY_TAG_ARRAY);
+    throw new Error(MSG_ERR_HIERARCHY_EMPTY_TAG_ARRAY);
   }
 
   function resolve(...params: Params) {
@@ -56,3 +55,6 @@ export function hierarchy<
     resolver: resolve as Resolver,
   };
 }
+
+export const MSG_ERR_HIERARCHY_EMPTY_TAG_ARRAY =
+  "The tag array cannot be empty. At least one tag is required.";

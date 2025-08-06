@@ -1,4 +1,3 @@
-import { ERR_TAG_INVALID_INPUT } from "./errors";
 import {
   ResolvedSingleTag,
   SingleTag,
@@ -66,8 +65,11 @@ export function tag<
     };
   }
 
-  throw new Error(ERR_TAG_INVALID_INPUT);
+  throw new Error(MSG_ERR_TAG_INVALID_INPUT);
 }
+
+export const MSG_ERR_TAG_INVALID_INPUT =
+  'The value provided to the "tag" function is neither a valid tag result nor a resolver function. This is an internal error.';
 
 function isSingleTagResult(value: unknown): value is SingleTagResult {
   return typeof value === "string";

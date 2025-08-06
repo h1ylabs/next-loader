@@ -1,7 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Join } from "./type-utils/join";
 
-// Common Tag Types
+/////////  Utility Types  /////////
+type Join<
+  Left extends string,
+  Right extends string,
+  Separator extends string,
+> = Left extends ""
+  ? Right
+  : Right extends ""
+    ? Left
+    : `${Left}${Separator}${Right}`;
+
+/////////  Common Tag Types  /////////
 type UnresolvedTag = {
   readonly resolved: false;
 };
@@ -19,7 +29,7 @@ type ResolvedMultipleTag<T extends string[] = string[]> = {
 type TagType = "single" | "composite" | "hierarchy";
 type Tag<Type extends TagType> = { type: Type };
 
-// Single Tag
+/////////  Single Tag Types  /////////
 export type SingleTag<
   Params extends SingleTagParameters = SingleTagParameters,
   Result extends SingleTagResult = SingleTagResult,
@@ -50,7 +60,7 @@ export type SingleTagResolver<
   Result extends SingleTagResult = SingleTagResult,
 > = (...args: Params) => ResolvedSingleTag<Result>;
 
-// Hierarchy Tag Types
+/////////  Hierarchy Tag Types  /////////
 export type HierarchyTag<
   Tags extends readonly SingleTag[] = readonly SingleTag[],
   Params extends HierarchyTagParameters<Tags> = HierarchyTagParameters<Tags>,
@@ -132,7 +142,7 @@ export type HierarchyTagResolver<
   Result extends HierarchyTagResult<Tags>,
 > = (...args: Params) => ResolvedHierarchyTag<Result>;
 
-// Composite Tag Types
+/////////  Composite Tag Types  /////////
 export type CompositeTag<
   Tags extends readonly SingleTag[] = readonly SingleTag[],
   Params extends CompositeTagParameters<Tags> = CompositeTagParameters<Tags>,

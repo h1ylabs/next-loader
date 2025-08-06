@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { compose } from "../compose";
-import { ERR_EMPTY_TAG_ARRAY } from "../errors";
-import { tag } from "../tag";
+import { compose, MSG_ERR_COMPOSE_EMPTY_TAG_ARRAY } from "@/compose";
+import { tag } from "@/tag";
 
 describe("compose()", () => {
   it("should create unresolved composite tag object", () => {
@@ -77,7 +76,7 @@ describe("compose()", () => {
   it("should throw error with empty tag array", () => {
     expect(() => {
       (compose as any)();
-    }).toThrow(ERR_EMPTY_TAG_ARRAY);
+    }).toThrow(MSG_ERR_COMPOSE_EMPTY_TAG_ARRAY);
   });
 
   it("should propagate errors from dynamic tag resolvers", () => {
