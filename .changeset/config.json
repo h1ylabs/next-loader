@@ -1,7 +1,10 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "h1ylabs/next-loader" }],
-  "commit": true,
+  "changelog": [
+    "@changesets/changelog-github",
+    { "repo": "h1ylabs/next-loader" }
+  ],
+  "commit": ["../changesets.commit.mjs", { "skipCI": false }],
   "fixed": [],
   "linked": [],
   "access": "public",
