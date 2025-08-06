@@ -1,4 +1,4 @@
-# @h1y/next-loader-tag
+# @h1y/loader-tag
 
 A TypeScript library that provides a type-safe tag system. Supports static tags, dynamic tags, composite tags, and hierarchical tags.
 
@@ -7,7 +7,7 @@ A TypeScript library that provides a type-safe tag system. Supports static tags,
 ## Installation
 
 ```bash
-npm install @h1y/next-loader-tag
+npm install @h1y/loader-tag
 ```
 
 ## Usage
@@ -15,7 +15,7 @@ npm install @h1y/next-loader-tag
 ### Basic Tags
 
 ```typescript
-import { tag } from "@h1y/next-loader-tag";
+import { tag } from "@h1y/loader-tag";
 
 // Static tag
 const userTag = tag("user");
@@ -32,7 +32,7 @@ console.log(resolved.result); // "user-123"
 Combine multiple tags with `_`.
 
 ```typescript
-import { tag, compose } from "@h1y/next-loader-tag";
+import { tag, compose } from "@h1y/loader-tag";
 
 const appTag = tag("app");
 const userTag = tag((id: number) => tag(`user-${id}`));
@@ -48,7 +48,7 @@ console.log(resolved.result); // "app_user-123_click"
 Connect multiple tags with `/` to create hierarchical structures.
 
 ```typescript
-import { tag, hierarchy } from "@h1y/next-loader-tag";
+import { tag, hierarchy } from "@h1y/loader-tag";
 
 const rootTag = tag("api");
 const versionTag = tag("v1");
