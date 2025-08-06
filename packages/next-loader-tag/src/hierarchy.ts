@@ -24,7 +24,7 @@ export function hierarchy<
   Resolver extends HierarchyTagResolver<Tags, Params, Result>,
 >(...tags: Tags): UnresolvedHierarchyTag<Tags, Params, Result, Resolver> {
   if (tags.length === 0) {
-    throw new Error(ERR_EMPTY_TAG_ARRAY);
+    throw new Error(MSG_ERR_HIERARCHY_EMPTY_TAG_ARRAY);
   }
 
   function resolve(...params: Params) {
@@ -56,4 +56,5 @@ export function hierarchy<
   };
 }
 
-export const ERR_EMPTY_TAG_ARRAY = `태그 배열은 비어 있을 수 없습니다. 최소 하나의 태그가 필요합니다.`;
+export const MSG_ERR_HIERARCHY_EMPTY_TAG_ARRAY =
+  "The tag array cannot be empty. At least one tag is required.";

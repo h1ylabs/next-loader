@@ -1,4 +1,4 @@
-import { ERR_TAG_INVALID_INPUT, tag } from "@/tag";
+import { MSG_ERR_TAG_INVALID_INPUT, tag } from "@/tag";
 
 describe("tag()", () => {
   it("should create static tag with string value", () => {
@@ -93,7 +93,7 @@ describe("tag()", () => {
       expect(() => {
         // @ts-expect-error - 의도적으로 잘못된 타입 전달
         tag(input);
-      }).toThrow(ERR_TAG_INVALID_INPUT);
+      }).toThrow(MSG_ERR_TAG_INVALID_INPUT);
     });
   });
 
