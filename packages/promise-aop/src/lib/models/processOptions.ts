@@ -1,20 +1,23 @@
 import type { HaltError } from "@/lib/errors/HaltError";
-import { type MergeableOptions, mergeOptions } from "@/lib/utils/mergeOptions";
+import {
+  type NormalizableOptions,
+  normalizeOptions,
+} from "@/lib/utils/normalizeOptions";
 
 export type RequiredProcessOptions<Result> = {
   readonly onResolveError: (error: HaltError) => Promise<Result>;
   readonly onResolveContinuedError: (error: unknown[]) => void;
 };
 
-export type ProcessOptions<Result> = MergeableOptions<
+export type ProcessOptions<Result> = NormalizableOptions<
   RequiredProcessOptions<Result>
 >;
 
-export function applyProcessOptions<Result>(
+export function normalizeProcessOptions<Result>(
   options?: ProcessOptions<Result>,
   defaultOptions: RequiredProcessOptions<Result> = defaultProcessOptions(),
-): ProcessOptions<Result> {
-  return mergeOptions(defaultOptions, options);
+): RequiredProcessOptions<Result> {
+  return normalizeOptions(defaultOptions, options);
 }
 
 export function defaultProcessOptions<Result>() {

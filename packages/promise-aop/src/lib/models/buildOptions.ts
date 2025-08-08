@@ -1,4 +1,7 @@
-import { MergeableOptions, mergeOptions } from "../utils/mergeOptions";
+import {
+  NormalizableOptions,
+  normalizeOptions,
+} from "../utils/normalizeOptions";
 import type { Advice } from "./advice";
 
 export type RequiredBuildOptions = {
@@ -24,16 +27,13 @@ export type AggregationUnit = (typeof AggregationUnit)[number];
 export const ErrorAfter = ["halt", "continue"] as const;
 export type ErrorAfter = (typeof ErrorAfter)[number];
 
-export const BuildStrategy = ["eager", "lazy"] as const;
-export type BuildStrategy = (typeof BuildStrategy)[number];
+export type BuildOptions = NormalizableOptions<RequiredBuildOptions>;
 
-export type BuildOptions = MergeableOptions<RequiredBuildOptions>;
-
-export function applyBuildOptions(
+export function normalizeBuildOptions(
   options?: BuildOptions,
   defaultOptions: RequiredBuildOptions = defaultBuildOptions(),
-): BuildOptions {
-  return mergeOptions(defaultOptions, options);
+): RequiredBuildOptions {
+  return normalizeOptions(defaultOptions, options);
 }
 
 export function defaultBuildOptions() {
