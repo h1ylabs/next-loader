@@ -1,23 +1,14 @@
-/**
- * recursively makes all properties of an object type optional.
- */
-export type MergeableOptions<T> = T extends object
+export type NormalizableOptions<T> = T extends object
   ? T extends (...args: never) => unknown
     ? T
     : T extends readonly unknown[]
       ? T
       : {
-          readonly [K in keyof T]?: MergeableOptions<T[K]>;
+          readonly [K in keyof T]?: NormalizableOptions<T[K]>;
         }
   : T;
 
-/**
- * applies configuration overrides to a source object.
- * @param source - The base configuration object
- * @param target - The configuration overrides to apply
- * @returns The merged configuration object
- */
-export function mergeOptions<T, U extends MergeableOptions<T>>(
+export function normalizeOptions<T, U extends NormalizableOptions<T>>(
   source: T,
   target: U | null | undefined,
 ): T {
@@ -25,7 +16,7 @@ export function mergeOptions<T, U extends MergeableOptions<T>>(
     return source;
   }
   if (isDifferentType(source, target)) {
-    throw new Error(MSG_ERR_MERGE_OPTIONS_TYPE_MISMATCH);
+    throw new Error(MSG_ERR_NORMALIZE_OPTIONS_TYPE_MISMATCH);
   }
   if (!isObject(source) || !isObject(target)) {
     return target as T;
@@ -37,7 +28,7 @@ export function mergeOptions<T, U extends MergeableOptions<T>>(
   // validate that target only contains properties that exist in source
   for (const key in target) {
     if (!Object.hasOwn(source as object, key)) {
-      throw new Error(MSG_ERR_MERGE_OPTIONS_UNKNOWN_PROPERTY(key));
+      throw new Error(MSG_ERR_NORMALIZE_OPTIONS_UNKNOWN_PROPERTY(key));
     }
   }
 
@@ -51,16 +42,16 @@ export function mergeOptions<T, U extends MergeableOptions<T>>(
       return;
     }
 
-    Object.assign(result, { [key]: mergeOptions(prevValue, value) });
+    Object.assign(result, { [key]: normalizeOptions(prevValue, value) });
   });
 
   return result;
 }
 
-export const MSG_ERR_MERGE_OPTIONS_TYPE_MISMATCH =
-  "mergeable options type mismatch: source and target must have the same type";
-export const MSG_ERR_MERGE_OPTIONS_UNKNOWN_PROPERTY = (key: string) =>
-  `unknown mergeable options property: '${key}' not found in source object`;
+export const MSG_ERR_NORMALIZE_OPTIONS_TYPE_MISMATCH =
+  "normalizable options type mismatch: source and target must have the same type";
+export const MSG_ERR_NORMALIZE_OPTIONS_UNKNOWN_PROPERTY = (key: string) =>
+  `unknown normalizable options property: '${key}' not found in source object`;
 
 // type guards
 function isDifferentType<P, Q>(a: P, b: Q) {

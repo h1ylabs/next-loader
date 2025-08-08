@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
-  mergeOptions,
-  MSG_ERR_MERGE_OPTIONS_TYPE_MISMATCH,
-  MSG_ERR_MERGE_OPTIONS_UNKNOWN_PROPERTY,
-} from "@/lib/utils/mergeOptions";
+  MSG_ERR_NORMALIZE_OPTIONS_TYPE_MISMATCH,
+  MSG_ERR_NORMALIZE_OPTIONS_UNKNOWN_PROPERTY,
+  normalizeOptions,
+} from "@/lib/utils/normalizeOptions";
 
-describe("mergeOptions", () => {
+describe("normalizeOptions", () => {
   // test type definitions
   interface ServerConfig {
     port: number;
@@ -58,7 +58,7 @@ describe("mergeOptions", () => {
         ssl: false,
       };
 
-      const result = mergeOptions(baseConfig, null);
+      const result = normalizeOptions(baseConfig, null);
 
       expect(result).toBe(baseConfig);
     });
@@ -70,7 +70,7 @@ describe("mergeOptions", () => {
         ssl: false,
       };
 
-      const result = mergeOptions(baseConfig, undefined);
+      const result = normalizeOptions(baseConfig, undefined);
 
       expect(result).toBe(baseConfig);
     });
@@ -81,8 +81,8 @@ describe("mergeOptions", () => {
       const stringConfig = "localhost";
       const numberOverride: any = 3000;
 
-      expect(() => mergeOptions(stringConfig, numberOverride)).toThrow(
-        MSG_ERR_MERGE_OPTIONS_TYPE_MISMATCH,
+      expect(() => normalizeOptions(stringConfig, numberOverride)).toThrow(
+        MSG_ERR_NORMALIZE_OPTIONS_TYPE_MISMATCH,
       );
     });
 
@@ -90,8 +90,8 @@ describe("mergeOptions", () => {
       const objectConfig = { port: 3000 };
       const arrayOverride: any = [3000, 4000];
 
-      expect(() => mergeOptions(objectConfig, arrayOverride)).toThrow(
-        MSG_ERR_MERGE_OPTIONS_UNKNOWN_PROPERTY("0"),
+      expect(() => normalizeOptions(objectConfig, arrayOverride)).toThrow(
+        MSG_ERR_NORMALIZE_OPTIONS_UNKNOWN_PROPERTY("0"),
       );
     });
 
@@ -99,8 +99,8 @@ describe("mergeOptions", () => {
       const booleanConfig = true;
       const stringOverride: any = "enabled";
 
-      expect(() => mergeOptions(booleanConfig, stringOverride)).toThrow(
-        MSG_ERR_MERGE_OPTIONS_TYPE_MISMATCH,
+      expect(() => normalizeOptions(booleanConfig, stringOverride)).toThrow(
+        MSG_ERR_NORMALIZE_OPTIONS_TYPE_MISMATCH,
       );
     });
   });
@@ -116,7 +116,7 @@ describe("mergeOptions", () => {
 
       const nameUpdate = { displayName: "Jane Smith" };
 
-      const result = mergeOptions(userSettings, nameUpdate);
+      const result = normalizeOptions(userSettings, nameUpdate);
 
       expect(result.displayName).toBe("Jane Smith");
       expect(result.email).toBe("john@example.com");
@@ -132,7 +132,7 @@ describe("mergeOptions", () => {
 
       const ageUpdate = { age: 25 };
 
-      const result = mergeOptions(userSettings, ageUpdate);
+      const result = normalizeOptions(userSettings, ageUpdate);
 
       expect(result.age).toBe(25);
       expect(result.displayName).toBe("John Doe");
@@ -148,7 +148,7 @@ describe("mergeOptions", () => {
 
       const statusUpdate = { isActive: false };
 
-      const result = mergeOptions(userSettings, statusUpdate);
+      const result = normalizeOptions(userSettings, statusUpdate);
 
       expect(result.isActive).toBe(false);
       expect(result.displayName).toBe("John Doe");
@@ -164,7 +164,7 @@ describe("mergeOptions", () => {
 
       const itemsOverride = { items: ["dashboard", "profile"] };
 
-      const result = mergeOptions(menuConfig, itemsOverride);
+      const result = normalizeOptions(menuConfig, itemsOverride);
 
       expect(result.items).toEqual(["dashboard", "profile"]);
       expect(result.maxItems).toBe(5);
@@ -182,7 +182,7 @@ describe("mergeOptions", () => {
         onSuccess: () => "updated success",
       };
 
-      const result = mergeOptions(handlerConfig, callbackOverride);
+      const result = normalizeOptions(handlerConfig, callbackOverride);
 
       expect(result.onSuccess()).toBe("updated success");
       expect(result.onError()).toBe("original error");
@@ -202,7 +202,7 @@ describe("mergeOptions", () => {
         ssl: true,
       };
 
-      const result = mergeOptions(serverConfig, overrides);
+      const result = normalizeOptions(serverConfig, overrides);
 
       expect(result).toEqual({
         port: 8080,
@@ -234,7 +234,7 @@ describe("mergeOptions", () => {
         },
       };
 
-      const result = mergeOptions(databaseConfig, overrides);
+      const result = normalizeOptions(databaseConfig, overrides);
 
       expect(result).toEqual({
         connectionSettings: {
@@ -287,7 +287,7 @@ describe("mergeOptions", () => {
         },
       };
 
-      const result = mergeOptions(appConfig, deepOverrides);
+      const result = normalizeOptions(appConfig, deepOverrides);
 
       expect(result.ui.theme.colors.primary).toBe("#red");
       expect(result.ui.theme.colors.secondary).toBe("#gray");
@@ -315,7 +315,7 @@ describe("mergeOptions", () => {
         },
       };
 
-      const result = mergeOptions(profileSettings, partialUpdate);
+      const result = normalizeOptions(profileSettings, partialUpdate);
 
       expect(result.displayName).toBe("Jane Smith");
       expect(result.email).toBe("john@example.com");
@@ -339,8 +339,8 @@ describe("mergeOptions", () => {
       };
 
       expect(() =>
-        mergeOptions(validConfig, invalidConfigWithExtraProps),
-      ).toThrow(MSG_ERR_MERGE_OPTIONS_UNKNOWN_PROPERTY("unknownProperty"));
+        normalizeOptions(validConfig, invalidConfigWithExtraProps),
+      ).toThrow(MSG_ERR_NORMALIZE_OPTIONS_UNKNOWN_PROPERTY("unknownProperty"));
     });
 
     it("should allow valid property updates", () => {
@@ -355,7 +355,7 @@ describe("mergeOptions", () => {
         ssl: true,
       };
 
-      expect(() => mergeOptions(validConfig, validOverrides)).not.toThrow();
+      expect(() => normalizeOptions(validConfig, validOverrides)).not.toThrow();
     });
   });
 
@@ -364,8 +364,8 @@ describe("mergeOptions", () => {
       const config = { validProp: "value" };
       const invalidOverride: any = { invalidProp: "test" };
 
-      expect(() => mergeOptions(config, invalidOverride)).toThrow(
-        MSG_ERR_MERGE_OPTIONS_UNKNOWN_PROPERTY("invalidProp"),
+      expect(() => normalizeOptions(config, invalidOverride)).toThrow(
+        MSG_ERR_NORMALIZE_OPTIONS_UNKNOWN_PROPERTY("invalidProp"),
       );
     });
 
@@ -373,8 +373,8 @@ describe("mergeOptions", () => {
       const stringValue = "test";
       const numberValue: any = 123;
 
-      expect(() => mergeOptions(stringValue, numberValue)).toThrow(
-        MSG_ERR_MERGE_OPTIONS_TYPE_MISMATCH,
+      expect(() => normalizeOptions(stringValue, numberValue)).toThrow(
+        MSG_ERR_NORMALIZE_OPTIONS_TYPE_MISMATCH,
       );
     });
   });
@@ -384,7 +384,7 @@ describe("mergeOptions", () => {
       const emptySource = {};
       const emptyTarget = {};
 
-      const result = mergeOptions(emptySource, emptyTarget);
+      const result = normalizeOptions(emptySource, emptyTarget);
 
       expect(result).toEqual({});
     });
@@ -393,7 +393,7 @@ describe("mergeOptions", () => {
       const sourceConfig = { port: 3000, host: "localhost" };
       const emptyTarget = {};
 
-      const result = mergeOptions(sourceConfig, emptyTarget);
+      const result = normalizeOptions(sourceConfig, emptyTarget);
 
       expect(result).toEqual({ port: 3000, host: "localhost" });
     });
@@ -420,7 +420,7 @@ describe("mergeOptions", () => {
         endpoints: ["api/v2/users"],
       };
 
-      const result = mergeOptions(complexConfig, mixedOverrides);
+      const result = normalizeOptions(complexConfig, mixedOverrides);
 
       expect(result.timeout).toBe(10000);
       expect(result.retries.max).toBe(5);
@@ -450,7 +450,7 @@ describe("mergeOptions", () => {
         },
       };
 
-      const result = mergeOptions(configWithNulls, overridesWithNulls);
+      const result = normalizeOptions(configWithNulls, overridesWithNulls);
 
       expect(result.requiredFeature).toBe("enabled");
       expect(result.optionalFeature).toBe("now-enabled");
@@ -469,7 +469,7 @@ describe("mergeOptions", () => {
         feature: null as any,
       };
 
-      const result = mergeOptions(config, nullUpdate);
+      const result = normalizeOptions(config, nullUpdate);
 
       expect(result.feature).toBeNull();
       expect(result.setting).toBe(true);
