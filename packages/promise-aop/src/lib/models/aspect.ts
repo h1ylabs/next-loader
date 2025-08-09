@@ -12,7 +12,7 @@ export type Aspect<Result, SharedContext> = { readonly name: string } & {
   >;
 };
 
-export type AspectComposition<Result, SharedContext> = {
+export type AspectOrganization<Result, SharedContext> = {
   readonly [AdviceType in Advice]: AdviceFunctionWithContext<
     Result,
     SharedContext,
