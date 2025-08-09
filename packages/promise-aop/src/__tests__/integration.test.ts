@@ -192,15 +192,8 @@ describe("integration", () => {
         aspects: [ThrowingInAfterThrowing],
         buildOptions: {
           advice: {
-            before: defaultBuildOptions().advice.before,
-            around: defaultBuildOptions().advice.around,
-            after: defaultBuildOptions().advice.after,
-            afterReturning: defaultBuildOptions().advice.afterReturning,
-            // Override: continue on afterThrowing errors
             afterThrowing: {
-              ...defaultBuildOptions().advice.afterThrowing,
               error: {
-                ...defaultBuildOptions().advice.afterThrowing.error,
                 runtime: { afterThrow: "continue" },
               },
             },
@@ -221,7 +214,7 @@ describe("integration", () => {
       expect(result).toBeNull();
       // after should still run even if afterThrowing threw (continue policy)
       expect(calls).toContain("after");
-      // Should report exactly one AdviceError (from afterThrowing)
+      // should report exactly one AdviceError (from afterThrowing)
       expect(onResolveContinuedError).toHaveBeenCalledTimes(1);
       const reported = onResolveContinuedError.mock.calls[0]?.[0];
       expect(Array.isArray(reported)).toBe(true);

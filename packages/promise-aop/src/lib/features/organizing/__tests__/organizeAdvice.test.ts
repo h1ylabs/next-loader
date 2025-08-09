@@ -12,7 +12,7 @@ import type {
 } from "@/lib/models/advice";
 import { type ExecutionStrategy } from "@/lib/models/buildOptions";
 
-// Test constants
+// test constants
 const SECTIONS = {
   DB: "db" as const,
   CACHE: "cache" as const,
@@ -32,7 +32,7 @@ type TestContext = {
 
 type TestResult = { id: string };
 
-// Helper to create advice metadata with test stub
+// helper to create advice metadata with test stub
 function createAdviceMetadata<T extends Advice>(
   name: string,
   options?: {
@@ -57,7 +57,7 @@ function createAdviceMetadata<T extends Advice>(
   ] as const;
 }
 
-// Helper to create test props
+// helper to create test props
 function createProps<T extends Advice>(
   execution: ExecutionStrategy,
   adviceGroup: readonly (readonly [
@@ -114,15 +114,15 @@ describe("organizeAdvice", () => {
       const result = await organizeAdvice(props);
 
       expect(result).toHaveLength(3);
-      // Level 0: D, C (order within level is not guaranteed)
+      // level 0: D, C (order within level is not guaranteed)
       expect(result[0]).toHaveLength(2);
       expect(
         result[0]!.map((a) => a === adviceD[1] || a === adviceC[1]),
       ).toEqual([true, true]);
-      // Level 1: B
+      // level 1: B
       expect(result[1]).toHaveLength(1);
       expect(result[1]![0]).toBe(adviceB[1]);
-      // Level 2: A
+      // level 2: A
       expect(result[2]).toHaveLength(1);
       expect(result[2]![0]).toBe(adviceA[1]);
     });
@@ -420,10 +420,10 @@ describe("organizeAdvice", () => {
     });
 
     it("should detect mixed circular and non-circular dependencies", async () => {
-      // Circular: A → B → A
+      // circular: A → B → A
       const adviceA = createAdviceMetadata("A", { dependsOn: ["B"] });
       const adviceB = createAdviceMetadata("B", { dependsOn: ["A"] });
-      // Non-circular: E → F
+      // non-circular: E → F (no cycle)
       const adviceE = createAdviceMetadata("E", { dependsOn: ["F"] });
       const adviceF = createAdviceMetadata("F");
 

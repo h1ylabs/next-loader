@@ -1,4 +1,4 @@
-// Comprehensive tests for BuildOptions combinations across phases
+// comprehensive tests for BuildOptions combinations across phases
 import { createAspect } from "@/createAspect";
 import { createProcess } from "@/createProcess";
 import type { Target } from "@/lib/models/target";
