@@ -92,6 +92,8 @@ describe("AsyncContext", () => {
       });
 
       expect(() => contextFn()).toThrow(MSG_ERR_ASYNC_CONTEXT_NOT_EXIST);
+      // Also validate instance-level global accessor throws outside execution
+      expect(() => asyncCtx.context()).toThrow(MSG_ERR_ASYNC_CONTEXT_NOT_EXIST);
     });
   });
 
@@ -209,6 +211,76 @@ describe("AsyncContext", () => {
       expect(result1.data).toBe(10);
       expect(result2.id).toBe("instance-2");
       expect(result2.data).toBe(20);
+    });
+  });
+
+  describe("Global access via instance.context()", () => {
+    it("should allow accessing context via instance inside execution", async () => {
+      const contextGenerator = (): TestContext => ({ id: "global-1", data: 7 });
+      const ac = AsyncContext.create(contextGenerator);
+
+      await AsyncContext.execute(ac, async (getCtx) => {
+        const fromParam = getCtx();
+        const fromInstance = ac.context();
+
+        expect(fromInstance).toBe(fromParam);
+        expect(fromInstance.id).toBe("global-1");
+        expect(fromInstance.data).toBe(7);
+      });
+    });
+
+    it("should isolate contexts across parallel executions using instance accessor", async () => {
+      const ac = AsyncContext.create<TestContext>();
+
+      const [a, b] = await Promise.all([
+        AsyncContext.executeWith(
+          ac,
+          () => ({ id: "g-parallel-1", data: 1 }),
+          async () => ac.context(),
+        ),
+        AsyncContext.executeWith(
+          ac,
+          () => ({ id: "g-parallel-2", data: 2 }),
+          async () => ac.context(),
+        ),
+      ]);
+
+      expect(a.id).toBe("g-parallel-1");
+      expect(a.data).toBe(1);
+      expect(b.id).toBe("g-parallel-2");
+      expect(b.data).toBe(2);
+    });
+
+    it("should work with executeWith and instance accessor", async () => {
+      const ac = AsyncContext.create<TestContext>();
+
+      const result = await AsyncContext.executeWith(
+        ac,
+        () => ({ id: "with-instance", data: 123 }),
+        async () => {
+          const ctx = ac.context();
+          return `${ctx.id}:${ctx.data}`;
+        },
+      );
+
+      expect(result).toBe("with-instance:123");
+    });
+
+    it("should support external helper accessing instance context within execution", async () => {
+      const ac = AsyncContext.create(
+        (): TestContext => ({ id: "ext", data: 9 }),
+      );
+
+      // Simulates an external helper that doesn't receive context param
+      const externalHelper = () => {
+        const { id, data } = ac.context();
+        return `${id}:${data}`;
+      };
+
+      const output = await AsyncContext.execute(ac, async () =>
+        externalHelper(),
+      );
+      expect(output).toBe("ext:9");
     });
   });
 });

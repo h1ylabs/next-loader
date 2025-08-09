@@ -6,7 +6,7 @@ export class AsyncContext<SharedContext> {
     private readonly contextStore = new AsyncLocalStorage<SharedContext>(),
   ) {}
 
-  private context = () => {
+  public context = () => {
     const store = this.contextStore.getStore();
 
     if (!store) {
