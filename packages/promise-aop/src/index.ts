@@ -4,6 +4,17 @@ export { AsyncContext } from "@/lib/utils/AsyncContext";
 // AOP Functions
 export { createAspect } from "./createAspect";
 export { createProcess } from "./createProcess";
+export { runProcess } from "./runProcess";
+
+// Options
+export {
+  defaultBuildOptions,
+  normalizeBuildOptions,
+} from "@/lib/models/buildOptions";
+export {
+  defaultProcessOptions,
+  normalizeProcessOptions,
+} from "@/lib/models/processOptions";
 
 // Types
 export type {

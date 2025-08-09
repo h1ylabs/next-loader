@@ -5,6 +5,8 @@ import { organizeAspect } from "@/lib/features/organizing";
 import type { Aspect } from "@/lib/models/aspect";
 import { defaultBuildOptions } from "@/lib/models/buildOptions";
 import type { Target } from "@/lib/models/target";
+import { AsyncContext } from "@/lib/utils/AsyncContext";
+import { runProcess } from "@/runProcess";
 
 import { createLoggingContext, type StandardTestContext } from "./test-utils";
 
@@ -330,6 +332,45 @@ describe("integration", () => {
           buildOptions: defaultBuildOptions(),
         }),
       ).rejects.toThrow(/Section conflict:/);
+    });
+  });
+
+  describe("global AsyncContext access (external helper)", () => {
+    it("should allow external helper to use instance.context() without param wiring", async () => {
+      const calls: string[] = [];
+
+      const ExternalAccessAspect: Aspect<string, TestContext> = createAspect<
+        string,
+        TestContext
+      >((a) => ({
+        name: "external",
+        before: a({
+          advice: async () => {
+            // external helper will read from global async context
+            externalHelper();
+          },
+        }),
+      }));
+
+      const run = createProcess<string, TestContext>({
+        aspects: [ExternalAccessAspect],
+      });
+
+      const ac = AsyncContext.create<TestContext>(createLoggingContext(calls));
+
+      const externalHelper = () => {
+        const { log } = ac.context();
+        log.info("external:before");
+      };
+
+      const result = await runProcess({
+        process: run,
+        context: ac,
+        target: async () => "OK",
+      });
+
+      expect(result).toBe("OK");
+      expect(calls).toContain("external:before");
     });
   });
 });

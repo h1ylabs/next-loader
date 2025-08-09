@@ -5,11 +5,11 @@ import {
   type BuildOptions,
   normalizeBuildOptions,
 } from "@/lib/models/buildOptions";
+import type { Process } from "@/lib/models/process";
 import {
   normalizeProcessOptions,
   type ProcessOptions,
 } from "@/lib/models/processOptions";
-import type { Target } from "@/lib/models/target";
 
 /**
  * Creates a process function that organizes aspects into an optimized execution chain.
@@ -92,7 +92,4 @@ export type __Props<Result, SharedContext> = {
   readonly processOptions?: ProcessOptions<Result>;
 };
 
-export type __Return<Result, SharedContext> = (
-  context: () => SharedContext,
-  target: Target<Result>,
-) => Promise<Result | null>;
+export type __Return<Result, SharedContext> = Process<Result, SharedContext>;
