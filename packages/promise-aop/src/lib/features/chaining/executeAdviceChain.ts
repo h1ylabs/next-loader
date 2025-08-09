@@ -46,11 +46,11 @@ export async function executeAdviceChain<Result, SharedContext>(
 }
 
 export type __Props<Result, SharedContext> = {
-  target: Target<Result>;
-  context: () => SharedContext;
-  advices: AspectOrganization<Result, SharedContext>;
-  buildOptions: RequiredBuildOptions;
-  processOptions: RequiredProcessOptions<Result>;
+  readonly target: Target<Result>;
+  readonly context: () => SharedContext;
+  readonly advices: AspectOrganization<Result, SharedContext>;
+  readonly buildOptions: RequiredBuildOptions;
+  readonly processOptions: RequiredProcessOptions<Result>;
 };
 
 export type __Return<Result> = Result | null;
