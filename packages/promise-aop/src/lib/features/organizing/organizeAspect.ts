@@ -13,7 +13,7 @@ import { organizeAdvice } from "./organizeAdvice";
 export async function organizeAspect<Result, SharedContext>({
   aspects,
   buildOptions,
-}: __Props<Result, SharedContext>) {
+}: __Props<Result, SharedContext>): Promise<__Return<Result, SharedContext>> {
   // collecting advices
   const advices: {
     readonly [AdviceType in Advice]: (readonly [
@@ -108,3 +108,8 @@ export type __Props<Result, SharedContext> = {
   readonly aspects: readonly Aspect<Result, SharedContext>[];
   readonly buildOptions: RequiredBuildOptions;
 };
+
+export type __Return<Result, SharedContext> = AspectOrganization<
+  Result,
+  SharedContext
+>;

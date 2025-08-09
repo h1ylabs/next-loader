@@ -16,7 +16,7 @@ export async function organizeAdvice<
   AdviceType extends Advice,
 >(
   props: __Props<Result, SharedContext, AdviceType>,
-): Promise<AdviceExecution<Result, SharedContext, AdviceType>> {
+): Promise<__Return<Result, SharedContext, AdviceType>> {
   return pipeAsync(__preparePhase, __constructPhase, __resolvePhase)(props);
 }
 
@@ -262,6 +262,12 @@ export type __Props<Result, SharedContext, AdviceType extends Advice> = {
   >;
   readonly options: RequiredBuildOptions["advice"][keyof RequiredBuildOptions["advice"]];
 };
+
+export type __Return<
+  Result,
+  SharedContext,
+  AdviceType extends Advice,
+> = AdviceExecution<Result, SharedContext, AdviceType>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PropertyKey = keyof any;
