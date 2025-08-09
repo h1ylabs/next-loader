@@ -22,13 +22,13 @@ describe("integration", () => {
       const LoggingAspect: Aspect<string, TestContext> = createAspect<
         string,
         TestContext
-      >((a) => ({
+      >((createAdvice) => ({
         name: "logging",
-        before: a({
+        before: createAdvice({
           use: ["log"],
           advice: async ({ log }) => log.info("before"),
         }),
-        around: a({
+        around: createAdvice({
           use: ["log"],
           advice: async ({ log }, wrap) => {
             wrap((target) => async () => {
@@ -39,11 +39,11 @@ describe("integration", () => {
             });
           },
         }),
-        afterReturning: a({
+        afterReturning: createAdvice({
           use: ["log"],
           advice: async ({ log }) => log.info("afterReturning"),
         }),
-        after: a({
+        after: createAdvice({
           use: ["log"],
           advice: async ({ log }) => log.info("after"),
         }),
@@ -83,9 +83,9 @@ describe("integration", () => {
       const FailBeforeAspect: Aspect<string, TestContext> = createAspect<
         string,
         TestContext
-      >((a) => ({
+      >((createAdvice) => ({
         name: "fail",
-        before: a({
+        before: createAdvice({
           use: ["log"],
           advice: async () => {
             throw new Error("boom");
@@ -96,13 +96,13 @@ describe("integration", () => {
       const ObserverAspect: Aspect<string, TestContext> = createAspect<
         string,
         TestContext
-      >((a) => ({
+      >((createAdvice) => ({
         name: "observer",
-        after: a({
+        after: createAdvice({
           use: ["log"],
           advice: async ({ log }) => log.info("after"),
         }),
-        afterThrowing: a({
+        afterThrowing: createAdvice({
           use: ["log"],
           advice: async ({ log }) => log.info("afterThrowing"),
         }),
@@ -140,9 +140,9 @@ describe("integration", () => {
       const AfterErrorAspect: Aspect<string, TestContext> = createAspect<
         string,
         TestContext
-      >((a) => ({
+      >((createAdvice) => ({
         name: "afterError",
-        after: a({
+        after: createAdvice({
           use: ["log"],
           advice: async () => {
             throw new Error("after failed");
@@ -174,15 +174,15 @@ describe("integration", () => {
       const calls: string[] = [];
 
       const ThrowingInAfterThrowing = createAspect<string, TestContext>(
-        (a) => ({
+        (createAdvice) => ({
           name: "throwingAfterThrowing",
-          afterThrowing: a({
+          afterThrowing: createAdvice({
             use: ["log"],
             advice: async () => {
               throw new Error("afterThrowing failed");
             },
           }),
-          after: a({
+          after: createAdvice({
             use: ["log"],
             advice: async ({ log }) => log.info("after"),
           }),
@@ -231,13 +231,13 @@ describe("integration", () => {
       const ObserverAspect: Aspect<string, TestContext> = createAspect<
         string,
         TestContext
-      >((a) => ({
+      >((createAdvice) => ({
         name: "observer",
-        afterThrowing: a({
+        afterThrowing: createAdvice({
           use: ["log"],
           advice: async ({ log }) => log.info("afterThrowing"),
         }),
-        after: a({
+        after: createAdvice({
           use: ["log"],
           advice: async ({ log }) => log.info("after"),
         }),
@@ -271,9 +271,9 @@ describe("integration", () => {
       const AspectA: Aspect<string, TestContext> = createAspect<
         string,
         TestContext
-      >((a) => ({
+      >((createAdvice) => ({
         name: "A",
-        before: a({
+        before: createAdvice({
           use: ["log"],
           advice: async ({ log }) => log.info("A.before"),
         }),
@@ -282,9 +282,9 @@ describe("integration", () => {
       const AspectB: Aspect<string, TestContext> = createAspect<
         string,
         TestContext
-      >((a) => ({
+      >((createAdvice) => ({
         name: "B",
-        before: a({
+        before: createAdvice({
           use: ["log"],
           dependsOn: ["A"],
           advice: async ({ log }) => log.info("B.before"),
@@ -313,17 +313,17 @@ describe("integration", () => {
       const ConflictAspectA: Aspect<string, TestContext> = createAspect<
         string,
         TestContext
-      >((a) => ({
+      >((createAdvice) => ({
         name: "ConfA",
-        before: a({ use: ["log"], advice: async () => {} }),
+        before: createAdvice({ use: ["log"], advice: async () => {} }),
       }));
 
       const ConflictAspectB: Aspect<string, TestContext> = createAspect<
         string,
         TestContext
-      >((a) => ({
+      >((createAdvice) => ({
         name: "ConfB",
-        before: a({ use: ["log"], advice: async () => {} }),
+        before: createAdvice({ use: ["log"], advice: async () => {} }),
       }));
 
       await expect(
@@ -342,9 +342,9 @@ describe("integration", () => {
       const ExternalAccessAspect: Aspect<string, TestContext> = createAspect<
         string,
         TestContext
-      >((a) => ({
+      >((createAdvice) => ({
         name: "external",
-        before: a({
+        before: createAdvice({
           advice: async () => {
             // external helper will read from global async context
             externalHelper();

@@ -27,15 +27,15 @@ type AspectGeneratorHelper<Result, SharedContext> = (
  *
  * @example
  * ```typescript
- * const loggingAspect = createAspect<string, { logger: Logger }>((a) => ({
+ * const loggingAspect = createAspect<string, { logger: Logger }>((createAdvice) => ({
  *   name: 'logging',
- *   before: a({
+ *   before: createAdvice({
  *     use: ['logger'],
  *     advice: async ({ logger }) => {
  *       logger.info('Starting execution');
  *     }
  *   }),
- *   after: a({
+ *   after: createAdvice({
  *     use: ['logger'],
  *     advice: async ({ logger }) => {
  *       logger.info('Execution completed');

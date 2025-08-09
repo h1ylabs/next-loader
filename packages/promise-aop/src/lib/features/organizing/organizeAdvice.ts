@@ -169,7 +169,7 @@ export function __resolvePhase<
         result.push(currentAdvice);
         break;
       case "sequential":
-        result.push(...currentAdvice.map((a) => [a]));
+        result.push(...currentAdvice.map((advice) => [advice]));
         break;
       default:
         exhaustiveCheckType(execution);

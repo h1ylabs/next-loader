@@ -117,7 +117,9 @@ describe("organizeAdvice", () => {
       // level 0: D, C (order within level is not guaranteed)
       expect(result[0]).toHaveLength(2);
       expect(
-        result[0]!.map((a) => a === adviceD[1] || a === adviceC[1]),
+        result[0]!.map(
+          (advice) => advice === adviceD[1] || advice === adviceC[1],
+        ),
       ).toEqual([true, true]);
       // level 1: B
       expect(result[1]).toHaveLength(1);

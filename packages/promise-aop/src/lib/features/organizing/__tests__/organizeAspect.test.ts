@@ -73,15 +73,15 @@ describe("organizeAspect", () => {
     });
 
     it("should collect advice by type from multiple aspects", async () => {
-      const aspectA = createAspect<TestResult, TestContext>((a) => ({
+      const aspectA = createAspect<TestResult, TestContext>((createAdvice) => ({
         name: "A",
-        before: a({
+        before: createAdvice({
           use: ["logger"],
           advice: async ({ logger }) => {
             logger.info("A before");
           },
         }),
-        around: a({
+        around: createAdvice({
           use: ["db"],
           advice: async ({ db }, wrap) => {
             wrap((target) => async () => {
@@ -92,15 +92,15 @@ describe("organizeAspect", () => {
         }),
       }));
 
-      const aspectB = createAspect<TestResult, TestContext>((a) => ({
+      const aspectB = createAspect<TestResult, TestContext>((createAdvice) => ({
         name: "B",
-        before: a({
+        before: createAdvice({
           use: ["auth"],
           advice: async ({ auth }) => {
             await auth.check();
           },
         }),
-        after: a({
+        after: createAdvice({
           use: ["logger"],
           advice: async ({ logger }) => {
             logger.info("B after");
@@ -147,9 +147,9 @@ describe("organizeAspect", () => {
 
   describe("advice function execution", () => {
     it("should delegate to processBatchAdvice with correct parameters", async () => {
-      const aspectA = createAspect<TestResult, TestContext>((a) => ({
+      const aspectA = createAspect<TestResult, TestContext>((createAdvice) => ({
         name: "A",
-        before: a({
+        before: createAdvice({
           use: ["logger"],
           advice: async ({ logger }) => {
             logger.info("test");
@@ -186,11 +186,11 @@ describe("organizeAspect", () => {
     });
 
     it("should pass arguments correctly for around advice", async () => {
-      const aspectA = createAspect<TestResult, TestContext>((a) => ({
+      const aspectA = createAspect<TestResult, TestContext>((createAdvice) => ({
         name: "A",
-        around: a({
+        around: createAdvice({
           use: ["db"],
-          advice: async (_ctx, wrap) => {
+          advice: async (_, wrap) => {
             wrap((target) => target);
           },
         }),
@@ -223,9 +223,9 @@ describe("organizeAspect", () => {
     });
 
     it("should pass error argument for afterThrowing advice", async () => {
-      const aspectA = createAspect<TestResult, TestContext>((a) => ({
+      const aspectA = createAspect<TestResult, TestContext>((createAdvice) => ({
         name: "A",
-        afterThrowing: a({
+        afterThrowing: createAdvice({
           use: ["logger"],
           advice: async ({ logger }, error) => {
             logger.info(`Error: ${String(error)}`);
@@ -274,9 +274,9 @@ describe("organizeAspect", () => {
         },
       });
 
-      const aspectA = createAspect<TestResult, TestContext>((a) => ({
+      const aspectA = createAspect<TestResult, TestContext>((createAdvice) => ({
         name: "A",
-        before: a({
+        before: createAdvice({
           advice: async () => {},
         }),
       }));

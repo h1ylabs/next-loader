@@ -11,24 +11,28 @@ describe("buildOptions behavior (execution + runtime)", () => {
       const calls: string[] = [];
       let targetCalled = false;
 
-      const FailingAspect = createAspect<string, StandardTestContext>((a) => ({
-        name: "A",
-        before: a({
-          advice: async () => {
-            throw new Error("A.fail");
-          },
+      const FailingAspect = createAspect<string, StandardTestContext>(
+        (createAdvice) => ({
+          name: "A",
+          before: createAdvice({
+            advice: async () => {
+              throw new Error("A.fail");
+            },
+          }),
         }),
-      }));
+      );
 
-      const LoggingAspect = createAspect<string, StandardTestContext>((a) => ({
-        name: "B",
-        before: a({
-          use: ["log"],
-          advice: async ({ log }) => {
-            log.info("B.before");
-          },
+      const LoggingAspect = createAspect<string, StandardTestContext>(
+        (createAdvice) => ({
+          name: "B",
+          before: createAdvice({
+            use: ["log"],
+            advice: async ({ log }) => {
+              log.info("B.before");
+            },
+          }),
         }),
-      }));
+      );
 
       const run = createProcess<string, StandardTestContext>({
         aspects: [FailingAspect, LoggingAspect],
@@ -52,24 +56,28 @@ describe("buildOptions behavior (execution + runtime)", () => {
     it("sequential + continue: continues and executes target", async () => {
       const calls: string[] = [];
 
-      const FailingAspect = createAspect<string, StandardTestContext>((a) => ({
-        name: "A",
-        before: a({
-          advice: async () => {
-            throw new Error("A.fail");
-          },
+      const FailingAspect = createAspect<string, StandardTestContext>(
+        (createAdvice) => ({
+          name: "A",
+          before: createAdvice({
+            advice: async () => {
+              throw new Error("A.fail");
+            },
+          }),
         }),
-      }));
+      );
 
-      const LoggingAspect = createAspect<string, StandardTestContext>((a) => ({
-        name: "B",
-        before: a({
-          use: ["log"],
-          advice: async ({ log }) => {
-            log.info("B.before");
-          },
+      const LoggingAspect = createAspect<string, StandardTestContext>(
+        (createAdvice) => ({
+          name: "B",
+          before: createAdvice({
+            use: ["log"],
+            advice: async ({ log }) => {
+              log.info("B.before");
+            },
+          }),
         }),
-      }));
+      );
 
       const run = createProcess<string, StandardTestContext>({
         aspects: [FailingAspect, LoggingAspect],
@@ -96,9 +104,9 @@ describe("buildOptions behavior (execution + runtime)", () => {
   describe("around phase", () => {
     it("sequential + continue: returns null when wrapper fails", async () => {
       const FailingAroundAspect = createAspect<string, StandardTestContext>(
-        (a) => ({
+        (createAdvice) => ({
           name: "A",
-          around: a({
+          around: createAdvice({
             use: ["log"],
             advice: async () => {
               throw new Error("wrap.fail");
@@ -129,9 +137,9 @@ describe("buildOptions behavior (execution + runtime)", () => {
 
     it("sequential + halt: returns null in current chain behavior", async () => {
       const FailingAroundAspect = createAspect<string, StandardTestContext>(
-        (a) => ({
+        (createAdvice) => ({
           name: "A",
-          around: a({
+          around: createAdvice({
             use: ["log"],
             advice: async () => {
               throw new Error("wrap.fail");
@@ -162,9 +170,9 @@ describe("buildOptions behavior (execution + runtime)", () => {
       const FailingAfterReturningAspect = createAspect<
         string,
         StandardTestContext
-      >((a) => ({
+      >((createAdvice) => ({
         name: "A",
-        afterReturning: a({
+        afterReturning: createAdvice({
           advice: async () => {
             throw new Error("A.ar.fail");
           },
@@ -174,9 +182,9 @@ describe("buildOptions behavior (execution + runtime)", () => {
       const LoggingAfterReturningAspect = createAspect<
         string,
         StandardTestContext
-      >((a) => ({
+      >((createAdvice) => ({
         name: "B",
-        afterReturning: a({
+        afterReturning: createAdvice({
           use: ["log"],
           advice: async ({ log }) => {
             log.info("B.ar");
@@ -199,9 +207,9 @@ describe("buildOptions behavior (execution + runtime)", () => {
       const FailingAfterThrowingAspect = createAspect<
         string,
         StandardTestContext
-      >((a) => ({
+      >((createAdvice) => ({
         name: "A",
-        afterThrowing: a({
+        afterThrowing: createAdvice({
           use: ["log"],
           advice: async ({ log }) => {
             log.info("A.at");
@@ -226,9 +234,9 @@ describe("buildOptions behavior (execution + runtime)", () => {
 
     it("after parallel + continue: continues and keeps result", async () => {
       const FailingAfterAspect = createAspect<string, StandardTestContext>(
-        (a) => ({
+        (createAdvice) => ({
           name: "A",
-          after: a({
+          after: createAdvice({
             use: ["log"],
             advice: async () => {
               throw new Error("A.after.fail");
@@ -251,23 +259,27 @@ describe("buildOptions behavior (execution + runtime)", () => {
     it("after aggregation=all + runtime:halt: collects all and halts via onResolveError", async () => {
       const calls: string[] = [];
 
-      const FailingA = createAspect<string, StandardTestContext>((a) => ({
-        name: "A",
-        after: a({
-          advice: async () => {
-            throw new Error("A.after.fail");
-          },
+      const FailingA = createAspect<string, StandardTestContext>(
+        (createAdvice) => ({
+          name: "A",
+          after: createAdvice({
+            advice: async () => {
+              throw new Error("A.after.fail");
+            },
+          }),
         }),
-      }));
+      );
 
-      const FailingB = createAspect<string, StandardTestContext>((a) => ({
-        name: "B",
-        after: a({
-          advice: async () => {
-            throw new Error("B.after.fail");
-          },
+      const FailingB = createAspect<string, StandardTestContext>(
+        (createAdvice) => ({
+          name: "B",
+          after: createAdvice({
+            advice: async () => {
+              throw new Error("B.after.fail");
+            },
+          }),
         }),
-      }));
+      );
 
       const run = createProcess<string, StandardTestContext>({
         aspects: [FailingA, FailingB],
@@ -290,22 +302,26 @@ describe("buildOptions behavior (execution + runtime)", () => {
 
   describe("aggregation: all vs unit", () => {
     it("before aggregation=all: collects errors and runtime policy decides final outcome", async () => {
-      const FailingAspectA = createAspect<string, StandardTestContext>((a) => ({
-        name: "A",
-        before: a({
-          advice: async () => {
-            throw new Error("A");
-          },
+      const FailingAspectA = createAspect<string, StandardTestContext>(
+        (createAdvice) => ({
+          name: "A",
+          before: createAdvice({
+            advice: async () => {
+              throw new Error("A");
+            },
+          }),
         }),
-      }));
-      const FailingAspectB = createAspect<string, StandardTestContext>((a) => ({
-        name: "B",
-        before: a({
-          advice: async () => {
-            throw new Error("B");
-          },
+      );
+      const FailingAspectB = createAspect<string, StandardTestContext>(
+        (createAdvice) => ({
+          name: "B",
+          before: createAdvice({
+            advice: async () => {
+              throw new Error("B");
+            },
+          }),
         }),
-      }));
+      );
 
       const runHalt = createProcess<string, StandardTestContext>({
         aspects: [FailingAspectA, FailingAspectB],

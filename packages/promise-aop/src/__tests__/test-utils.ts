@@ -98,13 +98,13 @@ export const createLoggingContext =
 export const createLoggingTestAspect = <Result>(
   name = "logging",
 ): Aspect<Result, StandardTestContext> =>
-  createAspect<Result, StandardTestContext>((a) => ({
+  createAspect<Result, StandardTestContext>((createAdvice) => ({
     name,
-    before: a({
+    before: createAdvice({
       use: ["log"],
       advice: async ({ log }) => log.info("before"),
     }),
-    around: a({
+    around: createAdvice({
       use: ["log"],
       advice: async ({ log }, wrap) => {
         wrap((target) => async () => {
@@ -115,16 +115,16 @@ export const createLoggingTestAspect = <Result>(
         });
       },
     }),
-    afterReturning: a({
+    afterReturning: createAdvice({
       use: ["log"],
       advice: async ({ log }) => log.info("afterReturning"),
     }),
-    afterThrowing: a({
+    afterThrowing: createAdvice({
       use: ["log"],
       advice: async ({ log }, error) =>
         log.info(`afterThrowing: ${String(error)}`),
     }),
-    after: a({
+    after: createAdvice({
       use: ["log"],
       advice: async ({ log }) => log.info("after"),
     }),
@@ -138,9 +138,9 @@ export const createFailingTestAspect = <Result>(
   phase: keyof Aspect<Result, StandardTestContext> = "before",
   errorMessage = "test error",
 ): Aspect<Result, StandardTestContext> =>
-  createAspect<Result, StandardTestContext>((a) => ({
+  createAspect<Result, StandardTestContext>((createAdvice) => ({
     name,
-    [phase]: a({
+    [phase]: createAdvice({
       advice: async () => {
         throw new Error(errorMessage);
       },

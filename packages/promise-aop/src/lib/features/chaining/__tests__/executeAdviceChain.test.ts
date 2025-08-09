@@ -8,15 +8,18 @@ describe("executeAdviceChain (focused)", () => {
   it("should return null when around advice throws and runtime is continue; after should run", async () => {
     const calls: string[] = [];
 
-    const A = createAspect<number, Ctx>((a) => ({
+    const A = createAspect<number, Ctx>((createAdvice) => ({
       name: "A",
-      around: a({
+      around: createAdvice({
         use: ["log"],
         advice: async () => {
           throw new Error("wrapping failed");
         },
       }),
-      after: a({ use: ["log"], advice: async (ctx) => ctx.log.info("after") }),
+      after: createAdvice({
+        use: ["log"],
+        advice: async ({ log }) => log.info("after"),
+      }),
     }));
 
     const run = createProcess<number, Ctx>({
@@ -59,13 +62,16 @@ describe("executeAdviceChain (focused)", () => {
   it("should run afterThrowing and after when target throws; result is null", async () => {
     const calls: string[] = [];
 
-    const Obs = createAspect<number, Ctx>((a) => ({
+    const Obs = createAspect<number, Ctx>((createAdvice) => ({
       name: "Obs",
-      afterThrowing: a({
+      afterThrowing: createAdvice({
         use: ["log"],
-        advice: async (ctx) => ctx.log.info("afterThrowing"),
+        advice: async ({ log }) => log.info("afterThrowing"),
       }),
-      after: a({ use: ["log"], advice: async (ctx) => ctx.log.info("after") }),
+      after: createAdvice({
+        use: ["log"],
+        advice: async ({ log }) => log.info("after"),
+      }),
     }));
 
     const run = createProcess<number, Ctx>({ aspects: [Obs] });
