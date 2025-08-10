@@ -5,8 +5,8 @@ import {
 } from "@/lib/utils/normalizeOptions";
 
 export type RequiredProcessOptions<Result> = {
-  readonly onResolveError: (error: HaltError) => Promise<Result>;
-  readonly onResolveContinuedError: (error: unknown[]) => void;
+  readonly resolveHaltRejection: (error: HaltError) => Promise<Result>;
+  readonly resolveContinuousRejection: (error: unknown[]) => void;
 };
 
 export type ProcessOptions<Result> = NormalizableOptions<
@@ -22,9 +22,9 @@ export function normalizeProcessOptions<Result>(
 
 export function defaultProcessOptions<Result>() {
   return {
-    onResolveError: async (error) => {
+    resolveHaltRejection: async (error) => {
       throw error;
     },
-    onResolveContinuedError: () => {},
+    resolveContinuousRejection: () => {},
   } as const satisfies RequiredProcessOptions<Result>;
 }

@@ -1,7 +1,8 @@
 import { createAspect } from "@/createAspect";
 import type { AdviceChainContext } from "@/lib/features/chaining/context";
-import type { Aspect } from "@/lib/models/aspect";
+import type { Aspect, AspectOrganization } from "@/lib/models/aspect";
 import { normalizeBuildOptions } from "@/lib/models/buildOptions";
+import type { RequiredProcessOptions } from "@/lib/models/processOptions";
 import { normalizeProcessOptions } from "@/lib/models/processOptions";
 import type { Target } from "@/lib/models/target";
 
@@ -150,7 +151,7 @@ export const createFailingTestAspect = <Result>(
 /**
  * Creates a simple target function for testing
  */
-export const createTestTarget =
+export const createCommonTarget =
   <Result>(value: Result): Target<Result> =>
   async () =>
     value;
@@ -163,3 +164,44 @@ export const createFailingTestTarget =
   async () => {
     throw new Error(errorMessage);
   };
+
+/**
+ * Creates a target that throws the given error instance (preserves object identity)
+ */
+export const createThrowingTestTarget =
+  <Result>(error: unknown): Target<Result> =>
+  async () => {
+    throw error;
+  };
+
+/**
+ * Creates a simple id/data context factory used across chaining tests
+ */
+export const createIdDataContext =
+  (id: string = "test", data: number = 42) =>
+  () => ({ id, data });
+
+/**
+ * Creates a default mock advices object, allowing selective overrides
+ */
+export const createCommonAdvices = <Result, SharedContext>(
+  overrides: Partial<AspectOrganization<Result, SharedContext>> = {},
+): AspectOrganization<Result, SharedContext> => ({
+  before: jest.fn(),
+  around: jest.fn(),
+  afterReturning: jest.fn(),
+  afterThrowing: jest.fn(),
+  after: jest.fn(),
+  ...overrides,
+});
+
+/**
+ * Creates a mocked RequiredProcessOptions with jest fns, allowing overrides
+ */
+export const createProcessOptionsMock = <Result>(
+  overrides: Partial<RequiredProcessOptions<Result>> = {},
+): RequiredProcessOptions<Result> => ({
+  resolveHaltRejection: jest.fn(),
+  resolveContinuousRejection: jest.fn(),
+  ...overrides,
+});

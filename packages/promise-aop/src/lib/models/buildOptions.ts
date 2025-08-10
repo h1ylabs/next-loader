@@ -83,8 +83,7 @@ export function defaultBuildOptions() {
         error: {
           aggregation: "all",
           runtime: {
-            // when set to 'continue' in the afterThrowing phase, returns null as the result on error.
-            afterThrow: "halt",
+            afterThrow: "continue",
           },
         },
       },

@@ -1,7 +1,7 @@
 import { AspectOrganization } from "@/lib/models/aspect";
 import { RequiredBuildOptions } from "@/lib/models/buildOptions";
 import { RequiredProcessOptions } from "@/lib/models/processOptions";
-import { Target } from "@/lib/models/target";
+import { Target, TARGET_FALLBACK } from "@/lib/models/target";
 import { AsyncContext } from "@/lib/utils/AsyncContext";
 
 import {
@@ -14,8 +14,8 @@ import {
 } from "./adviceTasks";
 import { AdviceChainContext } from "./context";
 import {
-  handleContinueRejection,
-  handleHaltRejection,
+  handleContinuousRejection,
+  resolveHaltRejection,
 } from "./rejectionHandlers";
 
 export async function executeAdviceChain<Result, SharedContext>(
@@ -39,8 +39,8 @@ export async function executeAdviceChain<Result, SharedContext>(
         .catch(afterThrowingAdviceTask(chain))
         .finally(afterAdviceTask(chain))
         // rejection handlers
-        .catch(handleHaltRejection(chain))
-        .finally(handleContinueRejection(chain))
+        .catch(resolveHaltRejection(chain))
+        .finally(handleContinuousRejection(chain))
     );
   });
 }
@@ -53,4 +53,4 @@ export type __Props<Result, SharedContext> = {
   readonly processOptions: RequiredProcessOptions<Result>;
 };
 
-export type __Return<Result> = Result | null;
+export type __Return<Result> = Result | typeof TARGET_FALLBACK;

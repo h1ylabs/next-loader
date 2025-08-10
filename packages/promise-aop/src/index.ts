@@ -6,6 +6,14 @@ export { createAspect } from "./createAspect";
 export { createProcess } from "./createProcess";
 export { runProcess } from "./runProcess";
 
+// Errors
+export { AdviceError } from "@/lib/errors/AdviceError";
+export { TargetError } from "@/lib/errors/TargetError";
+export { UnknownError } from "@/lib/errors/UnknownError";
+
+// Target Fallbacks
+export { TARGET_FALLBACK } from "@/lib/models/target";
+
 // Options
 export {
   defaultBuildOptions,
