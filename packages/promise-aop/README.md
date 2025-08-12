@@ -1,6 +1,6 @@
 # Promise-AOP
 
-A TypeScript-first AOP (Aspect-Oriented Programming) framework for asynchronous JavaScript. It provides a type-safe shared context, safe parallelism via section locking, configurable error handling (halt/continue with aggregation), and dependency-based execution ordering.
+A TypeScript-first AOP (Aspect-Oriented Programming) framework for asynchronous JavaScript. It provides type-safe shared context with section locking, flexible wrapper composition via around advice, configurable error handling (halt/continue with aggregation), and dependency-based execution ordering.
 
 [한국어 문서 (Korean Documentation)](./docs/README-ko.md)
 
@@ -73,13 +73,13 @@ pnpm add @h1y/promise-aop
 
 ### Advice types
 
-| Type             | When it runs       | Parameters         | Typical use case                                        |
-| ---------------- | ------------------ | ------------------ | ------------------------------------------------------- |
-| `before`         | Before target      | `(context)`        | Validation, setup, auth                                 |
-| `around`         | Wraps the target   | `(context, wrap)`  | Caching, retry, timing; work with or replace the result |
-| `afterReturning` | After success      | `(context)`        | Success logging/cleanup                                 |
-| `afterThrowing`  | After an exception | `(context, error)` | Error logging/notification                              |
-| `after`          | Always last        | `(context)`        | Cleanup, metrics                                        |
+| Type             | When it runs       | Parameters                                      | Typical use case                                     |
+| ---------------- | ------------------ | ----------------------------------------------- | ---------------------------------------------------- |
+| `before`         | Before target      | `(context)`                                     | Validation, setup, auth                              |
+| `around`         | Wraps the target   | `(context, { attachToResult, attachToTarget })` | Caching, retry, timing; flexible wrapper composition |
+| `afterReturning` | After success      | `(context)`                                     | Success logging/cleanup                              |
+| `afterThrowing`  | After an exception | `(context, error)`                              | Error logging/notification                           |
+| `after`          | Always last        | `(context)`                                     | Cleanup, metrics                                     |
 
 ### Aspects, process, and context
 
@@ -160,7 +160,7 @@ const process = createProcess({
 
 ## 🧩 Common patterns
 
-### Caching (fast path via `around`)
+### Caching with flexible wrapper composition
 
 ```ts
 type Data = { value: string };
@@ -177,8 +177,9 @@ const Cache = createAspect<Data, Ctx>((createAdvice) => ({
   name: "cache",
   around: createAdvice({
     use: ["cache"],
-    advice: async ({ cache }, wrap) => {
-      wrap((target) => async () => {
+    advice: async ({ cache }, { attachToTarget }) => {
+      // attachToTarget: Applied directly to the original target function
+      attachToTarget((target) => async () => {
         const cached = await cache.get(key);
         if (cached) return cached;
         const out = await target();
@@ -254,6 +255,59 @@ const B = createAspect<string, { log: Console }>((createAdvice) => ({
 }));
 ```
 
+### Advanced Around Advice: Flexible Wrapper Composition
+
+The v2 around advice provides two distinct attachment points for maximum flexibility:
+
+```ts
+const AdvancedAround = createAspect<number, { log: Console }>(
+  (createAdvice) => ({
+    name: "advanced-around",
+    around: createAdvice({
+      use: ["log"],
+      advice: async ({ log }, { attachToResult, attachToTarget }) => {
+        // attachToTarget: Applied to the original target function
+        // Executes innermost, closest to the actual target
+        attachToTarget((target) => async () => {
+          log.info("target-wrapper: before");
+          const result = await target();
+          log.info("target-wrapper: after");
+          return result + 10;
+        });
+
+        // attachToResult: Applied to the final composed result
+        // Executes outermost, wrapping the entire chain
+        attachToResult((target) => async () => {
+          log.info("result-wrapper: before");
+          const result = await target();
+          log.info("result-wrapper: after");
+          return result * 2;
+        });
+      },
+    }),
+  }),
+);
+
+// Execution order for target value 5:
+// result-wrapper: before
+// target-wrapper: before
+// [original target executes: 5]
+// target-wrapper: after  → 5 + 10 = 15
+// result-wrapper: after  → 15 * 2 = 30
+```
+
+#### Key differences
+
+- **`attachToTarget`**: Wraps the original target function directly. Multiple target wrappers compose in reverse order (last attached executes outermost among target wrappers).
+- **`attachToResult`**: Wraps the entire execution chain after all target wrappers are applied. Result wrappers also compose in reverse order.
+- **Execution order**: `resultWrapper(nextChain(targetWrapper(target)))`
+
+This design enables sophisticated scenarios like:
+
+- Caching at the target level while adding metrics at the result level
+- Input validation/transformation via target wrappers, output formatting via result wrappers
+- Multiple layers of error handling and retry logic
+
 ---
 
 ## 📚 API Reference
@@ -278,7 +332,7 @@ const B = createAspect<string, { log: Console }>((createAdvice) => ({
 - `AdviceFunction`, `AdviceFunctionWithContext`: Strongly‑typed advice signatures per advice type
 - `Target<Result>`: `() => Promise<Result>` — the function being advised
 - `TargetWrapper<Result>`: `(target: Target<Result>) => Target<Result>` — used by `around`
-- `Process<Result, Context>`: `(context: () => Context, target: Target<Result>) => Promise<Result | typeof TARGET_FALLBACK>`
+- `Process<Result, Context>`: `(context: () => Context, exit: <T>(callback: () => T) => T, target: Target<Result>) => Promise<Result | typeof TARGET_FALLBACK>`
 - `BuildOptions` (per‑advice): `execution` strategy and `error` policy (`ExecutionStrategy`, `AggregationUnit`, `ErrorAfter`)
 - `ProcessOptions<Result>`: `{ resolveHaltRejection, resolveContinuousRejection }`
 - `AsyncContext<Context>` and `Restricted<Context, Sections>`: Utilities to provide a fresh immutable context and restrict access per advice
@@ -304,27 +358,48 @@ const process = createProcess<
 });
 ```
 
-### Around composition order
+### Around wrapper composition order
 
-- The first `wrap` pushed is applied innermost.
+- **Target wrappers** (via `attachToTarget`): Last attached executes outermost among target wrappers
+- **Result wrappers** (via `attachToResult`): Last attached executes outermost among result wrappers
+- **Overall order**: `resultWrapper(nextChain(targetWrapper(target)))`
 
 ### AsyncContext integration
 
-```ts
-import { AsyncContext, createProcess } from "@h1y/promise-aop";
+Promise-AOP v2 provides seamless AsyncContext integration for better context management:
 
+```ts
+import { AsyncContext, createProcess, runProcess } from "@h1y/promise-aop";
+
+// Method 1: Direct AsyncContext usage with runProcess
+const asyncContext = AsyncContext.create(() => ({
+  logger: console,
+  database: myDb,
+}));
+
+const result = await runProcess({
+  process: myProcess,
+  context: asyncContext, // Pass AsyncContext directly
+  target: async () => "Hello World",
+});
+
+// Method 2: Manual AsyncContext execution (for advanced scenarios)
 const process = createProcess({
   aspects: [
     /* ... */
   ],
 });
-const ac = AsyncContext.create(() => ({
-  /* context object */
-}));
-const out = await AsyncContext.execute(ac, (getCtx) =>
-  process(getCtx, async () => 42),
+const out = await AsyncContext.execute(asyncContext, (getCtx, exit) =>
+  process(getCtx, exit, async () => 42),
 );
 ```
+
+#### Key benefits of AsyncContext
+
+- **Automatic context propagation**: Context flows through all async operations
+- **Type safety**: Full TypeScript support with context inference
+- **Memory efficiency**: Context is scoped to the execution chain
+- **Isolation**: Each execution maintains its own context instance
 
 ### Error precedence and early exit
 
