@@ -43,9 +43,14 @@ describe("executeAdviceChain", () => {
   const createMockBuildOptions = (): RequiredBuildOptions =>
     defaultBuildOptions();
 
-  const createMockProcessOptions = (): RequiredProcessOptions<TestResult> =>
-    createProcessOptionsMock<TestResult>({
-      resolveHaltRejection: jest.fn().mockReturnValue(TARGET_FALLBACK),
+  const createMockProcessOptions = (): RequiredProcessOptions<
+    TestResult,
+    TestSharedContext
+  > =>
+    createProcessOptionsMock<TestResult, TestSharedContext>({
+      resolveHaltRejection: jest
+        .fn()
+        .mockResolvedValue(() => Promise.resolve(TARGET_FALLBACK)),
     });
 
   const createTestProps = (
@@ -53,6 +58,7 @@ describe("executeAdviceChain", () => {
   ): __Props<TestResult, TestSharedContext> => ({
     target: createMockTarget(100),
     context: createMockContext(),
+    exit: <T>(callback: () => T) => callback(),
     advices: createMockAdvices(),
     buildOptions: createMockBuildOptions(),
     processOptions: createMockProcessOptions(),
@@ -98,9 +104,18 @@ describe("executeAdviceChain", () => {
     it("should execute afterThrowing when target throws error", async () => {
       const targetError = new Error("target failed");
       const mockAdvices = createMockAdvices();
+      const mockProcessOptions = createProcessOptionsMock<
+        TestResult,
+        TestSharedContext
+      >({
+        resolveHaltRejection: jest
+          .fn()
+          .mockResolvedValue(() => Promise.resolve(TARGET_FALLBACK)),
+      });
       const props = createTestProps({
         target: createErrorTarget(targetError),
         advices: mockAdvices,
+        processOptions: mockProcessOptions,
       });
 
       const result = await executeAdviceChain(props);
@@ -123,7 +138,14 @@ describe("executeAdviceChain", () => {
         before: jest.fn().mockRejectedValue(beforeError),
       });
 
-      const mockProcessOptions = createMockProcessOptions();
+      const mockProcessOptions = createProcessOptionsMock<
+        TestResult,
+        TestSharedContext
+      >({
+        resolveHaltRejection: jest
+          .fn()
+          .mockResolvedValue(() => Promise.resolve(TARGET_FALLBACK)),
+      });
       const props = createTestProps({
         advices: mockAdvices,
         processOptions: mockProcessOptions,
@@ -138,11 +160,13 @@ describe("executeAdviceChain", () => {
   });
 
   describe("TARGET_FALLBACK handling", () => {
-    it("should skip afterReturning when TARGET_FALLBACK is returned", async () => {
+    it("should execute afterReturning even when TARGET_FALLBACK is returned by wrapper", async () => {
       const mockAdvices = createMockAdvices({
-        around: jest.fn().mockImplementation(async (_context, wrap) => {
-          wrap(() => TargetFallback);
-        }),
+        around: jest
+          .fn()
+          .mockImplementation(async (_context, { attachToTarget }) => {
+            attachToTarget(() => TargetFallback);
+          }),
       });
 
       const props = createTestProps({
@@ -154,7 +178,7 @@ describe("executeAdviceChain", () => {
       expect(result).toBe(TARGET_FALLBACK);
       expect(mockAdvices.before).toHaveBeenCalledTimes(1);
       expect(mockAdvices.around).toHaveBeenCalledTimes(1);
-      expect(mockAdvices.afterReturning).not.toHaveBeenCalled();
+      expect(mockAdvices.afterReturning).toHaveBeenCalledTimes(1); // afterReturning is still called
       expect(mockAdvices.after).toHaveBeenCalledTimes(1);
     });
   });
@@ -188,7 +212,14 @@ describe("executeAdviceChain", () => {
 
   describe("rejection handling", () => {
     it("should handle continuous rejections", async () => {
-      const mockProcessOptions = createMockProcessOptions();
+      const mockProcessOptions = createProcessOptionsMock<
+        TestResult,
+        TestSharedContext
+      >({
+        resolveHaltRejection: jest
+          .fn()
+          .mockResolvedValue(() => Promise.resolve(TARGET_FALLBACK)),
+      });
       const mockAdvices = createMockAdvices({
         before: jest.fn().mockRejectedValue(new Error("before error")),
         after: jest.fn().mockRejectedValue(new Error("after error")),

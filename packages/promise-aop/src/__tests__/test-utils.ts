@@ -1,10 +1,20 @@
 import { createAspect } from "@/createAspect";
+import {
+  AsyncContext,
+  createProcess,
+  runProcess,
+  TARGET_FALLBACK,
+} from "@/index";
 import type { AdviceChainContext } from "@/lib/features/chaining/context";
 import type { Aspect, AspectOrganization } from "@/lib/models/aspect";
+import type { BuildOptions } from "@/lib/models/buildOptions";
 import { normalizeBuildOptions } from "@/lib/models/buildOptions";
-import type { RequiredProcessOptions } from "@/lib/models/processOptions";
+import type {
+  ProcessOptions,
+  RequiredProcessOptions,
+} from "@/lib/models/processOptions";
 import { normalizeProcessOptions } from "@/lib/models/processOptions";
-import type { Target } from "@/lib/models/target";
+import type { Target, TargetWrapper } from "@/lib/models/target";
 
 /**
  * Standard test context type for consistent testing across all test files
@@ -50,7 +60,7 @@ export const createTestChain = <Result, SharedContext>(
       after: jest.fn(async () => {}),
     },
     buildOptions: normalizeBuildOptions(),
-    processOptions: normalizeProcessOptions<Result>(),
+    processOptions: normalizeProcessOptions<Result, SharedContext>(),
     ...overrides,
   } as AdviceChainContext<Result, SharedContext>;
 
@@ -107,8 +117,8 @@ export const createLoggingTestAspect = <Result>(
     }),
     around: createAdvice({
       use: ["log"],
-      advice: async ({ log }, wrap) => {
-        wrap((target) => async () => {
+      advice: async ({ log }, { attachToTarget }) => {
+        attachToTarget((target) => async () => {
           log.info("around:before");
           const result = await target();
           log.info("around:after");
@@ -198,10 +208,65 @@ export const createCommonAdvices = <Result, SharedContext>(
 /**
  * Creates a mocked RequiredProcessOptions with jest fns, allowing overrides
  */
-export const createProcessOptionsMock = <Result>(
-  overrides: Partial<RequiredProcessOptions<Result>> = {},
-): RequiredProcessOptions<Result> => ({
-  resolveHaltRejection: jest.fn(),
-  resolveContinuousRejection: jest.fn(),
+export const createProcessOptionsMock = <Result, SharedContext>(
+  overrides: Partial<RequiredProcessOptions<Result, SharedContext>> = {},
+): RequiredProcessOptions<Result, SharedContext> => ({
+  resolveHaltRejection: jest
+    .fn()
+    .mockResolvedValue(() =>
+      Promise.reject(new Error("Default mock - should be overridden in tests")),
+    ),
+  resolveContinuousRejection: jest.fn().mockResolvedValue(undefined),
   ...overrides,
 });
+
+// Runner helper to reduce boilerplate
+export async function runWith<Result, Ctx>(
+  aspects: readonly Aspect<Result, Ctx>[],
+  opts: {
+    context: (() => Ctx) | AsyncContext<Ctx>;
+    target: Target<Result>;
+    buildOptions?: BuildOptions;
+    processOptions?: ProcessOptions<Result, Ctx>;
+  },
+) {
+  const process = createProcess<Result, Ctx>({
+    aspects,
+    buildOptions: opts.buildOptions,
+    processOptions: opts.processOptions,
+  });
+  return runProcess({ process, context: opts.context, target: opts.target });
+}
+
+// Standard fallback process options for tests
+export const createFallbackProcessOptions = <Result, SharedContext>() =>
+  createProcessOptionsMock<Result, SharedContext>({
+    resolveHaltRejection: jest
+      .fn()
+      .mockResolvedValue(async () => TARGET_FALLBACK),
+    resolveContinuousRejection: jest.fn().mockResolvedValue(undefined),
+  });
+
+// Wrapper builders for around advice tests
+export const wrapTargetWithLogs =
+  <R>(
+    log: { info: (s: string) => void },
+    label: string,
+    map: (r: R) => R = (r) => r,
+  ): TargetWrapper<R> =>
+  (target) =>
+  async () => {
+    log.info(`${label}-start`);
+    const r = await target();
+    log.info(`${label}-end`);
+    return map(r);
+  };
+
+export const wrapResultWithLogs = wrapTargetWithLogs;
+
+// Small async delay helper for stable async tests
+export const delay = (ms = 1) => new Promise((res) => setTimeout(res, ms));
+
+// Log order helper
+export const pickOrder = (calls: string[], token: string) =>
+  calls.filter((c) => c.includes(token));

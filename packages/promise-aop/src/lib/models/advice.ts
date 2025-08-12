@@ -53,7 +53,15 @@ type CheckAdviceFn<T> = T extends (...args: never) => Promise<void> ? T : never;
 type AdviceFunctionMappings<Result> = {
   before: CheckAdviceFn<() => Promise<void>>;
   around: CheckAdviceFn<
-    (wrap: (wrap: TargetWrapper<Result>) => void) => Promise<void>
+    ({
+      attachToResult,
+      attachToTarget,
+    }: {
+      // Advice Chain을 결과물에 부착
+      attachToResult: (wrapper: TargetWrapper<Result>) => void;
+      // Advice Chain을 결과물 내 Target에 부착
+      attachToTarget: (wrapper: TargetWrapper<Result>) => void;
+    }) => Promise<void>
   >;
   afterReturning: CheckAdviceFn<() => Promise<void>>;
   afterThrowing: CheckAdviceFn<(error: unknown) => Promise<void>>;

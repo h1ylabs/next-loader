@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   createCommonAdvices,
   createCommonTarget,
@@ -42,8 +43,10 @@ describe("adviceTasks", () => {
   const createMockBuildOptions = (): RequiredBuildOptions =>
     defaultBuildOptions();
 
-  const createMockProcessOptions = (): RequiredProcessOptions<TestResult> =>
-    createProcessOptionsMock<TestResult>();
+  const createMockProcessOptions = (): RequiredProcessOptions<
+    TestResult,
+    TestSharedContext
+  > => createProcessOptionsMock<TestResult, TestSharedContext>();
 
   const createMockChainContext = (
     overrides: Partial<AdviceChainContext<TestResult, TestSharedContext>> = {},
@@ -51,6 +54,7 @@ describe("adviceTasks", () => {
     const context: AdviceChainContext<TestResult, TestSharedContext> = {
       target: createMockTarget(100),
       context: createMockContext(),
+      exit: <T>(callback: () => T) => callback(),
       advices: createMockAdvices(),
       buildOptions: createMockBuildOptions(),
       processOptions: createMockProcessOptions(),
@@ -79,32 +83,46 @@ describe("adviceTasks", () => {
     it.each([
       {
         name: "wrapper composition",
-        wrapper: (target: Target<TestResult>) => async () => {
-          const result = await target();
-          return result + 1;
-        },
+        resolver:
+          (target: Target<TestResult>) =>
+          (nextChain: (t: Target<TestResult>) => Target<TestResult>) => {
+            const wrappedTarget = async () => {
+              const result = await target();
+              return result + 1;
+            };
+            return nextChain(wrappedTarget);
+          },
         targetValue: 10,
         expectedResult: 11,
       },
       {
-        name: "identity wrapper",
-        wrapper: (target: Target<TestResult>) => target,
+        name: "identity resolver",
+        resolver:
+          (target: Target<TestResult>) =>
+          (nextChain: (t: Target<TestResult>) => Target<TestResult>) => {
+            return nextChain(target);
+          },
         targetValue: 5,
         expectedResult: 5,
       },
       {
-        name: "double wrapper",
-        wrapper: (target: Target<TestResult>) => async () => {
-          const result = await target();
-          return result * 2;
-        },
+        name: "double resolver",
+        resolver:
+          (target: Target<TestResult>) =>
+          (nextChain: (t: Target<TestResult>) => Target<TestResult>) => {
+            const wrappedTarget = async () => {
+              const result = await target();
+              return result * 2;
+            };
+            return nextChain(wrappedTarget);
+          },
         targetValue: 3,
         expectedResult: 6,
       },
     ])(
       "should process around advice with $name",
-      async ({ wrapper, targetValue, expectedResult }) => {
-        const mockProcessAroundAdvice = jest.fn().mockResolvedValue(wrapper);
+      async ({ resolver, targetValue, expectedResult }) => {
+        const mockProcessAroundAdvice = jest.fn().mockResolvedValue(resolver);
         const chainContext = createMockChainContext({
           target: createMockTarget(targetValue),
         });
@@ -118,22 +136,37 @@ describe("adviceTasks", () => {
         });
 
         expect(typeof result).toBe("function");
-        const wrappedResult = await result();
+        // Ensure non-null resolver, then pass a nextChain
+        if (result === null) {
+          throw new Error("Expected non-null AroundAdviceResolver");
+        }
+        const nextChain = (target: Target<TestResult>) => target;
+        const finalTarget = result(nextChain);
+        const wrappedResult = await finalTarget();
         expect(wrappedResult).toBe(expectedResult);
       },
     );
 
-    it("should return TargetFallback when around advice sets target to fallback", async () => {
+    it("should handle fallback resolver correctly", async () => {
       const mockProcessAroundAdvice = jest
         .fn()
-        .mockResolvedValue(() => TargetFallback);
+        .mockResolvedValue(
+          (_: Target<TestResult>) =>
+            (_: (t: Target<TestResult>) => Target<TestResult>) =>
+              TargetFallback,
+        );
       const chainContext = createMockChainContext();
 
       const task = aroundAdviceTask(chainContext, mockProcessAroundAdvice);
       const result = await task();
 
       expect(typeof result).toBe("function");
-      const wrappedResult = await result();
+      const nextChain = (target: Target<TestResult>) => target;
+      if (result === null) {
+        throw new Error("Expected non-null AroundAdviceResolver");
+      }
+      const finalTarget = result(nextChain);
+      const wrappedResult = await finalTarget();
       expect(wrappedResult).toBe(TARGET_FALLBACK);
     });
   });
@@ -175,14 +208,15 @@ describe("adviceTasks", () => {
       expect(result).toBe(42);
     });
 
-    it("should skip afterReturning advice when result is TARGET_FALLBACK", async () => {
+    it("should execute afterReturning advice even when result is TARGET_FALLBACK", async () => {
       const mockAdvices = createMockAdvices();
       const chainContext = createMockChainContext({ advices: mockAdvices });
 
       const task = afterReturningAdviceTask(chainContext);
-      const result = await task(TARGET_FALLBACK);
+      const result = await task(TARGET_FALLBACK as unknown as number);
 
-      expect(mockAdvices.afterReturning).not.toHaveBeenCalled();
+      // afterReturningAdviceTask always executes the advice regardless of result type
+      expect(mockAdvices.afterReturning).toHaveBeenCalledTimes(1);
       expect(result).toBe(TARGET_FALLBACK);
     });
   });
