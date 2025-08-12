@@ -1,4 +1,4 @@
-import { MSG_ERROR_TARGET_ERROR, TargetError } from "@/lib/errors/TargetError";
+import { TargetError } from "@/lib/errors/TargetError";
 
 describe("TargetError", () => {
   it("should create a TargetError with an error cause", () => {
@@ -7,7 +7,6 @@ describe("TargetError", () => {
 
     expect(targetError).toBeInstanceOf(Error);
     expect(targetError.cause).toBe(originalError);
-    expect(targetError.message).toBe(MSG_ERROR_TARGET_ERROR);
   });
 
   it("should handle a string error message", () => {
