@@ -283,4 +283,165 @@ describe("AsyncContext", () => {
       expect(output).toBe("ext:9");
     });
   });
+
+  describe("exit functionality", () => {
+    it("should execute callback outside of current context", async () => {
+      const contextGenerator = (): TestContext => ({ id: "inside", data: 100 });
+      const asyncCtx = AsyncContext.create(contextGenerator);
+
+      let outsideResult: string = "";
+
+      await AsyncContext.execute(asyncCtx, async (context, exit) => {
+        const insideCtx = context();
+        expect(insideCtx.id).toBe("inside");
+
+        // Execute callback outside the current context
+        outsideResult = exit(() => {
+          // This should not have access to the context
+          expect(() => context()).toThrow(MSG_ERR_ASYNC_CONTEXT_NOT_EXIST);
+          return "executed-outside";
+        });
+
+        // Inside context should still work after exit
+        const stillInsideCtx = context();
+        expect(stillInsideCtx.id).toBe("inside");
+      });
+
+      expect(outsideResult).toBe("executed-outside");
+    });
+
+    it("should isolate contexts properly with exit", async () => {
+      const asyncCtx = AsyncContext.create<TestContext>();
+
+      const results = await AsyncContext.executeWith(
+        asyncCtx,
+        () => ({ id: "main-context", data: 50 }),
+        async (context) => {
+          const mainCtx = context();
+          expect(mainCtx.id).toBe("main-context");
+
+          // Exit and try to access context (should fail)
+          const exitResult = asyncCtx.exit(() => {
+            expect(() => asyncCtx.context()).toThrow(
+              MSG_ERR_ASYNC_CONTEXT_NOT_EXIST,
+            );
+            return "exit-success";
+          });
+
+          // Back to main context (should work)
+          const backToMainCtx = context();
+          expect(backToMainCtx.id).toBe("main-context");
+
+          return { mainCtx, exitResult };
+        },
+      );
+
+      expect(results.mainCtx.id).toBe("main-context");
+      expect(results.exitResult).toBe("exit-success");
+    });
+
+    it("should handle nested context operations with exit", async () => {
+      const outerCtx = AsyncContext.create(() => ({ id: "outer", data: 1 }));
+      const innerCtx = AsyncContext.create(() => ({ id: "inner", data: 2 }));
+
+      await AsyncContext.execute(outerCtx, async (outerContext) => {
+        expect(outerContext().id).toBe("outer");
+
+        await AsyncContext.execute(innerCtx, async (innerContext) => {
+          expect(innerContext().id).toBe("inner");
+
+          // Exit from inner context
+          const exitResult = innerCtx.exit(() => {
+            // Should not have access to inner context
+            expect(() => innerCtx.context()).toThrow(
+              MSG_ERR_ASYNC_CONTEXT_NOT_EXIST,
+            );
+
+            // Should still have access to outer context
+            expect(outerCtx.context().id).toBe("outer");
+
+            return "nested-exit-success";
+          });
+
+          expect(exitResult).toBe("nested-exit-success");
+
+          // Back in inner context
+          expect(innerContext().id).toBe("inner");
+        });
+
+        // Back in outer context
+        expect(outerContext().id).toBe("outer");
+      });
+    });
+
+    it("should handle exit with async operations", async () => {
+      const asyncCtx = AsyncContext.create(() => ({
+        id: "async-test",
+        data: 99,
+      }));
+
+      await AsyncContext.execute(asyncCtx, async (context) => {
+        const beforeExit = context();
+        expect(beforeExit.id).toBe("async-test");
+
+        // Exit and perform async operation
+        const exitPromise = asyncCtx.exit(async () => {
+          // This async operation should not have context access
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          expect(() => asyncCtx.context()).toThrow(
+            MSG_ERR_ASYNC_CONTEXT_NOT_EXIST,
+          );
+          return "async-exit-complete";
+        });
+
+        const result = await exitPromise;
+        expect(result).toBe("async-exit-complete");
+
+        // Context should still work after async exit
+        const afterExit = context();
+        expect(afterExit.id).toBe("async-test");
+      });
+    });
+
+    it("should preserve context isolation across multiple exits", async () => {
+      const ctx1 = AsyncContext.create(() => ({ id: "ctx1", data: 10 }));
+      const ctx2 = AsyncContext.create(() => ({ id: "ctx2", data: 20 }));
+
+      await Promise.all([
+        AsyncContext.execute(ctx1, async (context1) => {
+          expect(context1().id).toBe("ctx1");
+
+          const exitResult1 = ctx1.exit(() => {
+            expect(() => ctx1.context()).toThrow(
+              MSG_ERR_ASYNC_CONTEXT_NOT_EXIST,
+            );
+            expect(() => ctx2.context()).toThrow(
+              MSG_ERR_ASYNC_CONTEXT_NOT_EXIST,
+            );
+            return "ctx1-exit";
+          });
+
+          expect(exitResult1).toBe("ctx1-exit");
+          expect(context1().id).toBe("ctx1");
+        }),
+
+        AsyncContext.execute(ctx2, async (context2) => {
+          expect(context2().id).toBe("ctx2");
+
+          const exitResult2 = ctx2.exit(() => {
+            expect(() => ctx1.context()).toThrow(
+              MSG_ERR_ASYNC_CONTEXT_NOT_EXIST,
+            );
+            expect(() => ctx2.context()).toThrow(
+              MSG_ERR_ASYNC_CONTEXT_NOT_EXIST,
+            );
+            return "ctx2-exit";
+          });
+
+          expect(exitResult2).toBe("ctx2-exit");
+          expect(context2().id).toBe("ctx2");
+        }),
+      ]);
+    });
+  });
 });
