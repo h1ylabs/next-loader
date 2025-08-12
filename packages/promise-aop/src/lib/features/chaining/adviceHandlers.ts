@@ -1,6 +1,5 @@
 import { AdviceError } from "@/lib/errors/AdviceError";
 import { HaltError } from "@/lib/errors/HaltError";
-import { TargetError } from "@/lib/errors/TargetError";
 import { UnknownError } from "@/lib/errors/UnknownError";
 import { ErrorAfter } from "@/lib/models/buildOptions";
 import { exhaustiveCheckType, validateType } from "@/lib/utils/validateType";
@@ -45,10 +44,6 @@ export function handleRejection<Result, SharedContext>(
         default:
           exhaustiveCheckType(afterThrow);
       }
-    }
-    // 3. if error is thrown from target, halt immediately
-    else if (error instanceof TargetError) {
-      chain().haltRejection = new HaltError(error);
     }
 
     // 4. if error is unknown, halt immediately

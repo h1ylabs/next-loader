@@ -40,10 +40,14 @@ describe("rejectionHandlers", () => {
     defaultBuildOptions();
 
   const createMockProcessOptions = (
-    overrides: Partial<RequiredProcessOptions<TestResult>> = {},
-  ): RequiredProcessOptions<TestResult> =>
-    createProcessOptionsMock<TestResult>({
-      resolveHaltRejection: jest.fn().mockReturnValue(TARGET_FALLBACK),
+    overrides: Partial<
+      RequiredProcessOptions<TestResult, TestSharedContext>
+    > = {},
+  ): RequiredProcessOptions<TestResult, TestSharedContext> =>
+    createProcessOptionsMock<TestResult, TestSharedContext>({
+      resolveHaltRejection: jest
+        .fn()
+        .mockResolvedValue(() => Promise.resolve(TARGET_FALLBACK)),
       ...overrides,
     });
 
@@ -52,6 +56,7 @@ describe("rejectionHandlers", () => {
   ): AdviceChainContext<TestResult, TestSharedContext> => ({
     target: createMockTarget(100),
     context: createMockContext(),
+    exit: <T>(callback: () => T) => callback(),
     advices: createMockAdvices(),
     buildOptions: createMockBuildOptions(),
     processOptions: createMockProcessOptions(),
@@ -60,12 +65,30 @@ describe("rejectionHandlers", () => {
   });
 
   describe("resolveHaltRejection", () => {
+    it("should propagate original cause when using default process options", async () => {
+      const originalError = new Error("original error");
+      const haltError = new HaltError(originalError);
+
+      const context = createMockChainContext({
+        // Use default behavior: rethrow the cause
+
+        processOptions: (
+          await import("@/lib/models/processOptions")
+        ).defaultProcessOptions<number, TestSharedContext>(),
+      });
+      const chain = () => context;
+
+      const resolver = resolveHaltRejection(chain);
+      await expect(resolver(haltError)).rejects.toBe(originalError);
+    });
     it("should resolve HaltError using processOptions resolver", async () => {
       const originalError = new Error("original error");
       const haltError = new HaltError(originalError);
 
       const mockProcessOptions = createMockProcessOptions({
-        resolveHaltRejection: jest.fn().mockReturnValue(42),
+        resolveHaltRejection: jest
+          .fn()
+          .mockResolvedValue(() => Promise.resolve(42)),
       });
 
       const context = createMockChainContext({
@@ -77,7 +100,9 @@ describe("rejectionHandlers", () => {
       const result = await resolver(haltError);
 
       expect(mockProcessOptions.resolveHaltRejection).toHaveBeenCalledWith(
-        haltError,
+        expect.any(Function),
+        expect.any(Function),
+        originalError,
       );
       expect(result).toBe(42);
     });
@@ -101,7 +126,9 @@ describe("rejectionHandlers", () => {
       const originalError = new Error("original error");
       const haltError = new HaltError(originalError);
       const mockProcessOptions = createMockProcessOptions({
-        resolveHaltRejection: jest.fn().mockResolvedValue(TARGET_FALLBACK),
+        resolveHaltRejection: jest
+          .fn()
+          .mockResolvedValue(() => Promise.resolve(TARGET_FALLBACK)),
       });
 
       const context = createMockChainContext({
@@ -114,7 +141,9 @@ describe("rejectionHandlers", () => {
 
       expect(result).toBe(TARGET_FALLBACK);
       expect(mockProcessOptions.resolveHaltRejection).toHaveBeenCalledWith(
-        haltError,
+        expect.any(Function),
+        expect.any(Function),
+        originalError,
       );
     });
 
@@ -137,7 +166,9 @@ describe("rejectionHandlers", () => {
 
       await expect(resolver(haltError)).rejects.toBe(resolverError);
       expect(mockProcessOptions.resolveHaltRejection).toHaveBeenCalledWith(
-        haltError,
+        expect.any(Function),
+        expect.any(Function),
+        originalError,
       );
     });
   });
@@ -163,7 +194,11 @@ describe("rejectionHandlers", () => {
       ).toHaveBeenCalledTimes(1);
       expect(
         mockProcessOptions.resolveContinuousRejection,
-      ).toHaveBeenCalledWith(continueRejections);
+      ).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.any(Function),
+        continueRejections,
+      );
     });
 
     it("should handle empty continuous rejections array", async () => {
@@ -182,7 +217,7 @@ describe("rejectionHandlers", () => {
       ).toHaveBeenCalledTimes(1);
       expect(
         mockProcessOptions.resolveContinuousRejection,
-      ).toHaveBeenCalledWith([]);
+      ).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), []);
     });
 
     it("should handle single continuous rejection", async () => {
@@ -201,7 +236,9 @@ describe("rejectionHandlers", () => {
 
       expect(
         mockProcessOptions.resolveContinuousRejection,
-      ).toHaveBeenCalledWith([singleError]);
+      ).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), [
+        singleError,
+      ]);
     });
 
     it("should handle resolver that throws", async () => {
@@ -245,7 +282,9 @@ describe("rejectionHandlers", () => {
 
       expect(
         mockProcessOptions.resolveContinuousRejection,
-      ).toHaveBeenCalledWith([error1]);
+      ).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), [
+        error1,
+      ]);
     });
   });
 
@@ -254,7 +293,9 @@ describe("rejectionHandlers", () => {
       const continueError = new Error("continue error");
 
       const mockProcessOptions = createMockProcessOptions({
-        resolveHaltRejection: jest.fn().mockReturnValue(TARGET_FALLBACK),
+        resolveHaltRejection: jest
+          .fn()
+          .mockResolvedValue(() => Promise.resolve(TARGET_FALLBACK)),
       });
 
       const context = createMockChainContext({
@@ -269,7 +310,9 @@ describe("rejectionHandlers", () => {
 
       expect(
         mockProcessOptions.resolveContinuousRejection,
-      ).toHaveBeenCalledWith([continueError]);
+      ).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), [
+        continueError,
+      ]);
 
       // Then test rejection handling with regular error
       const haltResolver = resolveHaltRejection(chain);
@@ -296,7 +339,11 @@ describe("rejectionHandlers", () => {
 
       expect(
         mockProcessOptions.resolveContinuousRejection,
-      ).toHaveBeenCalledWith(mixedRejections);
+      ).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.any(Function),
+        mixedRejections,
+      );
     });
   });
 });

@@ -1,30 +1,42 @@
-import type { HaltError } from "@/lib/errors/HaltError";
 import {
   type NormalizableOptions,
   normalizeOptions,
 } from "@/lib/utils/normalizeOptions";
 
-export type RequiredProcessOptions<Result> = {
-  readonly resolveHaltRejection: (error: HaltError) => Promise<Result>;
-  readonly resolveContinuousRejection: (error: unknown[]) => void;
+import type { Target } from "./target";
+
+export type RequiredProcessOptions<Result, SharedContext> = {
+  readonly resolveHaltRejection: (
+    context: () => SharedContext,
+    exit: <T>(callback: () => T) => T,
+    error: unknown,
+  ) => Promise<Target<Result>>;
+  readonly resolveContinuousRejection: (
+    context: () => SharedContext,
+    exit: <T>(callback: () => T) => T,
+    error: unknown[],
+  ) => Promise<void>;
 };
 
-export type ProcessOptions<Result> = NormalizableOptions<
-  RequiredProcessOptions<Result>
+export type ProcessOptions<Result, SharedContext> = NormalizableOptions<
+  RequiredProcessOptions<Result, SharedContext>
 >;
 
-export function normalizeProcessOptions<Result>(
-  options?: ProcessOptions<Result>,
-  defaultOptions: RequiredProcessOptions<Result> = defaultProcessOptions(),
-): RequiredProcessOptions<Result> {
+export function normalizeProcessOptions<Result, SharedContext>(
+  options?: ProcessOptions<Result, SharedContext>,
+  defaultOptions: RequiredProcessOptions<
+    Result,
+    SharedContext
+  > = defaultProcessOptions(),
+): RequiredProcessOptions<Result, SharedContext> {
   return normalizeOptions(defaultOptions, options);
 }
 
-export function defaultProcessOptions<Result>() {
+export function defaultProcessOptions<Result, SharedContext>() {
   return {
-    resolveHaltRejection: async (error) => {
+    resolveHaltRejection: async (_context, _exit, error) => {
       throw error;
     },
-    resolveContinuousRejection: () => {},
-  } as const satisfies RequiredProcessOptions<Result>;
+    resolveContinuousRejection: async () => {},
+  } as const satisfies RequiredProcessOptions<Result, SharedContext>;
 }

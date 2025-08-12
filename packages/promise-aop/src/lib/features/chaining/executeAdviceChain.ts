@@ -1,7 +1,7 @@
 import { AspectOrganization } from "@/lib/models/aspect";
 import { RequiredBuildOptions } from "@/lib/models/buildOptions";
 import { RequiredProcessOptions } from "@/lib/models/processOptions";
-import { Target, TARGET_FALLBACK } from "@/lib/models/target";
+import { Target, TARGET_FALLBACK, TargetFallback } from "@/lib/models/target";
 import { AsyncContext } from "@/lib/utils/AsyncContext";
 
 import {
@@ -31,14 +31,30 @@ export async function executeAdviceChain<Result, SharedContext>(
   return AsyncContext.execute(AdviceChainContext, async (chain) => {
     return (
       Promise.resolve()
-        // advice tasks
         .then(beforeAdviceTask(chain))
         .then(aroundAdviceTask(chain))
+        .then((resolve) => {
+          // receive fallback
+          if (resolve === null) {
+            return async () =>
+              TargetFallback()
+                .finally(afterAdviceTask(chain))
+                .catch(resolveHaltRejection(chain))
+                .finally(handleContinuousRejection(chain));
+          }
+
+          return resolve((target) => {
+            return async () =>
+              target()
+                .then(afterReturningAdviceTask(chain))
+                .catch(afterThrowingAdviceTask(chain))
+                .finally(afterAdviceTask(chain))
+                .catch(resolveHaltRejection(chain))
+                .finally(handleContinuousRejection(chain));
+          });
+        })
         .then(executeTargetTask)
-        .then(afterReturningAdviceTask(chain))
-        .catch(afterThrowingAdviceTask(chain))
-        .finally(afterAdviceTask(chain))
-        // rejection handlers
+        // recover from Halt errors that occurred in upper stages (before/around etc.)
         .catch(resolveHaltRejection(chain))
         .finally(handleContinuousRejection(chain))
     );
@@ -48,9 +64,10 @@ export async function executeAdviceChain<Result, SharedContext>(
 export type __Props<Result, SharedContext> = {
   readonly target: Target<Result>;
   readonly context: () => SharedContext;
+  readonly exit: <T>(callback: () => T) => T;
   readonly advices: AspectOrganization<Result, SharedContext>;
   readonly buildOptions: RequiredBuildOptions;
-  readonly processOptions: RequiredProcessOptions<Result>;
+  readonly processOptions: RequiredProcessOptions<Result, SharedContext>;
 };
 
 export type __Return<Result> = Result | typeof TARGET_FALLBACK;

@@ -16,23 +16,37 @@ export class AsyncContext<SharedContext> {
     return store;
   };
 
+  public exit = <T>(callback: () => T) => {
+    return this.contextStore.exit(callback);
+  };
+
   static async execute<P, Q>(
-    { contextGenerator, contextStore, context }: AsyncContext<P>,
-    operation: (context: AsyncContext<P>["context"]) => Promise<Q>,
+    { contextGenerator, contextStore, context, exit }: AsyncContext<P>,
+    operation: (
+      context: AsyncContext<P>["context"],
+      exit: AsyncContext<P>["exit"],
+    ) => Promise<Q>,
   ): Promise<Q> {
     if (!contextGenerator) {
       throw new Error(MSG_ERR_ASYNC_CONTEXT_GENERATOR_NOT_PROVIDED);
     }
 
-    return contextStore.run(contextGenerator(), async () => operation(context));
+    return contextStore.run(contextGenerator(), async () =>
+      operation(context, exit),
+    );
   }
 
   static async executeWith<P, Q>(
-    { contextStore, context }: AsyncContext<P>,
+    { contextStore, context, exit }: AsyncContext<P>,
     contextGenerator: () => P,
-    operation: (context: AsyncContext<P>["context"]) => Promise<Q>,
+    operation: (
+      context: AsyncContext<P>["context"],
+      exit: AsyncContext<P>["exit"],
+    ) => Promise<Q>,
   ): Promise<Q> {
-    return contextStore.run(contextGenerator(), async () => operation(context));
+    return contextStore.run(contextGenerator(), async () =>
+      operation(context, exit),
+    );
   }
 
   static create<T>(contextGenerator?: () => T) {

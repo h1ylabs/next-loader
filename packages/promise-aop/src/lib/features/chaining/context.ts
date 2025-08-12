@@ -9,12 +9,13 @@ export type AdviceChainContext<Result, SharedContext> = {
   haltRejection?: HaltError;
   continueRejections: unknown[];
 
-  // default context
+  // functions for AsyncContext
   context: () => SharedContext;
+  exit: <T>(callback: () => T) => T;
 
-  // infomation for advice chain
+  // options for AdviceChain
   target: Target<Result>;
   advices: AspectOrganization<Result, SharedContext>;
   buildOptions: RequiredBuildOptions;
-  processOptions: RequiredProcessOptions<Result>;
+  processOptions: RequiredProcessOptions<Result, SharedContext>;
 };

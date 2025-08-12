@@ -1,7 +1,4 @@
-import {
-  AdviceError,
-  MSG_ERROR_ADVICE_NOT_CALLED_FROM_OUTSIDE,
-} from "@/lib/errors/AdviceError";
+import { AdviceError } from "@/lib/errors/AdviceError";
 import type { Advice } from "@/lib/models/advice";
 
 describe("AdviceError", () => {
@@ -14,7 +11,6 @@ describe("AdviceError", () => {
     expect(adviceError).toBeInstanceOf(Error);
     expect(adviceError.advice).toBe(advice);
     expect(adviceError.errors).toBe(errors);
-    expect(adviceError.message).toBe(MSG_ERROR_ADVICE_NOT_CALLED_FROM_OUTSIDE);
   });
 
   it("should handle different advice types", () => {

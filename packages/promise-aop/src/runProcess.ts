@@ -10,8 +10,8 @@ export async function runProcess<Result, SharedContext>({
   const asyncContext =
     typeof context === "function" ? AsyncContext.create(context) : context;
 
-  return AsyncContext.execute(asyncContext, async (ctx) =>
-    process(ctx, target),
+  return AsyncContext.execute(asyncContext, async (ctx, exit) =>
+    process(ctx, exit, target),
   );
 }
 

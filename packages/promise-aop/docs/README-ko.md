@@ -1,6 +1,6 @@
-# @h1y/promise-aop
+# Promise-AOP
 
-비동기 JavaScript를 위한 TypeScript-first AOP(Aspect-Oriented Programming) 프레임워크입니다. 타입 안전한 공유 컨텍스트, 섹션 단위 잠금 기반 병렬 처리, halt/continue 정책과 에러 집계, 의존성 기반 실행 순서를 제공합니다.
+비동기 JavaScript를 위한 TypeScript-first AOP(Aspect-Oriented Programming) 프레임워크입니다. 타입 안전한 공유 컨텍스트와 섹션 잠금, around advice를 통한 유연한 래퍼 조합, 설정 가능한 에러 처리(halt/continue와 집계), 의존성 기반 실행 순서를 제공합니다.
 
 [English README](../README.md)
 
@@ -73,13 +73,13 @@ pnpm add @h1y/promise-aop
 
 ### 어드바이스 타입
 
-| Type             | 언제 실행    | Parameters         | 주요 용도                                     |
-| ---------------- | ------------ | ------------------ | --------------------------------------------- |
-| `before`         | 타겟 이전    | `(context)`        | 검증, 초기화, 인증                            |
-| `around`         | 타겟을 래핑  | `(context, wrap)`  | 캐싱, 재시도, 시간 측정; 결과를 다루거나 대체 |
-| `afterReturning` | 성공 후      | `(context)`        | 성공 로그/정리                                |
-| `afterThrowing`  | 예외 발생 후 | `(context, error)` | 에러 로그/알림                                |
-| `after`          | 항상 마지막  | `(context)`        | 정리, 메트릭                                  |
+| Type             | 언제 실행    | Parameters                                      | 주요 용도                                 |
+| ---------------- | ------------ | ----------------------------------------------- | ----------------------------------------- |
+| `before`         | 타겟 이전    | `(context)`                                     | 검증, 초기화, 인증                        |
+| `around`         | 타겟을 래핑  | `(context, { attachToResult, attachToTarget })` | 캐싱, 재시도, 시간 측정; 유연한 래퍼 조합 |
+| `afterReturning` | 성공 후      | `(context)`                                     | 성공 로그/정리                            |
+| `afterThrowing`  | 예외 발생 후 | `(context, error)`                              | 에러 로그/알림                            |
+| `after`          | 항상 마지막  | `(context)`                                     | 정리, 메트릭                              |
 
 ### Aspect, Process, Context
 
@@ -160,7 +160,7 @@ const process = createProcess({
 
 ## 🧩 자주 쓰는 패턴
 
-### 캐싱 (fast‑path via `around`)
+### 유연한 래퍼 조합을 통한 캐싱
 
 ```ts
 type Data = { value: string };
@@ -177,8 +177,9 @@ const Cache = createAspect<Data, Ctx>((createAdvice) => ({
   name: "cache",
   around: createAdvice({
     use: ["cache"],
-    advice: async ({ cache }, wrap) => {
-      wrap((target) => async () => {
+    advice: async ({ cache }, { attachToTarget }) => {
+      // attachToTarget: 원본 타겟 함수에 직접 적용
+      attachToTarget((target) => async () => {
         const cached = await cache.get(key);
         if (cached) return cached;
         const out = await target();
@@ -254,11 +255,64 @@ const B = createAspect<string, { log: Console }>((createAdvice) => ({
 }));
 ```
 
+### 고급 Around Advice: 유연한 래퍼 조합
+
+v2 around advice는 최고의 유연성을 위해 두 가지 별개의 부착 지점을 제공합니다:
+
+```ts
+const AdvancedAround = createAspect<number, { log: Console }>(
+  (createAdvice) => ({
+    name: "advanced-around",
+    around: createAdvice({
+      use: ["log"],
+      advice: async ({ log }, { attachToResult, attachToTarget }) => {
+        // attachToTarget: 원본 타겟 함수에 적용
+        // 가장 안쪽에서 실행되어 실제 타겟에 가장 가깝게 위치
+        attachToTarget((target) => async () => {
+          log.info("target-wrapper: before");
+          const result = await target();
+          log.info("target-wrapper: after");
+          return result + 10;
+        });
+
+        // attachToResult: 최종 조합된 결과에 적용
+        // 가장 바깥쪽에서 실행되어 전체 체인을 래핑
+        attachToResult((target) => async () => {
+          log.info("result-wrapper: before");
+          const result = await target();
+          log.info("result-wrapper: after");
+          return result * 2;
+        });
+      },
+    }),
+  }),
+);
+
+// 타겟 값 5에 대한 실행 순서:
+// result-wrapper: before
+// target-wrapper: before
+// [원본 타겟 실행: 5]
+// target-wrapper: after  → 5 + 10 = 15
+// result-wrapper: after  → 15 * 2 = 30
+```
+
+#### 주요 차이점
+
+- **`attachToTarget`**: 원본 타겟 함수를 직접 래핑합니다. 여러 타겟 래퍼는 역순으로 조합됩니다(마지막에 부착된 것이 타겟 래퍼 중 가장 바깥쪽에서 실행).
+- **`attachToResult`**: 모든 타겟 래퍼가 적용된 후 전체 실행 체인을 래핑합니다. 결과 래퍼도 역순으로 조합됩니다.
+- **실행 순서**: `resultWrapper(nextChain(targetWrapper(target)))`
+
+이 설계는 다음과 같은 정교한 시나리오를 가능하게 합니다:
+
+- 타겟 레벨에서 캐싱하면서 결과 레벨에서 메트릭 추가
+- 타겟 래퍼를 통한 입력 검증/변환, 결과 래퍼를 통한 출력 포맷팅
+- 다계층 에러 처리 및 재시도 로직
+
 ---
 
 ## 📚 API 레퍼런스
 
-### Core Functions
+### Core functions
 
 | Function                                 | Description                                   | Returns                                     |
 | ---------------------------------------- | --------------------------------------------- | ------------------------------------------- |
@@ -266,7 +320,7 @@ const B = createAspect<string, { log: Console }>((createAdvice) => ({
 | `createProcess<Result, Context>(config)` | 어드바이스 체인을 실행 가능한 프로세스로 조합 | `Process<Result, Context>`                  |
 | `runProcess<Result, Context>(props)`     | 컨텍스트와 타겟을 받아 프로세스 실행          | `Promise<Result \| typeof TARGET_FALLBACK>` |
 
-### 타입 상세 (Core Functions에서 사용)
+### Type details (used by core functions)
 
 - Result: 타겟 함수의 반환 타입
 - Context / SharedContext: 모든 어드바이스에서 공유되는 불변 컨텍스트 객체
@@ -278,7 +332,7 @@ const B = createAspect<string, { log: Console }>((createAdvice) => ({
 - `AdviceFunction`, `AdviceFunctionWithContext`: 어드바이스 타입별 엄격한 시그니처
 - `Target<Result>`: `() => Promise<Result>` — 조인 포인트가 되는 타겟 함수
 - `TargetWrapper<Result>`: `(target: Target<Result>) => Target<Result>` — `around`에서 사용하는 래퍼
-- `Process<Result, Context>`: `(context: () => Context, target: Target<Result>) => Promise<Result | typeof TARGET_FALLBACK>`
+- `Process<Result, Context>`: `(context: () => Context, exit: <T>(callback: () => T) => T, target: Target<Result>) => Promise<Result | typeof TARGET_FALLBACK>`
 - `BuildOptions`(어드바이스별): 실행 전략과 에러 정책 (`ExecutionStrategy`, `AggregationUnit`, `ErrorAfter`)
 - `ProcessOptions<Result>`: `{ resolveHaltRejection, resolveContinuousRejection }`
 - `AsyncContext<Context>`와 `Restricted<Context, Sections>`: 실행마다 새 불변 컨텍스트 제공 및 섹션 단위 접근 제한 유틸리티
@@ -304,27 +358,48 @@ const process = createProcess<
 });
 ```
 
-### `around` 구성 순서
+### Around 래퍼 조합 순서
 
-- 먼저 등록된 `wrap`이 가장 안쪽(innermost)에 적용됩니다
+- **타겟 래퍼** (`attachToTarget` 사용): 마지막에 부착된 것이 타겟 래퍼 중 가장 바깥쪽에서 실행
+- **결과 래퍼** (`attachToResult` 사용): 마지막에 부착된 것이 결과 래퍼 중 가장 바깥쪽에서 실행
+- **전체 순서**: `resultWrapper(nextChain(targetWrapper(target)))`
 
 ### AsyncContext 통합
 
-```ts
-import { AsyncContext, createProcess } from "@h1y/promise-aop";
+Promise-AOP v2는 더 나은 컨텍스트 관리를 위해 완벽한 AsyncContext 통합을 제공합니다:
 
+```ts
+import { AsyncContext, createProcess, runProcess } from "@h1y/promise-aop";
+
+// 방법 1: runProcess와 직접 AsyncContext 사용
+const asyncContext = AsyncContext.create(() => ({
+  logger: console,
+  database: myDb,
+}));
+
+const result = await runProcess({
+  process: myProcess,
+  context: asyncContext, // AsyncContext를 직접 전달
+  target: async () => "Hello World",
+});
+
+// 방법 2: 수동 AsyncContext 실행 (고급 시나리오용)
 const process = createProcess({
   aspects: [
     /* ... */
   ],
 });
-const ac = AsyncContext.create(() => ({
-  /* context object */
-}));
-const out = await AsyncContext.execute(ac, (getCtx) =>
-  process(getCtx, async () => 42),
+const out = await AsyncContext.execute(asyncContext, (getCtx, exit) =>
+  process(getCtx, exit, async () => 42),
 );
 ```
+
+#### AsyncContext의 주요 장점
+
+- **자동 컨텍스트 전파**: 모든 비동기 작업에서 컨텍스트가 자동으로 흐름
+- **타입 안전성**: 컨텍스트 추론과 함께 완전한 TypeScript 지원
+- **메모리 효율성**: 컨텍스트가 실행 체인에 범위 지정됨
+- **격리**: 각 실행이 고유한 컨텍스트 인스턴스를 유지
 
 ### 에러 우선순위와 빠른 종료
 
@@ -358,6 +433,6 @@ yarn lint
 4. 브랜치를 푸시합니다 (`git push origin feature/amazing-feature`)
 5. Pull Request를 생성합니다
 
-## 📝 라이센스
+## 📝 License
 
-MIT
+MIT © [h1ylabs](https://github.com/h1ylabs)

@@ -42,14 +42,17 @@ describe("adviceHandlers", () => {
   const createMockBuildOptions = (): RequiredBuildOptions =>
     defaultBuildOptions();
 
-  const createMockProcessOptions = (): RequiredProcessOptions<TestResult> =>
-    createProcessOptionsMock<TestResult>();
+  const createMockProcessOptions = (): RequiredProcessOptions<
+    TestResult,
+    TestSharedContext
+  > => createProcessOptionsMock<TestResult, TestSharedContext>();
 
   const createMockChainContext = (
     overrides: Partial<AdviceChainContext<TestResult, TestSharedContext>> = {},
   ): AdviceChainContext<TestResult, TestSharedContext> => ({
     target: createMockTarget(100),
     context: createMockContext(),
+    exit: <T>(callback: () => T) => callback(),
     advices: createMockAdvices(),
     buildOptions: createMockBuildOptions(),
     processOptions: createMockProcessOptions(),
@@ -137,7 +140,8 @@ describe("adviceHandlers", () => {
       await expect(handleTask(targetError)).rejects.toBeInstanceOf(HaltError);
 
       expect(context.haltRejection).toBeInstanceOf(HaltError);
-      expect(context.haltRejection?.cause).toBe(targetError);
+      // In the latest logic, TargetError is wrapped in UnknownError and stored in HaltError's cause.
+      expect(context.haltRejection?.cause).toBeInstanceOf(UnknownError);
       expect(context.continueRejections).toHaveLength(0);
     });
 

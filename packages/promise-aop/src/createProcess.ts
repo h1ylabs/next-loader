@@ -76,9 +76,10 @@ export function createProcess<Result, SharedContext>({
   const processOptions = normalizeProcessOptions(optionalProcessOptions);
   const advices = organizeAspect({ aspects, buildOptions });
 
-  return async (context, target) =>
+  return async (context, exit, target) =>
     executeAdviceChain<Result, SharedContext>({
       context,
+      exit,
       target,
       advices: await advices,
       buildOptions,
@@ -89,7 +90,7 @@ export function createProcess<Result, SharedContext>({
 export type __Props<Result, SharedContext> = {
   readonly aspects: readonly Aspect<Result, SharedContext>[];
   readonly buildOptions?: BuildOptions;
-  readonly processOptions?: ProcessOptions<Result>;
+  readonly processOptions?: ProcessOptions<Result, SharedContext>;
 };
 
 export type __Return<Result, SharedContext> = Process<Result, SharedContext>;

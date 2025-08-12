@@ -13,6 +13,7 @@ import {
   normalizeBuildOptions,
   type RequiredBuildOptions,
 } from "@/lib/models/buildOptions";
+import type { TargetWrapper } from "@/lib/models/target";
 
 // Mock dependencies
 jest.mock("@/lib/features/organizing/organizeAdvice");
@@ -83,8 +84,8 @@ describe("organizeAspect", () => {
         }),
         around: createAdvice({
           use: ["db"],
-          advice: async ({ db }, wrap) => {
-            wrap((target) => async () => {
+          advice: async ({ db }, { attachToTarget }) => {
+            attachToTarget((target) => async () => {
               await db.query();
               return target();
             });
@@ -190,8 +191,8 @@ describe("organizeAspect", () => {
         name: "A",
         around: createAdvice({
           use: ["db"],
-          advice: async (_, wrap) => {
-            wrap((target) => target);
+          advice: async (_context, { attachToTarget }) => {
+            attachToTarget((target) => target);
           },
         }),
       }));
@@ -211,14 +212,26 @@ describe("organizeAspect", () => {
       };
 
       const mockWrap = jest.fn();
-      await organization.around(testContext, mockWrap);
+      await organization.around(testContext, {
+        attachToResult: mockWrap as unknown as (
+          wrapper: TargetWrapper<TestResult>,
+        ) => void,
+        attachToTarget: mockWrap as unknown as (
+          wrapper: TargetWrapper<TestResult>,
+        ) => void,
+      });
 
       expect(mockProcessBatchAdvice).toHaveBeenCalledWith({
         options: defaultBuildOptions().advice.around,
         execution: mockExecution,
         adviceType: "around",
         context: testContext,
-        args: [mockWrap],
+        args: [
+          {
+            attachToResult: mockWrap,
+            attachToTarget: mockWrap,
+          },
+        ],
       });
     });
 

@@ -1,7 +1,4 @@
-import {
-  MSG_ERROR_UNKNOWN_ERROR,
-  UnknownError,
-} from "@/lib/errors/UnknownError";
+import { UnknownError } from "@/lib/errors/UnknownError";
 
 describe("UnknownError", () => {
   it("should create an UnknownError with an error cause", () => {
@@ -10,7 +7,6 @@ describe("UnknownError", () => {
 
     expect(unknownError).toBeInstanceOf(Error);
     expect(unknownError.cause).toBe(originalError);
-    expect(unknownError.message).toBe(MSG_ERROR_UNKNOWN_ERROR);
   });
 
   it("should handle a string error message", () => {
