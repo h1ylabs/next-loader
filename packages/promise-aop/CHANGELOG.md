@@ -1,5 +1,11 @@
 # @h1y/promise-aop
 
+## 3.0.0
+
+### Major Changes
+
+- [#39](https://github.com/h1ylabs/next-loader/pull/39) [`2abf5f1`](https://github.com/h1ylabs/next-loader/commit/2abf5f1dceddc644b544e538f5ca6421ee9bffed) Thanks [@cutehammond772](https://github.com/cutehammond772)! - unified Rejection model replaces individual error classes, enhanced type safety with generics, and improved context management.
+
 ## 2.0.0
 
 ### Major Changes
