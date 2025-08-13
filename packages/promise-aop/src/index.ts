@@ -7,9 +7,11 @@ export { createProcess } from "./createProcess";
 export { runProcess } from "./runProcess";
 
 // Errors
-export { AdviceError } from "@/lib/errors/AdviceError";
-export { TargetError } from "@/lib/errors/TargetError";
-export { UnknownError } from "@/lib/errors/UnknownError";
+export {
+  ContinuousRejection,
+  HaltRejection,
+  Rejection,
+} from "@/lib/models/rejection";
 
 // Options
 export {

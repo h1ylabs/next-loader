@@ -1,5 +1,4 @@
-import { HaltError } from "@/lib/errors/HaltError";
-import { TargetError } from "@/lib/errors/TargetError";
+import { HaltRejection } from "@/lib/models/rejection";
 import type { AroundAdviceResolver, Target } from "@/lib/models/target";
 
 import { processAroundAdvice } from "../processing/processAroundAdvice";
@@ -72,7 +71,12 @@ export function afterThrowingAdviceTask<Result, SharedContext>(
 
     // explicitly propagate the error from the target.
     const targetRejection = async () => {
-      throw (chain().haltRejection = new HaltError(new TargetError(error)));
+      throw (chain().haltRejection = new HaltRejection({
+        error,
+        extraInfo: {
+          type: "target",
+        },
+      }));
     };
 
     return (

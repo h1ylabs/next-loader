@@ -7,18 +7,19 @@ import {
   normalizeOptions,
 } from "@/lib/utils/normalizeOptions";
 
+import type { ContinuousRejection, HaltRejection } from "./rejection";
 import type { Target } from "./target";
 
 export type RequiredProcessOptions<Result, SharedContext> = {
   readonly resolveHaltRejection: (
     context: ContextAccessor<SharedContext>,
     exit: ExecutionOuterContext,
-    error: unknown
+    error: HaltRejection
   ) => Promise<Target<Result>>;
   readonly resolveContinuousRejection: (
     context: ContextAccessor<SharedContext>,
     exit: ExecutionOuterContext,
-    error: unknown[]
+    error: ContinuousRejection[]
   ) => Promise<void>;
 };
 

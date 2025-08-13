@@ -1,4 +1,4 @@
-import { HaltError } from "@/lib/errors/HaltError";
+import { HaltRejection } from "@/lib/models/rejection";
 
 import { AdviceChainContext } from "./context";
 
@@ -6,11 +6,11 @@ export function resolveHaltRejection<Result, SharedContext>(
   chain: () => AdviceChainContext<Result, SharedContext>
 ) {
   return async (error: unknown) => {
-    if (error instanceof HaltError) {
+    if (error instanceof HaltRejection) {
       const fallback = await chain().processOptions.resolveHaltRejection(
         chain().context,
         chain().exit,
-        error.cause
+        error
       );
 
       return fallback();

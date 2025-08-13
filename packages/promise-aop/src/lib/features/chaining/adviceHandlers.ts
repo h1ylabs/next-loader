@@ -1,13 +1,15 @@
-import { AdviceError } from "@/lib/errors/AdviceError";
-import { HaltError } from "@/lib/errors/HaltError";
-import { UnknownError } from "@/lib/errors/UnknownError";
 import { ErrorAfter } from "@/lib/models/buildOptions";
+import {
+  ContinuousRejection,
+  HaltRejection,
+  Rejection,
+} from "@/lib/models/rejection";
 import { exhaustiveCheckType, validateType } from "@/lib/utils/validateType";
 
 import type { AdviceChainContext } from "./context";
 
 export function checkRejection<Result, SharedContext>(
-  chain: () => AdviceChainContext<Result, SharedContext>,
+  chain: () => AdviceChainContext<Result, SharedContext>
 ) {
   return async () => {
     if (chain().haltRejection) {
@@ -17,41 +19,50 @@ export function checkRejection<Result, SharedContext>(
 }
 
 export function handleRejection<Result, SharedContext>(
-  chain: () => AdviceChainContext<Result, SharedContext>,
+  chain: () => AdviceChainContext<Result, SharedContext>
 ) {
   return async (error: unknown) => {
-    // 1. if error is halted error propagated, continue propagating
-    if (error instanceof HaltError) {
+    // if error is halt rejection, continue propagating
+    if (error instanceof HaltRejection) {
       throw error;
     }
 
-    // 2. if error is thrown from advice, handle error
-    else if (error instanceof AdviceError) {
+    // if rejection is thrown from advice, handle rejection
+    else if (
+      error instanceof Rejection &&
+      error.info.extraInfo.type === "advice"
+    ) {
       const afterThrow = validateType(
         ErrorAfter,
-        chain().buildOptions.advice[error.advice].error.runtime.afterThrow,
+        chain().buildOptions.advice[error.info.extraInfo.advice].error.runtime
+          .afterThrow
       );
 
       switch (afterThrow) {
         // halt the total advice chain
         case "halt":
-          chain().haltRejection = new HaltError(error);
+          chain().haltRejection = new HaltRejection(error.info);
           break;
         // continue the advice chain
         case "continue":
-          chain().continueRejections.push(error);
+          chain().continueRejections.push(new ContinuousRejection(error.info));
           break;
         default:
           exhaustiveCheckType(afterThrow);
       }
     }
 
-    // 4. if error is unknown, halt immediately
+    // if error is unknown, halt immediately
     else {
-      chain().haltRejection = new HaltError(new UnknownError(error));
+      chain().haltRejection = new HaltRejection({
+        error,
+        extraInfo: {
+          type: "unknown",
+        },
+      });
     }
 
-    // if there is a halted error, propagate
+    // if there is a halted rejection, propagate it
     await checkRejection(chain)();
   };
 }

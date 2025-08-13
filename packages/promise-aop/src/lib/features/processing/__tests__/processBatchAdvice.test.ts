@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { AdviceError } from "@/lib/errors/AdviceError";
 import {
   type __Props,
   processBatchAdvice,
@@ -14,6 +13,7 @@ import type {
   AggregationUnit,
   RequiredBuildOptions,
 } from "@/lib/models/buildOptions";
+import { Rejection } from "@/lib/models/rejection";
 import { Restricted, type SectionsUsed } from "@/lib/utils/RestrictedContext";
 
 describe("processBatchAdvice", () => {
@@ -33,7 +33,7 @@ describe("processBatchAdvice", () => {
   });
 
   const createTestOptions = (
-    aggregation: AggregationUnit = "unit",
+    aggregation: AggregationUnit = "unit"
   ): RequiredBuildOptions["advice"][TestAdviceType] => ({
     execution: "parallel",
     error: {
@@ -46,7 +46,7 @@ describe("processBatchAdvice", () => {
 
   const createSuccessfulAdvice =
     (
-      delay: number = 0,
+      delay: number = 0
     ): AdviceFunctionWithContext<
       TestResult,
       TestSharedContext,
@@ -61,7 +61,7 @@ describe("processBatchAdvice", () => {
   const createFailingAdvice =
     (
       errorMessage: string,
-      delay: number = 0,
+      delay: number = 0
     ): AdviceFunctionWithContext<
       TestResult,
       TestSharedContext,
@@ -153,17 +153,22 @@ describe("processBatchAdvice", () => {
         adviceType: "before",
       });
 
-      await expect(processBatchAdvice(props)).rejects.toThrow(AdviceError);
+      await expect(processBatchAdvice(props)).rejects.toThrow(Rejection);
 
       try {
         await processBatchAdvice(props);
       } catch (error) {
-        expect(error).toBeInstanceOf(AdviceError);
-        if (error instanceof AdviceError) {
-          expect(error.advice).toBe("before");
-          expect(error.errors).toHaveLength(1);
-          expect(error.errors[0]).toBeInstanceOf(Error);
-          expect((error.errors[0] as Error).message).toBe("First group error");
+        expect(error).toBeInstanceOf(Rejection);
+        if (error instanceof Rejection) {
+          expect(error.info.extraInfo.type).toBe("advice");
+          if (error.info.extraInfo.type === "advice") {
+            expect(error.info.extraInfo.advice).toBe("before");
+          }
+          expect(Array.isArray(error.info.error)).toBe(true);
+          const errors = error.info.error as unknown[];
+          expect(errors).toHaveLength(1);
+          expect(errors[0]).toBeInstanceOf(Error);
+          expect((errors[0] as Error).message).toBe("First group error");
         }
       }
     });
@@ -187,7 +192,7 @@ describe("processBatchAdvice", () => {
         adviceType: "before",
       });
 
-      await expect(processBatchAdvice(props)).rejects.toThrow(AdviceError);
+      await expect(processBatchAdvice(props)).rejects.toThrow(Rejection);
     });
 
     it("should collect all errors from single group with multiple failures", async () => {
@@ -211,12 +216,13 @@ describe("processBatchAdvice", () => {
 
       try {
         await processBatchAdvice(props);
-        fail("Expected AdviceError to be thrown");
+        fail("Expected Rejection to be thrown");
       } catch (error) {
-        expect(error).toBeInstanceOf(AdviceError);
-        if (error instanceof AdviceError) {
-          expect(error.errors).toHaveLength(2);
-          const errorMessages = error.errors.map((e) => (e as Error).message);
+        expect(error).toBeInstanceOf(Rejection);
+        if (error instanceof Rejection) {
+          const errors = error.info.error as unknown[];
+          expect(errors).toHaveLength(2);
+          const errorMessages = errors.map((e) => (e as Error).message);
           expect(errorMessages).toContain("Error 1");
           expect(errorMessages).toContain("Error 2");
         }
@@ -245,13 +251,17 @@ describe("processBatchAdvice", () => {
 
       try {
         await processBatchAdvice(props);
-        fail("Expected AdviceError to be thrown");
+        fail("Expected Rejection to be thrown");
       } catch (error) {
-        expect(error).toBeInstanceOf(AdviceError);
-        if (error instanceof AdviceError) {
-          expect(error.advice).toBe("after");
-          expect(error.errors).toHaveLength(3);
-          const errorMessages = error.errors.map((e) => (e as Error).message);
+        expect(error).toBeInstanceOf(Rejection);
+        if (error instanceof Rejection) {
+          expect(error.info.extraInfo.type).toBe("advice");
+          if (error.info.extraInfo.type === "advice") {
+            expect(error.info.extraInfo.advice).toBe("after");
+          }
+          const errors = error.info.error as unknown[];
+          expect(errors).toHaveLength(3);
+          const errorMessages = errors.map((e) => (e as Error).message);
           expect(errorMessages).toContain("Group 1 Error 1");
           expect(errorMessages).toContain("Group 1 Error 2");
           expect(errorMessages).toContain("Group 3 Error");
@@ -286,7 +296,7 @@ describe("processBatchAdvice", () => {
         | undefined;
 
       const contextCapturingAdvice = async (
-        context: Restricted<TestSharedContext, ["database", "logger"]>,
+        context: Restricted<TestSharedContext, ["database", "logger"]>
       ) => {
         capturedContext = context;
         // Access allowed sections
@@ -324,7 +334,7 @@ describe("processBatchAdvice", () => {
 
     it("should handle advice with no use sections (empty array)", async () => {
       const minimalAdvice = async (
-        _context: Restricted<TestSharedContext, []>,
+        _context: Restricted<TestSharedContext, []>
       ) => {
         // Should have no access to any context properties
       };
@@ -353,10 +363,7 @@ describe("processBatchAdvice", () => {
 
     it("should handle advice without explicit use property", async () => {
       const defaultAdvice = async (
-        _context: Restricted<
-          TestSharedContext,
-          SectionsUsed<TestSharedContext>
-        >,
+        _context: Restricted<TestSharedContext, SectionsUsed<TestSharedContext>>
       ) => {
         // Default behavior when use is not specified
       };
@@ -466,12 +473,12 @@ describe("processBatchAdvice", () => {
 
       try {
         await processBatchAdvice(props);
-        fail("Expected AdviceError to be thrown");
+        fail("Expected Rejection to be thrown");
       } catch (error) {
         // Both advice should have been executed despite one failing
         expect(results).toContain("slow-success");
         expect(results).toContain("fast-fail");
-        expect(error).toBeInstanceOf(AdviceError);
+        expect(error).toBeInstanceOf(Rejection);
       }
     });
   });
