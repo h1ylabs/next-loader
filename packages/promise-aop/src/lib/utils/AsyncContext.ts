@@ -2,11 +2,11 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 export class AsyncContext<SharedContext> {
   private constructor(
-    private readonly contextGenerator?: () => SharedContext,
-    private readonly contextStore = new AsyncLocalStorage<SharedContext>(),
+    private readonly contextGenerator?: ContextGenerator<SharedContext>,
+    private readonly contextStore = new AsyncLocalStorage<SharedContext>()
   ) {}
 
-  public context = () => {
+  public context: ContextAccessor<SharedContext> = () => {
     const store = this.contextStore.getStore();
 
     if (!store) {
@@ -16,23 +16,22 @@ export class AsyncContext<SharedContext> {
     return store;
   };
 
-  public exit = <T>(callback: () => T) => {
-    return this.contextStore.exit(callback);
-  };
+  public exit: ExecutionOuterContext = (callback) =>
+    this.contextStore.exit(callback);
 
   static async execute<P, Q>(
     { contextGenerator, contextStore, context, exit }: AsyncContext<P>,
     operation: (
       context: AsyncContext<P>["context"],
-      exit: AsyncContext<P>["exit"],
-    ) => Promise<Q>,
+      exit: AsyncContext<P>["exit"]
+    ) => Promise<Q>
   ): Promise<Q> {
     if (!contextGenerator) {
       throw new Error(MSG_ERR_ASYNC_CONTEXT_GENERATOR_NOT_PROVIDED);
     }
 
     return contextStore.run(contextGenerator(), async () =>
-      operation(context, exit),
+      operation(context, exit)
     );
   }
 
@@ -41,18 +40,24 @@ export class AsyncContext<SharedContext> {
     contextGenerator: () => P,
     operation: (
       context: AsyncContext<P>["context"],
-      exit: AsyncContext<P>["exit"],
-    ) => Promise<Q>,
+      exit: AsyncContext<P>["exit"]
+    ) => Promise<Q>
   ): Promise<Q> {
     return contextStore.run(contextGenerator(), async () =>
-      operation(context, exit),
+      operation(context, exit)
     );
   }
 
-  static create<T>(contextGenerator?: () => T) {
+  static create<T>(contextGenerator?: ContextGenerator<T>) {
     return new AsyncContext<T>(contextGenerator);
   }
 }
+
+export type ContextGenerator<SharedContext> = () => SharedContext;
+export type ContextAccessor<SharedContext> = () => SharedContext;
+export type ExecutionOuterContext = <SharedContext>(
+  callback: () => SharedContext
+) => SharedContext;
 
 /**
  * Error message constant used when attempting to access context outside of a context run.

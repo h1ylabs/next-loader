@@ -3,6 +3,10 @@ import type { AspectOrganization } from "@/lib/models/aspect";
 import type { RequiredBuildOptions } from "@/lib/models/buildOptions";
 import type { RequiredProcessOptions } from "@/lib/models/processOptions";
 import type { Target } from "@/lib/models/target";
+import {
+  ContextAccessor,
+  ExecutionOuterContext,
+} from "@/lib/utils/AsyncContext";
 
 export type AdviceChainContext<Result, SharedContext> = {
   // collecting errors
@@ -10,8 +14,8 @@ export type AdviceChainContext<Result, SharedContext> = {
   continueRejections: unknown[];
 
   // functions for AsyncContext
-  context: () => SharedContext;
-  exit: <T>(callback: () => T) => T;
+  context: ContextAccessor<SharedContext>;
+  exit: ExecutionOuterContext;
 
   // options for AdviceChain
   target: Target<Result>;
