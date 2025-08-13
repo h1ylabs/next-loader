@@ -1,6 +1,6 @@
 import type { Process } from "@/lib/models/process";
 import type { Target } from "@/lib/models/target";
-import { AsyncContext } from "@/lib/utils/AsyncContext";
+import { AsyncContext, ContextGenerator } from "@/lib/utils/AsyncContext";
 
 export async function runProcess<Result, SharedContext>({
   process,
@@ -11,13 +11,15 @@ export async function runProcess<Result, SharedContext>({
     typeof context === "function" ? AsyncContext.create(context) : context;
 
   return AsyncContext.execute(asyncContext, async (ctx, exit) =>
-    process(ctx, exit, target),
+    process(ctx, exit, target)
   );
 }
 
 export type __Props<Result, SharedContext> = {
   readonly process: Process<Result, SharedContext>;
-  readonly context: (() => SharedContext) | AsyncContext<SharedContext>;
+  readonly context:
+    | ContextGenerator<SharedContext>
+    | AsyncContext<SharedContext>;
   readonly target: Target<Result>;
 };
 

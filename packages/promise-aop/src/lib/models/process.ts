@@ -1,7 +1,12 @@
-import type { Target, TARGET_FALLBACK } from "./target";
+import type {
+  ContextAccessor,
+  ExecutionOuterContext,
+} from "@/lib/utils/AsyncContext";
+
+import type { Target } from "./target";
 
 export type Process<Result, SharedContext> = (
-  context: () => SharedContext,
-  exit: <T>(callback: () => T) => T,
-  target: Target<Result>,
-) => Promise<Result | typeof TARGET_FALLBACK>;
+  context: ContextAccessor<SharedContext>,
+  exit: ExecutionOuterContext,
+  target: Target<Result>
+) => Promise<Result>;

@@ -7,12 +7,11 @@ export { createProcess } from "./createProcess";
 export { runProcess } from "./runProcess";
 
 // Errors
-export { AdviceError } from "@/lib/errors/AdviceError";
-export { TargetError } from "@/lib/errors/TargetError";
-export { UnknownError } from "@/lib/errors/UnknownError";
-
-// Target Fallbacks
-export { TARGET_FALLBACK } from "@/lib/models/target";
+export {
+  ContinuousRejection,
+  HaltRejection,
+  Rejection,
+} from "@/lib/models/rejection";
 
 // Options
 export {
@@ -35,6 +34,7 @@ export type {
   BuildOptions,
   RequiredBuildOptions,
 } from "@/lib/models/buildOptions";
+export type { Process } from "@/lib/models/process";
 export type {
   ProcessOptions,
   RequiredProcessOptions,

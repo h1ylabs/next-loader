@@ -8,13 +8,7 @@ import {
   runWith,
   StandardTestContext,
 } from "@/__tests__/test-utils";
-import {
-  AsyncContext,
-  createAspect,
-  createProcess,
-  runProcess,
-  TARGET_FALLBACK,
-} from "@/index";
+import { AsyncContext, createAspect, createProcess, runProcess } from "@/index";
 
 describe("Integration – Promise-AOP", () => {
   describe("happy path", () => {
@@ -43,13 +37,14 @@ describe("Integration – Promise-AOP", () => {
   });
 
   describe("error handling", () => {
-    it("runs afterThrowing, halts, and returns fallback via resolver", async () => {
+    it("runs afterThrowing, halts, and returns fallback value via resolver", async () => {
       const calls: string[] = [];
       const LoggingAspect = createLoggingTestAspect<number>();
+      const fallbackValue = -999;
 
       const resolveHaltRejection = jest
         .fn()
-        .mockResolvedValue(async () => TARGET_FALLBACK);
+        .mockResolvedValue(async () => fallbackValue);
       const resolveContinuousRejection = jest.fn().mockResolvedValue(undefined);
 
       const process = createProcess<number, StandardTestContext>({
@@ -65,11 +60,72 @@ describe("Integration – Promise-AOP", () => {
 
       const result = await runProcess({ process, context, target });
 
-      expect(result).toBe(TARGET_FALLBACK);
+      expect(result).toBe(fallbackValue);
       expect(resolveHaltRejection).toHaveBeenCalledTimes(1);
       // afterThrowing should log and after should always run
       expect(calls.some((c) => c.startsWith("afterThrowing:"))).toBe(true);
       expect(calls[calls.length - 1]).toBe("after");
+    });
+
+    it("handles error recovery with proper fallback resolution", async () => {
+      const calls: string[] = [];
+      const fallbackValue = 42;
+
+      const ErrorRecoveryAspect = createAspect<number, StandardTestContext>(
+        (createAdvice) => ({
+          name: "error-recovery",
+          around: createAdvice({
+            use: ["log"],
+            advice: async ({ log }, { attachToTarget }) => {
+              attachToTarget((target) => async () => {
+                log.info("around:before-target");
+                try {
+                  const result = await target();
+                  log.info("around:target-success");
+                  return result;
+                } catch (error) {
+                  log.info("around:target-failed");
+                  // continue strategy: let the error propagate to be handled by afterThrowing
+                  throw error;
+                }
+              });
+            },
+          }),
+          afterThrowing: createAdvice({
+            use: ["log"],
+            advice: async ({ log }) => {
+              log.info(`afterThrowing:handled`);
+            },
+          }),
+          afterReturning: createAdvice({
+            use: ["log"],
+            advice: async ({ log }) => {
+              log.info("afterReturning:executed");
+            },
+          }),
+        })
+      );
+
+      const process = createProcess<number, StandardTestContext>({
+        aspects: [ErrorRecoveryAspect],
+        processOptions: {
+          resolveHaltRejection: jest
+            .fn()
+            .mockResolvedValue(async () => fallbackValue),
+          resolveContinuousRejection: jest.fn().mockResolvedValue(undefined),
+        },
+      });
+
+      const context = createLoggingContext(calls);
+      const target = createFailingTestTarget<number>("target error");
+
+      const result = await runProcess({ process, context, target });
+
+      expect(result).toBe(fallbackValue);
+      expect(calls).toContain("around:before-target");
+      expect(calls).toContain("around:target-failed");
+      expect(calls).toContain("afterThrowing:handled");
+      // Note: afterReturning will execute for the fallback value after error resolution
     });
   });
 
@@ -135,11 +191,11 @@ describe("Integration – Promise-AOP", () => {
       const context = () =>
         ({
           log: { info: jest.fn(), error: jest.fn() },
-        }) as StandardTestContext;
+        } as StandardTestContext);
       const target = createCommonTarget<number>(0);
 
       await expect(runProcess({ process, context, target })).rejects.toThrow(
-        /Section conflict:/,
+        /Section conflict:/
       );
     });
   });
@@ -198,7 +254,7 @@ describe("Integration – Promise-AOP", () => {
               });
             },
           }),
-        }),
+        })
       );
 
       const result = await runWith<number, StandardTestContext>([TestAspect], {
@@ -246,12 +302,12 @@ describe("Integration – Promise-AOP", () => {
               });
             },
           }),
-        }),
+        })
       );
 
       const result = await runWith<number, StandardTestContext>(
         [MultiWrapperAspect],
-        { context: createLoggingContext(calls), target: createCommonTarget(2) },
+        { context: createLoggingContext(calls), target: createCommonTarget(2) }
       );
 
       // Expected execution order: wrapper-3(wrapper-2(wrapper-1(target)))
@@ -305,7 +361,7 @@ describe("Integration – Promise-AOP", () => {
               });
             },
           }),
-        }),
+        })
       );
 
       const result = await runWith<number, StandardTestContext>([AsyncAspect], {
@@ -347,30 +403,36 @@ describe("Integration – Promise-AOP", () => {
             use: ["log"],
             advice: async ({ log }, error) => {
               log.info(
-                `afterThrowing: ${error instanceof Error ? error.message : String(error)}`,
+                `afterThrowing: ${
+                  error instanceof Error ? error.message : String(error)
+                }`
               );
             },
           }),
-        }),
+        })
       );
+
+      const expectedFallback = -1000;
 
       const result = await runWith<number, StandardTestContext>(
         [ErrorHandlingAspect],
         {
           context: createLoggingContext(calls),
           target: createFailingTestTarget("target error"),
-          processOptions: createFallbackProcessOptions<
-            number,
-            StandardTestContext
-          >(),
-        },
+          processOptions: {
+            ...createFallbackProcessOptions<number, StandardTestContext>(),
+            resolveHaltRejection: jest
+              .fn()
+              .mockResolvedValue(async () => expectedFallback),
+          },
+        }
       );
 
-      expect(result).toBe(TARGET_FALLBACK);
+      expect(result).toBe(expectedFallback);
       expect(calls).toContain("error-wrapper-start");
       expect(calls).toContain("error-wrapper-caught");
       expect(calls.some((c) => c.includes("afterThrowing: target error"))).toBe(
-        true,
+        true
       );
     });
   });

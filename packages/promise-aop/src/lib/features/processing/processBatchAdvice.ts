@@ -1,9 +1,9 @@
-import { AdviceError } from "@/lib/errors/AdviceError";
 import { Advice, AdviceExecution, AdviceFunction } from "@/lib/models/advice";
 import {
   AggregationUnit,
   RequiredBuildOptions,
 } from "@/lib/models/buildOptions";
+import { Rejection } from "@/lib/models/rejection";
 import {
   RestrictedContext,
   type SectionsUsed,
@@ -13,7 +13,7 @@ import { exhaustiveCheckType, validateType } from "@/lib/utils/validateType";
 export async function processBatchAdvice<
   Result,
   SharedContext,
-  AdviceType extends Advice,
+  AdviceType extends Advice
 >({
   context,
   options,
@@ -33,9 +33,9 @@ export async function processBatchAdvice<
       group.map((task) => {
         return restrictedContext.use(
           async (ctx) => task.advice(ctx, ...args),
-          task.use ?? ([] as SectionsUsed<SharedContext>),
+          task.use ?? ([] as SectionsUsed<SharedContext>)
         );
-      }),
+      })
     );
 
     // errors(rejections) from unit advice
@@ -49,7 +49,13 @@ export async function processBatchAdvice<
 
     switch (aggregation) {
       case "unit":
-        throw new AdviceError(adviceType, errors);
+        throw new Rejection({
+          error: errors,
+          extraInfo: {
+            type: "advice",
+            advice: adviceType,
+          },
+        });
       case "all":
         errorCollected.push(...errors);
         break;
@@ -60,7 +66,13 @@ export async function processBatchAdvice<
 
   // throw errors if there are errors collected
   if (errorCollected.length > 0) {
-    throw new AdviceError(adviceType, errorCollected);
+    throw new Rejection({
+      error: errorCollected,
+      extraInfo: {
+        type: "advice",
+        advice: adviceType,
+      },
+    });
   }
 }
 

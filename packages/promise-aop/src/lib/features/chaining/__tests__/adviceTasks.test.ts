@@ -20,7 +20,7 @@ import {
   RequiredBuildOptions,
 } from "@/lib/models/buildOptions";
 import { RequiredProcessOptions } from "@/lib/models/processOptions";
-import { Target, TARGET_FALLBACK, TargetFallback } from "@/lib/models/target";
+import { Target } from "@/lib/models/target";
 
 describe("adviceTasks", () => {
   type TestResult = number;
@@ -36,7 +36,7 @@ describe("adviceTasks", () => {
     createIdDataContext("test", 42);
 
   const createMockAdvices = (
-    overrides: Partial<AspectOrganization<TestResult, TestSharedContext>> = {},
+    overrides: Partial<AspectOrganization<TestResult, TestSharedContext>> = {}
   ): AspectOrganization<TestResult, TestSharedContext> =>
     createCommonAdvices<TestResult, TestSharedContext>(overrides);
 
@@ -49,7 +49,7 @@ describe("adviceTasks", () => {
   > => createProcessOptionsMock<TestResult, TestSharedContext>();
 
   const createMockChainContext = (
-    overrides: Partial<AdviceChainContext<TestResult, TestSharedContext>> = {},
+    overrides: Partial<AdviceChainContext<TestResult, TestSharedContext>> = {}
   ): (() => AdviceChainContext<TestResult, TestSharedContext>) => {
     const context: AdviceChainContext<TestResult, TestSharedContext> = {
       target: createMockTarget(100),
@@ -144,16 +144,18 @@ describe("adviceTasks", () => {
         const finalTarget = result(nextChain);
         const wrappedResult = await finalTarget();
         expect(wrappedResult).toBe(expectedResult);
-      },
+      }
     );
 
     it("should handle fallback resolver correctly", async () => {
+      const fallbackValue = -999;
       const mockProcessAroundAdvice = jest
         .fn()
         .mockResolvedValue(
           (_: Target<TestResult>) =>
             (_: (t: Target<TestResult>) => Target<TestResult>) =>
-              TargetFallback,
+            async () =>
+              fallbackValue
         );
       const chainContext = createMockChainContext();
 
@@ -167,7 +169,7 @@ describe("adviceTasks", () => {
       }
       const finalTarget = result(nextChain);
       const wrappedResult = await finalTarget();
-      expect(wrappedResult).toBe(TARGET_FALLBACK);
+      expect(wrappedResult).toBe(fallbackValue);
     });
   });
 
@@ -178,9 +180,11 @@ describe("adviceTasks", () => {
       expect(result).toBe(42);
     });
 
-    it("should execute TargetFallback and return TARGET_FALLBACK", async () => {
-      const result = await executeTargetTask(TargetFallback);
-      expect(result).toBe(TARGET_FALLBACK);
+    it("should execute fallback target and return fallback value", async () => {
+      const fallbackValue = -777;
+      const fallbackTarget = async () => fallbackValue;
+      const result = await executeTargetTask(fallbackTarget);
+      expect(result).toBe(fallbackValue);
     });
 
     it("should propagate target execution results", async () => {
@@ -201,23 +205,27 @@ describe("adviceTasks", () => {
       const result = await task(42);
 
       expect(mockAdvices.afterReturning).toHaveBeenCalledTimes(1);
-      expect(mockAdvices.afterReturning).toHaveBeenCalledWith({
-        id: "test",
-        data: 42,
-      });
+      expect(mockAdvices.afterReturning).toHaveBeenCalledWith(
+        {
+          id: "test",
+          data: 42,
+        },
+        42
+      );
       expect(result).toBe(42);
     });
 
-    it("should execute afterReturning advice even when result is TARGET_FALLBACK", async () => {
+    it("should execute afterReturning advice even when result is fallback value", async () => {
+      const fallbackValue = -555;
       const mockAdvices = createMockAdvices();
       const chainContext = createMockChainContext({ advices: mockAdvices });
 
       const task = afterReturningAdviceTask(chainContext);
-      const result = await task(TARGET_FALLBACK as unknown as number);
+      const result = await task(fallbackValue);
 
       // afterReturningAdviceTask always executes the advice regardless of result type
       expect(mockAdvices.afterReturning).toHaveBeenCalledTimes(1);
-      expect(result).toBe(TARGET_FALLBACK);
+      expect(result).toBe(fallbackValue);
     });
   });
 
@@ -265,7 +273,7 @@ describe("adviceTasks", () => {
       // Context should be called multiple times (once per advice call)
       expect(contextCallCount).toBeGreaterThan(2);
       expect(mockAdvices.before).toHaveBeenCalledWith(testContext);
-      expect(mockAdvices.afterReturning).toHaveBeenCalledWith(testContext);
+      expect(mockAdvices.afterReturning).toHaveBeenCalledWith(testContext, 42);
       expect(mockAdvices.after).toHaveBeenCalledWith(testContext);
     });
   });

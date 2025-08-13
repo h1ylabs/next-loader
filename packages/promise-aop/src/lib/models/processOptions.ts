@@ -1,20 +1,25 @@
+import type {
+  ContextAccessor,
+  ExecutionOuterContext,
+} from "@/lib/utils/AsyncContext";
 import {
   type NormalizableOptions,
   normalizeOptions,
 } from "@/lib/utils/normalizeOptions";
 
+import type { ContinuousRejection, HaltRejection } from "./rejection";
 import type { Target } from "./target";
 
 export type RequiredProcessOptions<Result, SharedContext> = {
   readonly resolveHaltRejection: (
-    context: () => SharedContext,
-    exit: <T>(callback: () => T) => T,
-    error: unknown,
+    context: ContextAccessor<SharedContext>,
+    exit: ExecutionOuterContext,
+    error: HaltRejection
   ) => Promise<Target<Result>>;
   readonly resolveContinuousRejection: (
-    context: () => SharedContext,
-    exit: <T>(callback: () => T) => T,
-    error: unknown[],
+    context: ContextAccessor<SharedContext>,
+    exit: ExecutionOuterContext,
+    error: ContinuousRejection[]
   ) => Promise<void>;
 };
 
@@ -27,7 +32,7 @@ export function normalizeProcessOptions<Result, SharedContext>(
   defaultOptions: RequiredProcessOptions<
     Result,
     SharedContext
-  > = defaultProcessOptions(),
+  > = defaultProcessOptions()
 ): RequiredProcessOptions<Result, SharedContext> {
   return normalizeOptions(defaultOptions, options);
 }

@@ -1,18 +1,12 @@
-import { HaltError } from "@/lib/errors/HaltError";
-import { TargetError } from "@/lib/errors/TargetError";
-import {
-  AroundAdviceResolver,
-  Target,
-  TARGET_FALLBACK,
-  TargetFallback,
-} from "@/lib/models/target";
+import { HaltRejection } from "@/lib/models/rejection";
+import type { AroundAdviceResolver, Target } from "@/lib/models/target";
 
 import { processAroundAdvice } from "../processing/processAroundAdvice";
 import { checkRejection, handleRejection } from "./adviceHandlers";
 import type { AdviceChainContext } from "./context";
 
 export function beforeAdviceTask<Result, SharedContext>(
-  chain: () => AdviceChainContext<Result, SharedContext>,
+  chain: () => AdviceChainContext<Result, SharedContext>
 ) {
   return async () => {
     const beforeAdvice = async () => chain().advices.before(chain().context());
@@ -23,7 +17,7 @@ export function beforeAdviceTask<Result, SharedContext>(
 
 export function aroundAdviceTask<Result, SharedContext>(
   chain: () => AdviceChainContext<Result, SharedContext>,
-  process = processAroundAdvice,
+  process = processAroundAdvice
 ) {
   return async () => {
     const resolve = await process({
@@ -32,7 +26,7 @@ export function aroundAdviceTask<Result, SharedContext>(
     });
 
     const { handleAroundAdvice, resultAroundAdvice } = ((resolveAdvice) => {
-      let resolver: AroundAdviceResolver<Result> | null = null;
+      let resolver: AroundAdviceResolver<Result> = () => chain().target;
 
       return {
         handleAroundAdvice: () => (resolver = resolveAdvice(chain().target)),
@@ -48,18 +42,16 @@ export function aroundAdviceTask<Result, SharedContext>(
   };
 }
 
-export function executeTargetTask<Result>(
-  target: Target<Result> | TargetFallback,
-): Promise<Result | typeof TARGET_FALLBACK> {
+export function executeTargetTask<Result>(target: Target<Result>) {
   return target();
 }
 
 export function afterReturningAdviceTask<Result, SharedContext>(
-  chain: () => AdviceChainContext<Result, SharedContext>,
+  chain: () => AdviceChainContext<Result, SharedContext>
 ) {
   return async (result: Result) => {
     const afterReturningAdvice = async () =>
-      chain().advices.afterReturning(chain().context());
+      chain().advices.afterReturning(chain().context(), result);
 
     return Promise.resolve()
       .then(checkRejection(chain))
@@ -70,7 +62,7 @@ export function afterReturningAdviceTask<Result, SharedContext>(
 }
 
 export function afterThrowingAdviceTask<Result, SharedContext>(
-  chain: () => AdviceChainContext<Result, SharedContext>,
+  chain: () => AdviceChainContext<Result, SharedContext>
 ) {
   return async (error: unknown) => {
     const afterThrowingAdvice = async () => {
@@ -79,7 +71,12 @@ export function afterThrowingAdviceTask<Result, SharedContext>(
 
     // explicitly propagate the error from the target.
     const targetRejection = async () => {
-      throw (chain().haltRejection = new HaltError(new TargetError(error)));
+      throw (chain().haltRejection = new HaltRejection({
+        error,
+        extraInfo: {
+          type: "target",
+        },
+      }));
     };
 
     return (
@@ -94,7 +91,7 @@ export function afterThrowingAdviceTask<Result, SharedContext>(
 }
 
 export function afterAdviceTask<Result, SharedContext>(
-  chain: () => AdviceChainContext<Result, SharedContext>,
+  chain: () => AdviceChainContext<Result, SharedContext>
 ) {
   return async () => {
     const afterAdvice = async () => chain().advices.after(chain().context());

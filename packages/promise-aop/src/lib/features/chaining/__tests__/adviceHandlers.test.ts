@@ -4,10 +4,6 @@ import {
   createIdDataContext,
   createProcessOptionsMock,
 } from "@/__tests__/test-utils";
-import { AdviceError } from "@/lib/errors/AdviceError";
-import { HaltError } from "@/lib/errors/HaltError";
-import { TargetError } from "@/lib/errors/TargetError";
-import { UnknownError } from "@/lib/errors/UnknownError";
 import {
   checkRejection,
   handleRejection,
@@ -19,6 +15,11 @@ import {
   RequiredBuildOptions,
 } from "@/lib/models/buildOptions";
 import { RequiredProcessOptions } from "@/lib/models/processOptions";
+import {
+  ContinuousRejection,
+  HaltRejection,
+  Rejection,
+} from "@/lib/models/rejection";
 import { Target } from "@/lib/models/target";
 
 describe("adviceHandlers", () => {
@@ -48,7 +49,7 @@ describe("adviceHandlers", () => {
   > => createProcessOptionsMock<TestResult, TestSharedContext>();
 
   const createMockChainContext = (
-    overrides: Partial<AdviceChainContext<TestResult, TestSharedContext>> = {},
+    overrides: Partial<AdviceChainContext<TestResult, TestSharedContext>> = {}
   ): AdviceChainContext<TestResult, TestSharedContext> => ({
     target: createMockTarget(100),
     context: createMockContext(),
@@ -71,34 +72,46 @@ describe("adviceHandlers", () => {
     });
 
     it("should throw haltRejection when it exists", async () => {
-      const haltError = new HaltError(new Error("halted"));
+      const haltRejection = new HaltRejection({
+        error: new Error("halted"),
+        extraInfo: { type: "unknown" },
+      });
       const context = createMockChainContext({
-        haltRejection: haltError,
+        haltRejection,
       });
       const chain = () => context;
 
       const checkTask = checkRejection(chain);
 
-      await expect(checkTask()).rejects.toBe(haltError);
+      await expect(checkTask()).rejects.toBe(haltRejection);
     });
   });
 
   describe("handleRejection", () => {
-    it("should propagate HaltError without modification", async () => {
-      const haltError = new HaltError(new Error("already halted"));
+    it("should propagate HaltRejection without modification", async () => {
+      const haltRejection = new HaltRejection({
+        error: new Error("already halted"),
+        extraInfo: { type: "unknown" },
+      });
       const context = createMockChainContext();
       const chain = () => context;
 
       const handleTask = handleRejection(chain);
 
-      await expect(handleTask(haltError)).rejects.toBe(haltError);
+      await expect(handleTask(haltRejection)).rejects.toBe(haltRejection);
       expect(context.haltRejection).toBeUndefined();
       expect(context.continueRejections).toHaveLength(0);
     });
 
-    describe("AdviceError handling", () => {
-      it("should handle AdviceError with halt strategy", async () => {
-        const adviceError = new AdviceError("before", ["test error"]);
+    describe("Rejection handling", () => {
+      it("should handle Rejection with halt strategy", async () => {
+        const rejection = new Rejection({
+          error: ["test error"],
+          extraInfo: {
+            type: "advice",
+            advice: "before",
+          },
+        });
 
         const buildOptions = createMockBuildOptions();
 
@@ -108,14 +121,22 @@ describe("adviceHandlers", () => {
         const handleTask = handleRejection(chain);
 
         // This should set haltRejection and then throw it
-        await expect(handleTask(adviceError)).rejects.toBeInstanceOf(HaltError);
-        expect(context.haltRejection).toBeInstanceOf(HaltError);
-        expect(context.haltRejection?.cause).toBe(adviceError);
+        await expect(handleTask(rejection)).rejects.toBeInstanceOf(
+          HaltRejection
+        );
+        expect(context.haltRejection).toBeInstanceOf(HaltRejection);
+        expect(context.haltRejection?.info).toBe(rejection.info);
         expect(context.continueRejections).toHaveLength(0);
       });
 
-      it("should handle AdviceError with continue strategy", async () => {
-        const adviceError = new AdviceError("after", ["test error"]);
+      it("should handle Rejection with continue strategy", async () => {
+        const rejection = new Rejection({
+          error: ["test error"],
+          extraInfo: {
+            type: "advice",
+            advice: "after",
+          },
+        });
 
         const buildOptions = createMockBuildOptions();
 
@@ -123,76 +144,87 @@ describe("adviceHandlers", () => {
         const chain = () => context;
 
         const handleTask = handleRejection(chain);
-        await handleTask(adviceError);
+        await handleTask(rejection);
 
         expect(context.haltRejection).toBeUndefined();
-        expect(context.continueRejections).toContain(adviceError);
         expect(context.continueRejections).toHaveLength(1);
+        expect(context.continueRejections[0]).toBeInstanceOf(
+          ContinuousRejection
+        );
+        expect(context.continueRejections[0]?.info).toBe(rejection.info);
       });
     });
 
-    it("should convert TargetError to HaltError immediately", async () => {
-      const targetError = new TargetError(new Error("target failed"));
+    it("should convert unknown error to HaltRejection immediately", async () => {
+      const unknownError = new Error("target failed");
       const context = createMockChainContext();
       const chain = () => context;
 
       const handleTask = handleRejection(chain);
-      await expect(handleTask(targetError)).rejects.toBeInstanceOf(HaltError);
+      await expect(handleTask(unknownError)).rejects.toBeInstanceOf(
+        HaltRejection
+      );
 
-      expect(context.haltRejection).toBeInstanceOf(HaltError);
-      // In the latest logic, TargetError is wrapped in UnknownError and stored in HaltError's cause.
-      expect(context.haltRejection?.cause).toBeInstanceOf(UnknownError);
+      expect(context.haltRejection).toBeInstanceOf(HaltRejection);
+      expect(context.haltRejection?.info.error).toBe(unknownError);
+      expect(context.haltRejection?.info.extraInfo.type).toBe("unknown");
       expect(context.continueRejections).toHaveLength(0);
     });
 
-    it("should wrap unknown error in UnknownError then HaltError", async () => {
+    it("should wrap unknown error in HaltRejection", async () => {
       const unknownError = new Error("unknown error");
       const context = createMockChainContext();
       const chain = () => context;
 
       const handleTask = handleRejection(chain);
-      await expect(handleTask(unknownError)).rejects.toBeInstanceOf(HaltError);
-
-      expect(context.haltRejection).toBeInstanceOf(HaltError);
-      expect(context.haltRejection?.cause).toBeInstanceOf(UnknownError);
-      expect((context.haltRejection?.cause as UnknownError).cause).toBe(
-        unknownError,
+      await expect(handleTask(unknownError)).rejects.toBeInstanceOf(
+        HaltRejection
       );
+
+      expect(context.haltRejection).toBeInstanceOf(HaltRejection);
+      expect(context.haltRejection?.info.error).toBe(unknownError);
+      expect(context.haltRejection?.info.extraInfo.type).toBe("unknown");
       expect(context.continueRejections).toHaveLength(0);
     });
 
-    it("should handle string errors by wrapping in UnknownError then HaltError", async () => {
+    it("should handle string errors by wrapping in HaltRejection", async () => {
       const stringError = "string error";
       const context = createMockChainContext();
       const chain = () => context;
 
       const handleTask = handleRejection(chain);
-      await expect(handleTask(stringError)).rejects.toBeInstanceOf(HaltError);
-
-      expect(context.haltRejection).toBeInstanceOf(HaltError);
-      expect(context.haltRejection?.cause).toBeInstanceOf(UnknownError);
-      expect((context.haltRejection?.cause as UnknownError).cause).toBe(
-        stringError,
+      await expect(handleTask(stringError)).rejects.toBeInstanceOf(
+        HaltRejection
       );
+
+      expect(context.haltRejection).toBeInstanceOf(HaltRejection);
+      expect(context.haltRejection?.info.error).toBe(stringError);
+      expect(context.haltRejection?.info.extraInfo.type).toBe("unknown");
     });
 
-    it("should handle null errors by wrapping in UnknownError then HaltError", async () => {
+    it("should handle null errors by wrapping in HaltRejection", async () => {
       const context = createMockChainContext();
       const chain = () => context;
 
       const handleTask = handleRejection(chain);
-      await expect(handleTask(null)).rejects.toBeInstanceOf(HaltError);
+      await expect(handleTask(null)).rejects.toBeInstanceOf(HaltRejection);
 
-      expect(context.haltRejection).toBeInstanceOf(HaltError);
-      expect(context.haltRejection?.cause).toBeInstanceOf(UnknownError);
-      expect((context.haltRejection?.cause as UnknownError).cause).toBeNull();
+      expect(context.haltRejection).toBeInstanceOf(HaltRejection);
+      expect(context.haltRejection?.info.error).toBeNull();
+      expect(context.haltRejection?.info.extraInfo.type).toBe("unknown");
     });
   });
 
   describe("integration scenarios", () => {
     it("should handle mixed error types in sequence", async () => {
-      const continueError = new AdviceError("after", ["continue error"]);
-      const haltError = new AdviceError("before", ["halt error"]);
+      const continueRejection = new Rejection({
+        error: ["continue error"],
+        extraInfo: { type: "advice", advice: "after" },
+      });
+      const haltRejection = new Rejection({
+        error: ["halt error"],
+        extraInfo: { type: "advice", advice: "before" },
+      });
 
       const buildOptions = createMockBuildOptions();
 
@@ -201,33 +233,41 @@ describe("adviceHandlers", () => {
       const handleTask = handleRejection(chain);
 
       // First handle continue error
-      await handleTask(continueError);
-      expect(context.continueRejections).toContain(continueError);
+      await handleTask(continueRejection);
+      expect(context.continueRejections).toHaveLength(1);
+      expect(context.continueRejections[0]).toBeInstanceOf(ContinuousRejection);
       expect(context.haltRejection).toBeUndefined();
 
       // Then handle halt error - should set haltRejection and throw
-      await expect(handleTask(haltError)).rejects.toBeInstanceOf(HaltError);
-      expect(context.haltRejection).toBeInstanceOf(HaltError);
+      await expect(handleTask(haltRejection)).rejects.toBeInstanceOf(
+        HaltRejection
+      );
+      expect(context.haltRejection).toBeInstanceOf(HaltRejection);
       // Continue rejections should still be preserved
-      expect(context.continueRejections).toContain(continueError);
+      expect(context.continueRejections).toHaveLength(1);
     });
 
     it("should preserve existing continue rejections when halt occurs", async () => {
-      const existingError = new AdviceError("after", ["existing error"]);
-      const targetError = new TargetError(new Error("target error"));
+      const existingRejection = new ContinuousRejection({
+        error: ["existing error"],
+        extraInfo: { type: "advice", advice: "after" },
+      });
+      const targetError = new Error("target error");
 
       const context = createMockChainContext({
-        continueRejections: [existingError],
+        continueRejections: [existingRejection],
       });
       const chain = () => context;
 
       const handleTask = handleRejection(chain);
 
-      await expect(handleTask(targetError)).rejects.toBeInstanceOf(HaltError);
+      await expect(handleTask(targetError)).rejects.toBeInstanceOf(
+        HaltRejection
+      );
 
       // Existing continue rejections should be preserved
-      expect(context.continueRejections).toContain(existingError);
-      expect(context.haltRejection).toBeInstanceOf(HaltError);
+      expect(context.continueRejections).toContain(existingRejection);
+      expect(context.haltRejection).toBeInstanceOf(HaltRejection);
     });
 
     it("should work with checkRejection after handling", async () => {
@@ -237,7 +277,7 @@ describe("adviceHandlers", () => {
       // First handle an error to set haltRejection
       const handleTask = handleRejection(chain);
       await expect(handleTask(new Error("test"))).rejects.toBeInstanceOf(
-        HaltError,
+        HaltRejection
       );
 
       // Now checkRejection should throw the haltRejection

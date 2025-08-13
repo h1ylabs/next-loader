@@ -1,10 +1,5 @@
 import { createAspect } from "@/createAspect";
-import {
-  AsyncContext,
-  createProcess,
-  runProcess,
-  TARGET_FALLBACK,
-} from "@/index";
+import { AsyncContext, createProcess, runProcess } from "@/index";
 import type { AdviceChainContext } from "@/lib/features/chaining/context";
 import type { Aspect, AspectOrganization } from "@/lib/models/aspect";
 import type { BuildOptions } from "@/lib/models/buildOptions";
@@ -45,12 +40,12 @@ export interface StandardTestContext {
  * Creates a unified chain context for testing advice chains
  */
 export const createTestChain = <Result, SharedContext>(
-  overrides: Partial<AdviceChainContext<Result, SharedContext>> = {},
+  overrides: Partial<AdviceChainContext<Result, SharedContext>> = {}
 ): (() => AdviceChainContext<Result, SharedContext>) => {
   const state = {
     haltRejection: undefined,
     continueRejections: [] as unknown[],
-    context: () => ({}) as SharedContext,
+    context: () => ({} as SharedContext),
     target: (async () => "OK") as Target<Result>,
     advices: {
       before: jest.fn(async () => {}),
@@ -71,7 +66,7 @@ export const createTestChain = <Result, SharedContext>(
  * Creates a standard test context instance
  */
 export const createStandardTestContext = (
-  overrides: Partial<StandardTestContext> = {},
+  overrides: Partial<StandardTestContext> = {}
 ): StandardTestContext => ({
   log: {
     info: jest.fn(),
@@ -107,7 +102,7 @@ export const createLoggingContext =
  * Creates a reusable logging aspect for testing
  */
 export const createLoggingTestAspect = <Result>(
-  name = "logging",
+  name = "logging"
 ): Aspect<Result, StandardTestContext> =>
   createAspect<Result, StandardTestContext>((createAdvice) => ({
     name,
@@ -147,7 +142,7 @@ export const createLoggingTestAspect = <Result>(
 export const createFailingTestAspect = <Result>(
   name = "failing",
   phase: keyof Aspect<Result, StandardTestContext> = "before",
-  errorMessage = "test error",
+  errorMessage = "test error"
 ): Aspect<Result, StandardTestContext> =>
   createAspect<Result, StandardTestContext>((createAdvice) => ({
     name,
@@ -195,7 +190,7 @@ export const createIdDataContext =
  * Creates a default mock advices object, allowing selective overrides
  */
 export const createCommonAdvices = <Result, SharedContext>(
-  overrides: Partial<AspectOrganization<Result, SharedContext>> = {},
+  overrides: Partial<AspectOrganization<Result, SharedContext>> = {}
 ): AspectOrganization<Result, SharedContext> => ({
   before: jest.fn(),
   around: jest.fn(),
@@ -209,12 +204,12 @@ export const createCommonAdvices = <Result, SharedContext>(
  * Creates a mocked RequiredProcessOptions with jest fns, allowing overrides
  */
 export const createProcessOptionsMock = <Result, SharedContext>(
-  overrides: Partial<RequiredProcessOptions<Result, SharedContext>> = {},
+  overrides: Partial<RequiredProcessOptions<Result, SharedContext>> = {}
 ): RequiredProcessOptions<Result, SharedContext> => ({
   resolveHaltRejection: jest
     .fn()
     .mockResolvedValue(() =>
-      Promise.reject(new Error("Default mock - should be overridden in tests")),
+      Promise.reject(new Error("Default mock - should be overridden in tests"))
     ),
   resolveContinuousRejection: jest.fn().mockResolvedValue(undefined),
   ...overrides,
@@ -228,7 +223,7 @@ export async function runWith<Result, Ctx>(
     target: Target<Result>;
     buildOptions?: BuildOptions;
     processOptions?: ProcessOptions<Result, Ctx>;
-  },
+  }
 ) {
   const process = createProcess<Result, Ctx>({
     aspects,
@@ -239,11 +234,13 @@ export async function runWith<Result, Ctx>(
 }
 
 // Standard fallback process options for tests
-export const createFallbackProcessOptions = <Result, SharedContext>() =>
+export const createFallbackProcessOptions = <Result, SharedContext>(
+  fallbackValue?: Result
+) =>
   createProcessOptionsMock<Result, SharedContext>({
     resolveHaltRejection: jest
       .fn()
-      .mockResolvedValue(async () => TARGET_FALLBACK),
+      .mockResolvedValue(async () => fallbackValue ?? (-999 as Result)),
     resolveContinuousRejection: jest.fn().mockResolvedValue(undefined),
   });
 
@@ -252,7 +249,7 @@ export const wrapTargetWithLogs =
   <R>(
     log: { info: (s: string) => void },
     label: string,
-    map: (r: R) => R = (r) => r,
+    map: (r: R) => R = (r) => r
   ): TargetWrapper<R> =>
   (target) =>
   async () => {
