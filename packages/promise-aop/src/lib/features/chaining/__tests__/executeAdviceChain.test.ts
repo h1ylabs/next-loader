@@ -15,7 +15,7 @@ import {
   RequiredBuildOptions,
 } from "@/lib/models/buildOptions";
 import { RequiredProcessOptions } from "@/lib/models/processOptions";
-import { Target, TARGET_FALLBACK, TargetFallback } from "@/lib/models/target";
+import { Target } from "@/lib/models/target";
 
 describe("executeAdviceChain", () => {
   type TestResult = number;
@@ -32,29 +32,28 @@ describe("executeAdviceChain", () => {
 
   const createMockContext = (
     id = "test",
-    data = 42,
+    data = 42
   ): (() => TestSharedContext) => createIdDataContext(id, data);
 
   const createMockAdvices = (
-    overrides: Partial<AspectOrganization<TestResult, TestSharedContext>> = {},
+    overrides: Partial<AspectOrganization<TestResult, TestSharedContext>> = {}
   ): AspectOrganization<TestResult, TestSharedContext> =>
     createCommonAdvices<TestResult, TestSharedContext>(overrides);
 
   const createMockBuildOptions = (): RequiredBuildOptions =>
     defaultBuildOptions();
 
-  const createMockProcessOptions = (): RequiredProcessOptions<
-    TestResult,
-    TestSharedContext
-  > =>
+  const createMockProcessOptions = (
+    fallbackValue: TestResult = -999
+  ): RequiredProcessOptions<TestResult, TestSharedContext> =>
     createProcessOptionsMock<TestResult, TestSharedContext>({
       resolveHaltRejection: jest
         .fn()
-        .mockResolvedValue(() => Promise.resolve(TARGET_FALLBACK)),
+        .mockResolvedValue(() => Promise.resolve(fallbackValue)),
     });
 
   const createTestProps = (
-    overrides: Partial<__Props<TestResult, TestSharedContext>> = {},
+    overrides: Partial<__Props<TestResult, TestSharedContext>> = {}
   ): __Props<TestResult, TestSharedContext> => ({
     target: createMockTarget(100),
     context: createMockContext(),
@@ -95,7 +94,10 @@ describe("executeAdviceChain", () => {
 
       const expectedContext = { id: "test-id", data: 123 };
       expect(mockAdvices.before).toHaveBeenCalledWith(expectedContext);
-      expect(mockAdvices.afterReturning).toHaveBeenCalledWith(expectedContext);
+      expect(mockAdvices.afterReturning).toHaveBeenCalledWith(
+        expectedContext,
+        100
+      ); // context and result
       expect(mockAdvices.after).toHaveBeenCalledWith(expectedContext);
     });
   });
@@ -103,6 +105,7 @@ describe("executeAdviceChain", () => {
   describe("error handling flow", () => {
     it("should execute afterThrowing when target throws error", async () => {
       const targetError = new Error("target failed");
+      const fallbackValue = -999;
       const mockAdvices = createMockAdvices();
       const mockProcessOptions = createProcessOptionsMock<
         TestResult,
@@ -110,7 +113,7 @@ describe("executeAdviceChain", () => {
       >({
         resolveHaltRejection: jest
           .fn()
-          .mockResolvedValue(() => Promise.resolve(TARGET_FALLBACK)),
+          .mockResolvedValue(() => Promise.resolve(fallbackValue)),
       });
       const props = createTestProps({
         target: createErrorTarget(targetError),
@@ -120,20 +123,21 @@ describe("executeAdviceChain", () => {
 
       const result = await executeAdviceChain(props);
 
-      expect(result).toBe(TARGET_FALLBACK);
+      expect(result).toBe(fallbackValue);
       expect(mockAdvices.before).toHaveBeenCalledTimes(1);
       expect(mockAdvices.around).toHaveBeenCalledTimes(1);
       expect(mockAdvices.afterReturning).not.toHaveBeenCalled();
       expect(mockAdvices.afterThrowing).toHaveBeenCalledTimes(1);
       expect(mockAdvices.afterThrowing).toHaveBeenCalledWith(
         { id: "test", data: 42 },
-        targetError,
+        targetError
       );
       expect(mockAdvices.after).toHaveBeenCalledTimes(1);
     });
 
     it("should handle errors from advice functions", async () => {
       const beforeError = new Error("before error");
+      const fallbackValue = -888;
       const mockAdvices = createMockAdvices({
         before: jest.fn().mockRejectedValue(beforeError),
       });
@@ -144,7 +148,7 @@ describe("executeAdviceChain", () => {
       >({
         resolveHaltRejection: jest
           .fn()
-          .mockResolvedValue(() => Promise.resolve(TARGET_FALLBACK)),
+          .mockResolvedValue(() => Promise.resolve(fallbackValue)),
       });
       const props = createTestProps({
         advices: mockAdvices,
@@ -154,18 +158,19 @@ describe("executeAdviceChain", () => {
       const result = await executeAdviceChain(props);
 
       // Should handle the error and return fallback
-      expect(result).toBe(TARGET_FALLBACK);
+      expect(result).toBe(fallbackValue);
       expect(mockProcessOptions.resolveHaltRejection).toHaveBeenCalled();
     });
   });
 
-  describe("TARGET_FALLBACK handling", () => {
-    it("should execute afterReturning even when TARGET_FALLBACK is returned by wrapper", async () => {
+  describe("fallback handling", () => {
+    it("should execute afterReturning when wrapper returns fallback value", async () => {
+      const fallbackValue = -777;
       const mockAdvices = createMockAdvices({
         around: jest
           .fn()
           .mockImplementation(async (_context, { attachToTarget }) => {
-            attachToTarget(() => TargetFallback);
+            attachToTarget(() => async () => fallbackValue);
           }),
       });
 
@@ -175,7 +180,7 @@ describe("executeAdviceChain", () => {
 
       const result = await executeAdviceChain(props);
 
-      expect(result).toBe(TARGET_FALLBACK);
+      expect(result).toBe(fallbackValue);
       expect(mockAdvices.before).toHaveBeenCalledTimes(1);
       expect(mockAdvices.around).toHaveBeenCalledTimes(1);
       expect(mockAdvices.afterReturning).toHaveBeenCalledTimes(1); // afterReturning is still called
@@ -190,19 +195,19 @@ describe("executeAdviceChain", () => {
           createTestProps({
             context: () => ({ id: "parallel-1", data: 10 }),
             target: createMockTarget(1),
-          }),
+          })
         ),
         executeAdviceChain(
           createTestProps({
             context: () => ({ id: "parallel-2", data: 20 }),
             target: createMockTarget(2),
-          }),
+          })
         ),
         executeAdviceChain(
           createTestProps({
             context: () => ({ id: "parallel-3", data: 30 }),
             target: createMockTarget(3),
-          }),
+          })
         ),
       ]);
 
@@ -212,13 +217,14 @@ describe("executeAdviceChain", () => {
 
   describe("rejection handling", () => {
     it("should handle continuous rejections", async () => {
+      const fallbackValue = -123;
       const mockProcessOptions = createProcessOptionsMock<
         TestResult,
         TestSharedContext
       >({
         resolveHaltRejection: jest
           .fn()
-          .mockResolvedValue(() => Promise.resolve(TARGET_FALLBACK)),
+          .mockResolvedValue(() => Promise.resolve(fallbackValue)),
       });
       const mockAdvices = createMockAdvices({
         before: jest.fn().mockRejectedValue(new Error("before error")),
@@ -230,8 +236,9 @@ describe("executeAdviceChain", () => {
         processOptions: mockProcessOptions,
       });
 
-      await executeAdviceChain(props);
+      const result = await executeAdviceChain(props);
 
+      expect(result).toBe(fallbackValue);
       // Should resolve continuous rejections
       expect(mockProcessOptions.resolveContinuousRejection).toHaveBeenCalled();
 

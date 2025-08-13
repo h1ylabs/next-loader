@@ -11,9 +11,6 @@ export { AdviceError } from "@/lib/errors/AdviceError";
 export { TargetError } from "@/lib/errors/TargetError";
 export { UnknownError } from "@/lib/errors/UnknownError";
 
-// Target Fallbacks
-export { TARGET_FALLBACK } from "@/lib/models/target";
-
 // Options
 export {
   defaultBuildOptions,

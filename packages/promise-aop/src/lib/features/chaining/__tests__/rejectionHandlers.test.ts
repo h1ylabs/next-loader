@@ -16,7 +16,7 @@ import {
   RequiredBuildOptions,
 } from "@/lib/models/buildOptions";
 import { RequiredProcessOptions } from "@/lib/models/processOptions";
-import { Target, TARGET_FALLBACK } from "@/lib/models/target";
+import { Target } from "@/lib/models/target";
 
 describe("rejectionHandlers", () => {
   type TestResult = number;
@@ -40,19 +40,20 @@ describe("rejectionHandlers", () => {
     defaultBuildOptions();
 
   const createMockProcessOptions = (
+    fallbackValue: TestResult = -999,
     overrides: Partial<
       RequiredProcessOptions<TestResult, TestSharedContext>
-    > = {},
+    > = {}
   ): RequiredProcessOptions<TestResult, TestSharedContext> =>
     createProcessOptionsMock<TestResult, TestSharedContext>({
       resolveHaltRejection: jest
         .fn()
-        .mockResolvedValue(() => Promise.resolve(TARGET_FALLBACK)),
+        .mockResolvedValue(() => Promise.resolve(fallbackValue)),
       ...overrides,
     });
 
   const createMockChainContext = (
-    overrides: Partial<AdviceChainContext<TestResult, TestSharedContext>> = {},
+    overrides: Partial<AdviceChainContext<TestResult, TestSharedContext>> = {}
   ): AdviceChainContext<TestResult, TestSharedContext> => ({
     target: createMockTarget(100),
     context: createMockContext(),
@@ -84,11 +85,12 @@ describe("rejectionHandlers", () => {
     it("should resolve HaltError using processOptions resolver", async () => {
       const originalError = new Error("original error");
       const haltError = new HaltError(originalError);
+      const fallbackValue = 42;
 
-      const mockProcessOptions = createMockProcessOptions({
+      const mockProcessOptions = createMockProcessOptions(fallbackValue, {
         resolveHaltRejection: jest
           .fn()
-          .mockResolvedValue(() => Promise.resolve(42)),
+          .mockResolvedValue(() => Promise.resolve(fallbackValue)),
       });
 
       const context = createMockChainContext({
@@ -102,9 +104,9 @@ describe("rejectionHandlers", () => {
       expect(mockProcessOptions.resolveHaltRejection).toHaveBeenCalledWith(
         expect.any(Function),
         expect.any(Function),
-        originalError,
+        originalError
       );
-      expect(result).toBe(42);
+      expect(result).toBe(fallbackValue);
     });
 
     it("should throw non-HaltError without processing", async () => {
@@ -125,10 +127,11 @@ describe("rejectionHandlers", () => {
     it("should handle resolver that returns a promise", async () => {
       const originalError = new Error("original error");
       const haltError = new HaltError(originalError);
-      const mockProcessOptions = createMockProcessOptions({
+      const fallbackValue = -888;
+      const mockProcessOptions = createMockProcessOptions(fallbackValue, {
         resolveHaltRejection: jest
           .fn()
-          .mockResolvedValue(() => Promise.resolve(TARGET_FALLBACK)),
+          .mockResolvedValue(() => Promise.resolve(fallbackValue)),
       });
 
       const context = createMockChainContext({
@@ -139,11 +142,11 @@ describe("rejectionHandlers", () => {
       const resolver = resolveHaltRejection(chain);
       const result = await resolver(haltError);
 
-      expect(result).toBe(TARGET_FALLBACK);
+      expect(result).toBe(fallbackValue);
       expect(mockProcessOptions.resolveHaltRejection).toHaveBeenCalledWith(
         expect.any(Function),
         expect.any(Function),
-        originalError,
+        originalError
       );
     });
 
@@ -151,7 +154,7 @@ describe("rejectionHandlers", () => {
       const originalError = new Error("original error");
       const haltError = new HaltError(originalError);
       const resolverError = new Error("resolver failed");
-      const mockProcessOptions = createMockProcessOptions({
+      const mockProcessOptions = createMockProcessOptions(-777, {
         resolveHaltRejection: jest.fn().mockImplementation(() => {
           throw resolverError;
         }),
@@ -168,7 +171,7 @@ describe("rejectionHandlers", () => {
       expect(mockProcessOptions.resolveHaltRejection).toHaveBeenCalledWith(
         expect.any(Function),
         expect.any(Function),
-        originalError,
+        originalError
       );
     });
   });
@@ -190,14 +193,14 @@ describe("rejectionHandlers", () => {
       await handler();
 
       expect(
-        mockProcessOptions.resolveContinuousRejection,
+        mockProcessOptions.resolveContinuousRejection
       ).toHaveBeenCalledTimes(1);
       expect(
-        mockProcessOptions.resolveContinuousRejection,
+        mockProcessOptions.resolveContinuousRejection
       ).toHaveBeenCalledWith(
         expect.any(Function),
         expect.any(Function),
-        continueRejections,
+        continueRejections
       );
     });
 
@@ -213,10 +216,10 @@ describe("rejectionHandlers", () => {
       await handler();
 
       expect(
-        mockProcessOptions.resolveContinuousRejection,
+        mockProcessOptions.resolveContinuousRejection
       ).toHaveBeenCalledTimes(1);
       expect(
-        mockProcessOptions.resolveContinuousRejection,
+        mockProcessOptions.resolveContinuousRejection
       ).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), []);
     });
 
@@ -235,7 +238,7 @@ describe("rejectionHandlers", () => {
       await handler();
 
       expect(
-        mockProcessOptions.resolveContinuousRejection,
+        mockProcessOptions.resolveContinuousRejection
       ).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), [
         singleError,
       ]);
@@ -245,10 +248,8 @@ describe("rejectionHandlers", () => {
       const error1 = new Error("error 1");
       const resolverError = new Error("resolver failed");
 
-      const mockProcessOptions = createMockProcessOptions({
-        resolveContinuousRejection: jest.fn().mockImplementation(() => {
-          throw resolverError;
-        }),
+      const mockProcessOptions = createMockProcessOptions(-777, {
+        resolveContinuousRejection: jest.fn().mockRejectedValue(resolverError),
       });
 
       const context = createMockChainContext({
@@ -264,7 +265,7 @@ describe("rejectionHandlers", () => {
 
     it("should handle async resolver", async () => {
       const error1 = new Error("error 1");
-      const mockProcessOptions = createMockProcessOptions({
+      const mockProcessOptions = createMockProcessOptions(-666, {
         resolveContinuousRejection: jest.fn().mockImplementation(async () => {
           await new Promise((resolve) => setTimeout(resolve, 10));
           return "resolved";
@@ -281,7 +282,7 @@ describe("rejectionHandlers", () => {
       await handler();
 
       expect(
-        mockProcessOptions.resolveContinuousRejection,
+        mockProcessOptions.resolveContinuousRejection
       ).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), [
         error1,
       ]);
@@ -291,11 +292,12 @@ describe("rejectionHandlers", () => {
   describe("integration scenarios", () => {
     it("should work together in typical error resolution flow", async () => {
       const continueError = new Error("continue error");
+      const fallbackValue = -666;
 
-      const mockProcessOptions = createMockProcessOptions({
+      const mockProcessOptions = createMockProcessOptions(fallbackValue, {
         resolveHaltRejection: jest
           .fn()
-          .mockResolvedValue(() => Promise.resolve(TARGET_FALLBACK)),
+          .mockResolvedValue(() => Promise.resolve(fallbackValue)),
       });
 
       const context = createMockChainContext({
@@ -309,7 +311,7 @@ describe("rejectionHandlers", () => {
       await continuousHandler();
 
       expect(
-        mockProcessOptions.resolveContinuousRejection,
+        mockProcessOptions.resolveContinuousRejection
       ).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), [
         continueError,
       ]);
@@ -338,11 +340,11 @@ describe("rejectionHandlers", () => {
       await handler();
 
       expect(
-        mockProcessOptions.resolveContinuousRejection,
+        mockProcessOptions.resolveContinuousRejection
       ).toHaveBeenCalledWith(
         expect.any(Function),
         expect.any(Function),
-        mixedRejections,
+        mixedRejections
       );
     });
   });

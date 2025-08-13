@@ -1,7 +1,7 @@
-import { AspectOrganization } from "@/lib/models/aspect";
-import { RequiredBuildOptions } from "@/lib/models/buildOptions";
-import { RequiredProcessOptions } from "@/lib/models/processOptions";
-import { Target, TARGET_FALLBACK, TargetFallback } from "@/lib/models/target";
+import type { AspectOrganization } from "@/lib/models/aspect";
+import type { RequiredBuildOptions } from "@/lib/models/buildOptions";
+import type { RequiredProcessOptions } from "@/lib/models/processOptions";
+import type { Target } from "@/lib/models/target";
 import { AsyncContext } from "@/lib/utils/AsyncContext";
 
 import {
@@ -19,13 +19,13 @@ import {
 } from "./rejectionHandlers";
 
 export async function executeAdviceChain<Result, SharedContext>(
-  props: __Props<Result, SharedContext>,
+  props: __Props<Result, SharedContext>
 ): Promise<__Return<Result>> {
   const AdviceChainContext = AsyncContext.create(
     (): AdviceChainContext<Result, SharedContext> => ({
       ...props,
       continueRejections: [],
-    }),
+    })
   );
 
   return AsyncContext.execute(AdviceChainContext, async (chain) => {
@@ -33,28 +33,19 @@ export async function executeAdviceChain<Result, SharedContext>(
       Promise.resolve()
         .then(beforeAdviceTask(chain))
         .then(aroundAdviceTask(chain))
-        .then((resolve) => {
-          // receive fallback
-          if (resolve === null) {
-            return async () =>
-              TargetFallback()
-                .finally(afterAdviceTask(chain))
-                .catch(resolveHaltRejection(chain))
-                .finally(handleContinuousRejection(chain));
-          }
-
-          return resolve((target) => {
-            return async () =>
+        .then((resolve) =>
+          resolve(
+            (target) => async () =>
               target()
                 .then(afterReturningAdviceTask(chain))
                 .catch(afterThrowingAdviceTask(chain))
                 .finally(afterAdviceTask(chain))
                 .catch(resolveHaltRejection(chain))
-                .finally(handleContinuousRejection(chain));
-          });
-        })
+                .finally(handleContinuousRejection(chain))
+          )
+        )
         .then(executeTargetTask)
-        // recover from Halt errors that occurred in upper stages (before/around etc.)
+        // recover from halt error that occurred in upper stages (before/around etc.)
         .catch(resolveHaltRejection(chain))
         .finally(handleContinuousRejection(chain))
     );
@@ -70,4 +61,4 @@ export type __Props<Result, SharedContext> = {
   readonly processOptions: RequiredProcessOptions<Result, SharedContext>;
 };
 
-export type __Return<Result> = Result | typeof TARGET_FALLBACK;
+export type __Return<Result> = Result;

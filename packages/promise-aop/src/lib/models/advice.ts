@@ -14,13 +14,13 @@ export type Advice = (typeof Advice)[number];
 
 export type AdviceFunction<
   Result,
-  AdviceType extends Advice,
+  AdviceType extends Advice
 > = AdviceFunctionMappings<Result>[AdviceType];
 
 export type AdviceFunctionWithContext<
   Result,
   SharedContext,
-  AdviceType extends Advice,
+  AdviceType extends Advice
 > = (
   context: SharedContext,
   ...args: Parameters<AdviceFunction<Result, AdviceType>>
@@ -30,7 +30,7 @@ export type AdviceMetadata<
   Result,
   SharedContext,
   AdviceType extends Advice,
-  Sections extends SectionsUsed<SharedContext> = SectionsUsed<SharedContext>,
+  Sections extends SectionsUsed<SharedContext> = SectionsUsed<SharedContext>
 > = {
   readonly use?: Sections;
   readonly dependsOn?: readonly string[];
@@ -44,7 +44,7 @@ export type AdviceMetadata<
 export type AdviceExecution<
   Result,
   SharedContext,
-  AdviceType extends Advice,
+  AdviceType extends Advice
 > = AdviceMetadata<Result, SharedContext, AdviceType>[][];
 
 // advice function must be async & void function
@@ -63,7 +63,7 @@ type AdviceFunctionMappings<Result> = {
       attachToTarget: (wrapper: TargetWrapper<Result>) => void;
     }) => Promise<void>
   >;
-  afterReturning: CheckAdviceFn<() => Promise<void>>;
+  afterReturning: CheckAdviceFn<(result: Result) => Promise<void>>;
   afterThrowing: CheckAdviceFn<(error: unknown) => Promise<void>>;
   after: CheckAdviceFn<() => Promise<void>>;
 };
