@@ -35,6 +35,7 @@ export type {
   BuildOptions,
   RequiredBuildOptions,
 } from "@/lib/models/buildOptions";
+export type { Process } from "@/lib/models/process";
 export type {
   ProcessOptions,
   RequiredProcessOptions,
