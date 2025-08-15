@@ -1,4 +1,4 @@
-import { MSG_SIGNAL_DEFAULT_MESSAGE, Signal } from "@/lib/signal/Signal";
+import { MSG_SIGNAL_DEFAULT_MESSAGE, Signal } from "@/lib/utils/Signal";
 
 describe("Signal", () => {
   describe("constructor", () => {
