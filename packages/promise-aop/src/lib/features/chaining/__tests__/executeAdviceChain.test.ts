@@ -32,11 +32,11 @@ describe("executeAdviceChain", () => {
 
   const createMockContext = (
     id = "test",
-    data = 42
+    data = 42,
   ): (() => TestSharedContext) => createIdDataContext(id, data);
 
   const createMockAdvices = (
-    overrides: Partial<AspectOrganization<TestResult, TestSharedContext>> = {}
+    overrides: Partial<AspectOrganization<TestResult, TestSharedContext>> = {},
   ): AspectOrganization<TestResult, TestSharedContext> =>
     createCommonAdvices<TestResult, TestSharedContext>(overrides);
 
@@ -44,7 +44,7 @@ describe("executeAdviceChain", () => {
     defaultBuildOptions();
 
   const createMockProcessOptions = (
-    fallbackValue: TestResult = -999
+    fallbackValue: TestResult = -999,
   ): RequiredProcessOptions<TestResult, TestSharedContext> =>
     createProcessOptionsMock<TestResult, TestSharedContext>({
       resolveHaltRejection: jest
@@ -53,7 +53,7 @@ describe("executeAdviceChain", () => {
     });
 
   const createTestProps = (
-    overrides: Partial<__Props<TestResult, TestSharedContext>> = {}
+    overrides: Partial<__Props<TestResult, TestSharedContext>> = {},
   ): __Props<TestResult, TestSharedContext> => ({
     target: createMockTarget(100),
     context: createMockContext(),
@@ -96,7 +96,7 @@ describe("executeAdviceChain", () => {
       expect(mockAdvices.before).toHaveBeenCalledWith(expectedContext);
       expect(mockAdvices.afterReturning).toHaveBeenCalledWith(
         expectedContext,
-        100
+        100,
       ); // context and result
       expect(mockAdvices.after).toHaveBeenCalledWith(expectedContext);
     });
@@ -130,7 +130,7 @@ describe("executeAdviceChain", () => {
       expect(mockAdvices.afterThrowing).toHaveBeenCalledTimes(1);
       expect(mockAdvices.afterThrowing).toHaveBeenCalledWith(
         { id: "test", data: 42 },
-        targetError
+        targetError,
       );
       expect(mockAdvices.after).toHaveBeenCalledTimes(1);
     });
@@ -195,19 +195,19 @@ describe("executeAdviceChain", () => {
           createTestProps({
             context: () => ({ id: "parallel-1", data: 10 }),
             target: createMockTarget(1),
-          })
+          }),
         ),
         executeAdviceChain(
           createTestProps({
             context: () => ({ id: "parallel-2", data: 20 }),
             target: createMockTarget(2),
-          })
+          }),
         ),
         executeAdviceChain(
           createTestProps({
             context: () => ({ id: "parallel-3", data: 30 }),
             target: createMockTarget(3),
-          })
+          }),
         ),
       ]);
 

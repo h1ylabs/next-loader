@@ -9,7 +9,7 @@ import { exhaustiveCheckType, validateType } from "@/lib/utils/validateType";
 import type { AdviceChainContext } from "./context";
 
 export function checkRejection<Result, SharedContext>(
-  chain: () => AdviceChainContext<Result, SharedContext>
+  chain: () => AdviceChainContext<Result, SharedContext>,
 ) {
   return async () => {
     if (chain().haltRejection) {
@@ -19,7 +19,7 @@ export function checkRejection<Result, SharedContext>(
 }
 
 export function handleRejection<Result, SharedContext>(
-  chain: () => AdviceChainContext<Result, SharedContext>
+  chain: () => AdviceChainContext<Result, SharedContext>,
 ) {
   return async (error: unknown) => {
     // if error is halt rejection, continue propagating
@@ -35,7 +35,7 @@ export function handleRejection<Result, SharedContext>(
       const afterThrow = validateType(
         ErrorAfter,
         chain().buildOptions.advice[error.info.extraInfo.advice].error.runtime
-          .afterThrow
+          .afterThrow,
       );
 
       switch (afterThrow) {

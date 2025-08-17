@@ -103,7 +103,7 @@ describe("Integration – Promise-AOP", () => {
               log.info("afterReturning:executed");
             },
           }),
-        })
+        }),
       );
 
       const process = createProcess<number, StandardTestContext>({
@@ -191,11 +191,11 @@ describe("Integration – Promise-AOP", () => {
       const context = () =>
         ({
           log: { info: jest.fn(), error: jest.fn() },
-        } as StandardTestContext);
+        }) as StandardTestContext;
       const target = createCommonTarget<number>(0);
 
       await expect(runProcess({ process, context, target })).rejects.toThrow(
-        /Section conflict:/
+        /Section conflict:/,
       );
     });
   });
@@ -254,7 +254,7 @@ describe("Integration – Promise-AOP", () => {
               });
             },
           }),
-        })
+        }),
       );
 
       const result = await runWith<number, StandardTestContext>([TestAspect], {
@@ -302,12 +302,12 @@ describe("Integration – Promise-AOP", () => {
               });
             },
           }),
-        })
+        }),
       );
 
       const result = await runWith<number, StandardTestContext>(
         [MultiWrapperAspect],
-        { context: createLoggingContext(calls), target: createCommonTarget(2) }
+        { context: createLoggingContext(calls), target: createCommonTarget(2) },
       );
 
       // Expected execution order: wrapper-3(wrapper-2(wrapper-1(target)))
@@ -361,7 +361,7 @@ describe("Integration – Promise-AOP", () => {
               });
             },
           }),
-        })
+        }),
       );
 
       const result = await runWith<number, StandardTestContext>([AsyncAspect], {
@@ -405,11 +405,11 @@ describe("Integration – Promise-AOP", () => {
               log.info(
                 `afterThrowing: ${
                   error instanceof Error ? error.message : String(error)
-                }`
+                }`,
               );
             },
           }),
-        })
+        }),
       );
 
       const expectedFallback = -1000;
@@ -425,14 +425,14 @@ describe("Integration – Promise-AOP", () => {
               .fn()
               .mockResolvedValue(async () => expectedFallback),
           },
-        }
+        },
       );
 
       expect(result).toBe(expectedFallback);
       expect(calls).toContain("error-wrapper-start");
       expect(calls).toContain("error-wrapper-caught");
       expect(calls.some((c) => c.includes("afterThrowing: target error"))).toBe(
-        true
+        true,
       );
     });
   });

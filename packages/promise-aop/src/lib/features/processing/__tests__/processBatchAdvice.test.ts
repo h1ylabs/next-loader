@@ -33,7 +33,7 @@ describe("processBatchAdvice", () => {
   });
 
   const createTestOptions = (
-    aggregation: AggregationUnit = "unit"
+    aggregation: AggregationUnit = "unit",
   ): RequiredBuildOptions["advice"][TestAdviceType] => ({
     execution: "parallel",
     error: {
@@ -46,7 +46,7 @@ describe("processBatchAdvice", () => {
 
   const createSuccessfulAdvice =
     (
-      delay: number = 0
+      delay: number = 0,
     ): AdviceFunctionWithContext<
       TestResult,
       TestSharedContext,
@@ -61,7 +61,7 @@ describe("processBatchAdvice", () => {
   const createFailingAdvice =
     (
       errorMessage: string,
-      delay: number = 0
+      delay: number = 0,
     ): AdviceFunctionWithContext<
       TestResult,
       TestSharedContext,
@@ -296,7 +296,7 @@ describe("processBatchAdvice", () => {
         | undefined;
 
       const contextCapturingAdvice = async (
-        context: Restricted<TestSharedContext, ["database", "logger"]>
+        context: Restricted<TestSharedContext, ["database", "logger"]>,
       ) => {
         capturedContext = context;
         // Access allowed sections
@@ -334,7 +334,7 @@ describe("processBatchAdvice", () => {
 
     it("should handle advice with no use sections (empty array)", async () => {
       const minimalAdvice = async (
-        _context: Restricted<TestSharedContext, []>
+        _context: Restricted<TestSharedContext, []>,
       ) => {
         // Should have no access to any context properties
       };
@@ -363,7 +363,10 @@ describe("processBatchAdvice", () => {
 
     it("should handle advice without explicit use property", async () => {
       const defaultAdvice = async (
-        _context: Restricted<TestSharedContext, SectionsUsed<TestSharedContext>>
+        _context: Restricted<
+          TestSharedContext,
+          SectionsUsed<TestSharedContext>
+        >,
       ) => {
         // Default behavior when use is not specified
       };

@@ -49,7 +49,7 @@ describe("adviceHandlers", () => {
   > => createProcessOptionsMock<TestResult, TestSharedContext>();
 
   const createMockChainContext = (
-    overrides: Partial<AdviceChainContext<TestResult, TestSharedContext>> = {}
+    overrides: Partial<AdviceChainContext<TestResult, TestSharedContext>> = {},
   ): AdviceChainContext<TestResult, TestSharedContext> => ({
     target: createMockTarget(100),
     context: createMockContext(),
@@ -122,7 +122,7 @@ describe("adviceHandlers", () => {
 
         // This should set haltRejection and then throw it
         await expect(handleTask(rejection)).rejects.toBeInstanceOf(
-          HaltRejection
+          HaltRejection,
         );
         expect(context.haltRejection).toBeInstanceOf(HaltRejection);
         expect(context.haltRejection?.info).toBe(rejection.info);
@@ -149,7 +149,7 @@ describe("adviceHandlers", () => {
         expect(context.haltRejection).toBeUndefined();
         expect(context.continueRejections).toHaveLength(1);
         expect(context.continueRejections[0]).toBeInstanceOf(
-          ContinuousRejection
+          ContinuousRejection,
         );
         expect(context.continueRejections[0]?.info).toBe(rejection.info);
       });
@@ -162,7 +162,7 @@ describe("adviceHandlers", () => {
 
       const handleTask = handleRejection(chain);
       await expect(handleTask(unknownError)).rejects.toBeInstanceOf(
-        HaltRejection
+        HaltRejection,
       );
 
       expect(context.haltRejection).toBeInstanceOf(HaltRejection);
@@ -178,7 +178,7 @@ describe("adviceHandlers", () => {
 
       const handleTask = handleRejection(chain);
       await expect(handleTask(unknownError)).rejects.toBeInstanceOf(
-        HaltRejection
+        HaltRejection,
       );
 
       expect(context.haltRejection).toBeInstanceOf(HaltRejection);
@@ -194,7 +194,7 @@ describe("adviceHandlers", () => {
 
       const handleTask = handleRejection(chain);
       await expect(handleTask(stringError)).rejects.toBeInstanceOf(
-        HaltRejection
+        HaltRejection,
       );
 
       expect(context.haltRejection).toBeInstanceOf(HaltRejection);
@@ -240,7 +240,7 @@ describe("adviceHandlers", () => {
 
       // Then handle halt error - should set haltRejection and throw
       await expect(handleTask(haltRejection)).rejects.toBeInstanceOf(
-        HaltRejection
+        HaltRejection,
       );
       expect(context.haltRejection).toBeInstanceOf(HaltRejection);
       // Continue rejections should still be preserved
@@ -262,7 +262,7 @@ describe("adviceHandlers", () => {
       const handleTask = handleRejection(chain);
 
       await expect(handleTask(targetError)).rejects.toBeInstanceOf(
-        HaltRejection
+        HaltRejection,
       );
 
       // Existing continue rejections should be preserved
@@ -277,7 +277,7 @@ describe("adviceHandlers", () => {
       // First handle an error to set haltRejection
       const handleTask = handleRejection(chain);
       await expect(handleTask(new Error("test"))).rejects.toBeInstanceOf(
-        HaltRejection
+        HaltRejection,
       );
 
       // Now checkRejection should throw the haltRejection

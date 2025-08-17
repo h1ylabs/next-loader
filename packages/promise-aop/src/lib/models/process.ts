@@ -8,5 +8,5 @@ import type { Target } from "./target";
 export type Process<Result, SharedContext> = (
   context: ContextAccessor<SharedContext>,
   exit: ExecutionOuterContext,
-  target: Target<Result>
+  target: Target<Result>,
 ) => Promise<Result>;

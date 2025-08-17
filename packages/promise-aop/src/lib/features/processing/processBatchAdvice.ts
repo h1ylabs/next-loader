@@ -13,7 +13,7 @@ import { exhaustiveCheckType, validateType } from "@/lib/utils/validateType";
 export async function processBatchAdvice<
   Result,
   SharedContext,
-  AdviceType extends Advice
+  AdviceType extends Advice,
 >({
   context,
   options,
@@ -33,9 +33,9 @@ export async function processBatchAdvice<
       group.map((task) => {
         return restrictedContext.use(
           async (ctx) => task.advice(ctx, ...args),
-          task.use ?? ([] as SectionsUsed<SharedContext>)
+          task.use ?? ([] as SectionsUsed<SharedContext>),
         );
-      })
+      }),
     );
 
     // errors(rejections) from unit advice

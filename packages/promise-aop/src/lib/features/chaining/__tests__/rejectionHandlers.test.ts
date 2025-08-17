@@ -43,7 +43,7 @@ describe("rejectionHandlers", () => {
     fallbackValue: TestResult = -999,
     overrides: Partial<
       RequiredProcessOptions<TestResult, TestSharedContext>
-    > = {}
+    > = {},
   ): RequiredProcessOptions<TestResult, TestSharedContext> =>
     createProcessOptionsMock<TestResult, TestSharedContext>({
       resolveHaltRejection: jest
@@ -53,7 +53,7 @@ describe("rejectionHandlers", () => {
     });
 
   const createMockChainContext = (
-    overrides: Partial<AdviceChainContext<TestResult, TestSharedContext>> = {}
+    overrides: Partial<AdviceChainContext<TestResult, TestSharedContext>> = {},
   ): AdviceChainContext<TestResult, TestSharedContext> => ({
     target: createMockTarget(100),
     context: createMockContext(),
@@ -110,7 +110,7 @@ describe("rejectionHandlers", () => {
       expect(mockProcessOptions.resolveHaltRejection).toHaveBeenCalledWith(
         expect.any(Function),
         expect.any(Function),
-        haltRejection
+        haltRejection,
       );
       expect(result).toBe(fallbackValue);
     });
@@ -155,7 +155,7 @@ describe("rejectionHandlers", () => {
       expect(mockProcessOptions.resolveHaltRejection).toHaveBeenCalledWith(
         expect.any(Function),
         expect.any(Function),
-        haltRejection
+        haltRejection,
       );
     });
 
@@ -183,7 +183,7 @@ describe("rejectionHandlers", () => {
       expect(mockProcessOptions.resolveHaltRejection).toHaveBeenCalledWith(
         expect.any(Function),
         expect.any(Function),
-        haltRejection
+        haltRejection,
       );
     });
   });
@@ -214,14 +214,14 @@ describe("rejectionHandlers", () => {
       await handler();
 
       expect(
-        mockProcessOptions.resolveContinuousRejection
+        mockProcessOptions.resolveContinuousRejection,
       ).toHaveBeenCalledTimes(1);
       expect(
-        mockProcessOptions.resolveContinuousRejection
+        mockProcessOptions.resolveContinuousRejection,
       ).toHaveBeenCalledWith(
         expect.any(Function),
         expect.any(Function),
-        continuousRejections
+        continuousRejections,
       );
     });
 
@@ -237,10 +237,10 @@ describe("rejectionHandlers", () => {
       await handler();
 
       expect(
-        mockProcessOptions.resolveContinuousRejection
+        mockProcessOptions.resolveContinuousRejection,
       ).toHaveBeenCalledTimes(1);
       expect(
-        mockProcessOptions.resolveContinuousRejection
+        mockProcessOptions.resolveContinuousRejection,
       ).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), []);
     });
 
@@ -262,7 +262,7 @@ describe("rejectionHandlers", () => {
       await handler();
 
       expect(
-        mockProcessOptions.resolveContinuousRejection
+        mockProcessOptions.resolveContinuousRejection,
       ).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), [
         continuousRejection,
       ]);
@@ -314,7 +314,7 @@ describe("rejectionHandlers", () => {
       await handler();
 
       expect(
-        mockProcessOptions.resolveContinuousRejection
+        mockProcessOptions.resolveContinuousRejection,
       ).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), [
         continuousRejection,
       ]);
@@ -347,7 +347,7 @@ describe("rejectionHandlers", () => {
       await continuousHandler();
 
       expect(
-        mockProcessOptions.resolveContinuousRejection
+        mockProcessOptions.resolveContinuousRejection,
       ).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), [
         continuousRejection,
       ]);
@@ -389,11 +389,11 @@ describe("rejectionHandlers", () => {
       await handler();
 
       expect(
-        mockProcessOptions.resolveContinuousRejection
+        mockProcessOptions.resolveContinuousRejection,
       ).toHaveBeenCalledWith(
         expect.any(Function),
         expect.any(Function),
-        mixedRejections
+        mixedRejections,
       );
     });
   });

@@ -23,13 +23,13 @@ import {
 } from "./rejectionHandlers";
 
 export async function executeAdviceChain<Result, SharedContext>(
-  props: __Props<Result, SharedContext>
+  props: __Props<Result, SharedContext>,
 ): Promise<__Return<Result>> {
   const AdviceChainContext = AsyncContext.create(
     (): AdviceChainContext<Result, SharedContext> => ({
       ...props,
       continueRejections: [],
-    })
+    }),
   );
 
   return AsyncContext.execute(AdviceChainContext, async (chain) => {
@@ -45,8 +45,8 @@ export async function executeAdviceChain<Result, SharedContext>(
                 .catch(afterThrowingAdviceTask(chain))
                 .finally(afterAdviceTask(chain))
                 .catch(resolveHaltRejection(chain))
-                .finally(handleContinuousRejection(chain))
-          )
+                .finally(handleContinuousRejection(chain)),
+          ),
         )
         .then(executeTargetTask)
         // recover from halt error that occurred in upper stages (before/around etc.)
