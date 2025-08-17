@@ -7,20 +7,31 @@ import {
   normalizeOptions,
 } from "@/lib/utils/normalizeOptions";
 
-import type { ContinuousRejection, HaltRejection } from "./rejection";
-import type { Target } from "./target";
+import type { ErrorInfo } from "./rejection";
+import { Rejection } from "./rejection";
 
 export type RequiredProcessOptions<Result, SharedContext> = {
-  readonly resolveHaltRejection: (
-    context: ContextAccessor<SharedContext>,
-    exit: ExecutionOuterContext,
-    error: HaltRejection,
-  ) => Promise<Target<Result>>;
-  readonly resolveContinuousRejection: (
-    context: ContextAccessor<SharedContext>,
-    exit: ExecutionOuterContext,
-    error: ContinuousRejection[],
-  ) => Promise<void>;
+  // determines which error to propagate from the collected errors.
+  readonly determineError: (props: {
+    context: ContextAccessor<SharedContext>;
+    exit: ExecutionOuterContext;
+    errors: unknown[];
+    info: ErrorInfo;
+  }) => Promise<unknown>;
+
+  // handles an error based on a specific error.
+  readonly handleError: (props: {
+    context: ContextAccessor<SharedContext>;
+    exit: ExecutionOuterContext;
+    error: unknown;
+  }) => Promise<Result>;
+
+  // handles errors that were just passed over.
+  readonly handleContinuedErrors: (props: {
+    context: ContextAccessor<SharedContext>;
+    exit: ExecutionOuterContext;
+    errors: readonly (readonly [unknown[], ErrorInfo])[];
+  }) => Promise<void>;
 };
 
 export type ProcessOptions<Result, SharedContext> = NormalizableOptions<
@@ -37,11 +48,20 @@ export function normalizeProcessOptions<Result, SharedContext>(
   return normalizeOptions(defaultOptions, options);
 }
 
-export function defaultProcessOptions<Result, SharedContext>() {
+export function defaultProcessOptions<
+  Result,
+  SharedContext,
+>(): RequiredProcessOptions<Result, SharedContext> {
   return {
-    resolveHaltRejection: async (_context, _exit, error) => {
+    determineError: async ({ errors }) => {
+      return errors[0];
+    },
+    handleError: async ({ error }) => {
+      if (error instanceof Rejection) {
+        throw error.errors[0];
+      }
       throw error;
     },
-    resolveContinuousRejection: async () => {},
-  } as const satisfies RequiredProcessOptions<Result, SharedContext>;
+    handleContinuedErrors: async () => {},
+  };
 }

@@ -47,9 +47,7 @@ describe("executeAdviceChain", () => {
     fallbackValue: TestResult = -999,
   ): RequiredProcessOptions<TestResult, TestSharedContext> =>
     createProcessOptionsMock<TestResult, TestSharedContext>({
-      resolveHaltRejection: jest
-        .fn()
-        .mockResolvedValue(() => Promise.resolve(fallbackValue)),
+      handleError: jest.fn().mockResolvedValue(fallbackValue),
     });
 
   const createTestProps = (
@@ -111,9 +109,7 @@ describe("executeAdviceChain", () => {
         TestResult,
         TestSharedContext
       >({
-        resolveHaltRejection: jest
-          .fn()
-          .mockResolvedValue(() => Promise.resolve(fallbackValue)),
+        handleError: jest.fn().mockResolvedValue(fallbackValue),
       });
       const props = createTestProps({
         target: createErrorTarget(targetError),
@@ -152,10 +148,10 @@ describe("executeAdviceChain", () => {
         TestResult,
         TestSharedContext
       >({
-        resolveHaltRejection: jest.fn().mockImplementation(() => {
+        handleError: jest.fn().mockImplementation(() => {
           // afterThrowing should be completed when resolveHaltRejection is called
           expect(afterThrowingCompleted).toBe(true);
-          return Promise.resolve(() => Promise.resolve(fallbackValue));
+          return Promise.resolve(fallbackValue);
         }),
       });
 
@@ -195,9 +191,9 @@ describe("executeAdviceChain", () => {
         TestResult,
         TestSharedContext
       >({
-        resolveHaltRejection: jest.fn().mockImplementation(() => {
+        handleError: jest.fn().mockImplementation(() => {
           executionOrder.push("resolveHaltRejection");
-          return Promise.resolve(() => Promise.resolve(fallbackValue));
+          return Promise.resolve(fallbackValue);
         }),
       });
 
@@ -231,9 +227,7 @@ describe("executeAdviceChain", () => {
         TestResult,
         TestSharedContext
       >({
-        resolveHaltRejection: jest
-          .fn()
-          .mockResolvedValue(() => Promise.resolve(fallbackValue)),
+        handleError: jest.fn().mockResolvedValue(fallbackValue),
       });
       const props = createTestProps({
         advices: mockAdvices,
@@ -244,7 +238,7 @@ describe("executeAdviceChain", () => {
 
       // Should handle the error and return fallback
       expect(result).toBe(fallbackValue);
-      expect(mockProcessOptions.resolveHaltRejection).toHaveBeenCalled();
+      expect(mockProcessOptions.handleError).toHaveBeenCalled();
     });
   });
 
@@ -307,9 +301,7 @@ describe("executeAdviceChain", () => {
         TestResult,
         TestSharedContext
       >({
-        resolveHaltRejection: jest
-          .fn()
-          .mockResolvedValue(() => Promise.resolve(fallbackValue)),
+        handleError: jest.fn().mockResolvedValue(fallbackValue),
       });
       const mockAdvices = createMockAdvices({
         before: jest.fn().mockRejectedValue(new Error("before error")),
@@ -325,10 +317,10 @@ describe("executeAdviceChain", () => {
 
       expect(result).toBe(fallbackValue);
       // Should resolve continuous rejections
-      expect(mockProcessOptions.resolveContinuousRejection).toHaveBeenCalled();
+      expect(mockProcessOptions.handleContinuedErrors).toHaveBeenCalled();
 
       // Should resolve halt rejection
-      expect(mockProcessOptions.resolveHaltRejection).toHaveBeenCalled();
+      expect(mockProcessOptions.handleError).toHaveBeenCalled();
     });
   });
 });

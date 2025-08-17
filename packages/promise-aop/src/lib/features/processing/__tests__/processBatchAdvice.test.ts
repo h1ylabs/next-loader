@@ -160,12 +160,12 @@ describe("processBatchAdvice", () => {
       } catch (error) {
         expect(error).toBeInstanceOf(Rejection);
         if (error instanceof Rejection) {
-          expect(error.info.extraInfo.type).toBe("advice");
-          if (error.info.extraInfo.type === "advice") {
-            expect(error.info.extraInfo.advice).toBe("before");
+          expect(error.info.occurredFrom).toBe("advice");
+          if (error.info.occurredFrom === "advice") {
+            expect(error.info.advice).toBe("before");
           }
-          expect(Array.isArray(error.info.error)).toBe(true);
-          const errors = error.info.error as unknown[];
+          expect(Array.isArray(error.errors)).toBe(true);
+          const errors = error.errors as unknown[];
           expect(errors).toHaveLength(1);
           expect(errors[0]).toBeInstanceOf(Error);
           expect((errors[0] as Error).message).toBe("First group error");
@@ -220,7 +220,7 @@ describe("processBatchAdvice", () => {
       } catch (error) {
         expect(error).toBeInstanceOf(Rejection);
         if (error instanceof Rejection) {
-          const errors = error.info.error as unknown[];
+          const errors = error.errors as unknown[];
           expect(errors).toHaveLength(2);
           const errorMessages = errors.map((e) => (e as Error).message);
           expect(errorMessages).toContain("Error 1");
@@ -255,11 +255,11 @@ describe("processBatchAdvice", () => {
       } catch (error) {
         expect(error).toBeInstanceOf(Rejection);
         if (error instanceof Rejection) {
-          expect(error.info.extraInfo.type).toBe("advice");
-          if (error.info.extraInfo.type === "advice") {
-            expect(error.info.extraInfo.advice).toBe("after");
+          expect(error.info.occurredFrom).toBe("advice");
+          if (error.info.occurredFrom === "advice") {
+            expect(error.info.advice).toBe("after");
           }
-          const errors = error.info.error as unknown[];
+          const errors = error.errors as unknown[];
           expect(errors).toHaveLength(3);
           const errorMessages = errors.map((e) => (e as Error).message);
           expect(errorMessages).toContain("Group 1 Error 1");

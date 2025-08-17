@@ -1,69 +1,69 @@
 # Promise-AOP
 
-**최신 버전: v3.0.0**
+**최신 버전: v4.0.0**
 
-깔끔하고 유지보수하기 쉬운 비동기 코드를 위한 TypeScript-first AOP(Aspect-Oriented Programming) 프레임워크입니다. 횡단 관심사를 한 번 작성하고 어디든 적용하세요.
+깔끔하고 유지보수하기 쉬운 비동기 코드를 위한 TypeScript-first AOP(Aspect-Oriented Programming) 프레임워크입니다. 로깅, 캐싱, 에러 처리 등의 횡단 관심사를 구조화된 방식으로 관리하며, 타입 안전성과 명시적 컨텍스트 관리에 중점을 둡니다.
 
-- ✨ **타입 안전**: 지능적인 컨텍스트 추론과 완전한 TypeScript 지원
-- 🔒 **섹션 기반 잠금**: 공유 컨텍스트에 대한 안전한 동시 접근
-- 🎯 **유연한 조합**: before, around, after 어드바이스와 의존성 순서 지정
-- 🛡️ **견고한 에러 처리**: 구조화된 에러 분류와 복구 전략
-- 📦 **의존성 없음**: 경량화된 완전한 ESM/CJS 지원
+[English Documentation](../README.md)
 
-[English README](../README.md)
+## 🏗️ 아키텍처 개요
 
----
+Promise-AOP는 **Aspect**가 횡단 관심사를 정의하고, **Process**가 이를 실행 체인으로 컴파일하며, **Context**가 스레드 안전한 데이터 접근을 제공하는 명확한 실행 모델을 따릅니다.
 
-## 🚀 빠른 시작
-
-간단한 로깅 예제로 5분 안에 시작해보세요:
-
-```typescript
-import { createAspect, createProcess, runProcess } from "@h1y/promise-aop";
-
-// 1단계: 로깅을 처리하는 aspect 생성
-const LoggingAspect = createAspect<string, { logger: Console }>(
-  (createAdvice) => ({
-    name: "logging",
-    before: createAdvice({
-      use: ["logger"],
-      advice: async ({ logger }) => logger.info("🚀 작업 시작..."),
-    }),
-    after: createAdvice({
-      use: ["logger"],
-      advice: async ({ logger }) => logger.info("✅ 작업 완료!"),
-    }),
-  }),
-);
-
-// 2단계: aspect들을 결합하는 process 생성
-const process = createProcess<string, { logger: Console }>({
-  aspects: [LoggingAspect],
-});
-
-// 3단계: process와 함께 대상 함수 실행
-const result = await runProcess({
-  process,
-  context: () => ({ logger: console }),
-  target: async () => {
-    // 실제 비즈니스 로직은 여기에
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    return "안녕, AOP 세계!";
-  },
-});
-
-console.log(result); // "안녕, AOP 세계!"
-
-// 출력 결과:
-// 🚀 작업 시작...
-// ✅ 작업 완료!
+```mermaid
+flowchart TD
+    A["🎯 Target Function<br/>(비즈니스 로직)"] 
+    B["📦 Aspect<br/>(횡단 관심사)"]
+    C["⚙️ Process<br/>(컴파일된 실행 체인)"]
+    D["🔄 runProcess<br/>(컨텍스트와 함께 실행)"]
+    E["📊 Context<br/>(공유 데이터)"]
+    
+    B --> C
+    A --> D
+    C --> D
+    E --> D
+    
+    subgraph "Advice 타입"
+        F["before"]
+        G["around"]
+        H["after"]
+        I["afterReturning"]
+        J["afterThrowing"]
+    end
+    
+    B --> F
+    B --> G
+    B --> H
+    B --> I
+    B --> J
 ```
 
-**무슨 일이 일어났을까요?**
+### 실행 흐름
 
-1. 모든 함수의 전후에 실행되는 **로깅 aspect**를 만들었습니다
-2. 모든 대상 함수에 적용할 수 있는 **process로 조합**했습니다
-3. 자동 로깅이 적용된 **비즈니스 로직을 실행**했습니다
+```mermaid
+sequenceDiagram
+    participant Context
+    participant Before
+    participant Around
+    participant Target
+    participant AfterReturning
+    participant AfterThrowing
+    participant After
+    
+    Context->>Before: 실행 (병렬)
+    Before->>Around: 래퍼 설정
+    Around->>Target: 래핑된 실행
+    
+    alt 성공
+        Target->>AfterReturning: 결과
+        AfterReturning->>After: 계속
+    else 에러
+        Target->>AfterThrowing: 에러
+        AfterThrowing->>After: 계속
+    end
+    
+    After->>Context: 완료
+```
 
 ---
 
@@ -80,1021 +80,638 @@ yarn add @h1y/promise-aop
 pnpm add @h1y/promise-aop
 ```
 
-**요구사항**: Node.js 16+ (AsyncLocalStorage 사용)
+**요구사항**: Node.js 16+ (`AsyncLocalStorage` 사용)
 
 ---
 
-## 💡 왜 Promise-AOP인가?
+## 🚀 빠른 시작
 
-### 문제점
-
-AOP 없이는 로깅, 인증, 에러 처리 같은 횡단 관심사가 코드베이스 전반에 흩어져 유지보수가 어려워집니다:
+이 예제는 비즈니스 로직 함수에 적용된 간단한 로깅 aspect를 보여줍니다.
 
 ```typescript
-// ❌ 관심사 분산 - 유지보수가 어려움
-async function getUserData(userId: string) {
-  console.log("🚀 getUserData 시작..."); // 로깅
+import { createAspect, createProcess, runProcess } from "@h1y/promise-aop";
 
-  if (!isAuthenticated()) {
-    // 인증
-    throw new Error("인증되지 않음");
-  }
+// 애플리케이션을 위한 공유 컨텍스트 정의
+type AppContext = { logger: Console };
 
+// 1. 횡단 관심사(로깅)를 위한 Aspect 생성
+const LoggingAspect = createAspect<string, AppContext>((createAdvice) => ({
+  name: "logging",
+  before: createAdvice({
+    use: ["logger"], // 필요한 컨텍스트 부분 선언
+    advice: async ({ logger }) => logger.info("🚀 작업 시작..."),
+  }),
+  after: createAdvice({
+    use: ["logger"],
+    advice: async ({ logger }) => logger.info("✅ 작업 완료!"),
+  }),
+}));
+
+// 2. aspect들을 조합하는 Process 생성
+const process = createProcess<string, AppContext>({ aspects: [LoggingAspect] });
+
+// 3. process와 함께 대상 함수 실행
+const result = await runProcess({
+  process,
+  context: () => ({ logger: console }),
+  target: async () => {
+    // 실제 비즈니스 로직
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    return "안녕, AOP 세계!";
+  },
+});
+
+console.log(result); // "안녕, AOP 세계!"
+
+// 콘솔 출력:
+// 🚀 작업 시작...
+// ✅ 작업 완료!
+```
+
+**무엇이 일어났나요?**
+
+1. **Aspect 정의**: `before`와 `after` advice를 가진 재사용 가능한 로깅 관심사를 만들었습니다
+2. **Process 컴파일**: aspect들을 실행 가능한 process로 조합했습니다  
+3. **컨텍스트 제공**: 모든 aspect에 공유 서비스(logger)를 제공했습니다
+4. **자동 위빙**: 프레임워크가 자동으로 대상 함수 주변에서 advice를 실행했습니다
+
+---
+
+## 🧐 AOP 개념 이해하기
+
+Promise-AOP에 들어가기 전에 핵심 개념들을 이해해보겠습니다:
+
+### Aspect-Oriented Programming이란?
+
+**Aspect-Oriented Programming (AOP)**는 **횡단 관심사**(로깅, 보안, 캐싱 등)를 주요 비즈니스 로직에서 분리하는 프로그래밍 패러다임입니다.
+
+```mermaid
+graph LR
+    A["비즈니스 로직<br/>(앱이 하는 일)"] 
+    B["횡단 관심사<br/>(모니터링/보안/캐싱 방법)"]
+    C["AOP 프레임워크<br/>(이들을 함께 엮음)"]
+    D["깔끔하고 유지보수 가능한 코드"]
+    
+    A --> C
+    B --> C
+    C --> D
+```
+
+### 주요 용어
+
+| 용어 | 정의 | 예시 |
+|------|------|------|
+| **Aspect** | 횡단 관심사를 캡슐화하는 모듈 단위 | `LoggingAspect`, `CachingAspect` |
+| **Advice** | 실제로 실행되는 코드 (언제/어떻게/어디서) | `before`, `after`, `around` |
+| **Target** | 원본 비즈니스 함수 | `getUserById()`, `processPayment()` |
+| **Context** | 모든 aspect에서 사용 가능한 공유 데이터/서비스 | `{ logger, db, metrics }` |
+| **Process** | aspect들과 target의 컴파일된 실행 체인 | `createProcess()`의 결과 |
+
+### 컨텍스트 & 섹션 기반 접근
+
+Promise-AOP는 스레드 안전한 접근을 위해 **섹션 기반 컨텍스트 시스템**을 사용합니다:
+
+```mermaid
+graph TD
+    A["Context: { logger, db, metrics, cache }"] 
+    B["Aspect A<br/>use: ['logger']"] 
+    C["Aspect B<br/>use: ['db', 'metrics']"] 
+    D["Aspect C<br/>use: ['cache']"] 
+    
+    A --> B
+    A --> C
+    A --> D
+    
+    E["✅ 병렬 실행<br/>(겹치는 섹션 없음)"]
+    B --> E
+    C --> E
+    D --> E
+```
+
+## ✨ 왜 Promise-AOP인가?
+
+Promise-AOP는 횡단 관심사를 핵심 비즈니스 로직에서 분리하여 더 깔끔하고 유지보수하기 쉬우며 테스트 가능한 코드를 만들 수 있도록 도와줍니다.
+
+**이전: 관심사 분산**
+
+```typescript
+// 비즈니스 로직이 로깅, 메트릭, 에러 처리로 어수선함
+async function getUser(id: string) {
+  logger.info(`사용자 ${id} 조회 중...`);
+  const startTime = Date.now();
   try {
-    const start = Date.now(); // 메트릭
-    const data = await database.query(userId);
-    metrics.record("getUserData", Date.now() - start);
-
-    console.log("✅ getUserData 완료!"); // 더 많은 로깅
-    return data;
-  } catch (error) {
-    logger.error("getUserData 실패:", error); // 에러 처리
-    throw error;
+    const user = await db.fetchUser(id);
+    metrics.record("user.fetch.success", Date.now() - startTime);
+    return user;
+  } catch (e) {
+    logger.error(`사용자 ${id} 조회 실패`, e);
+    metrics.record("user.fetch.failure", Date.now() - startTime);
+    throw e;
   }
 }
 ```
 
-### 해결책
-
-Promise-AOP를 사용하면 관심사를 깔끔하게 분리할 수 있습니다:
+**이후: 깔끔한 분리**
 
 ```typescript
-// ✅ 관심사 분리 - 비즈니스 로직이 순수함
-const getUserData = async (userId: string) => {
-  return database.query(userId); // 순수한 비즈니스 로직
-};
+// 순수한 비즈니스 로직, 읽기 쉽고 테스트하기 쉬움
+const fetchUser = async (id: string) => db.fetchUser(id);
 
-// 로깅, 인증, 메트릭을 자동으로 적용
-const result = await runProcess({
-  process: createProcess({
-    aspects: [LoggingAspect, AuthAspect, MetricsAspect],
-  }),
-  context: () => ({ logger: console, auth, metrics, database }),
-  target: getUserData,
+// 관심사를 선언적으로 적용
+const processedGetUser = (id: string) => runProcess({
+  process: createProcess({ aspects: [LoggingAspect, MetricsAspect] }),
+  context: () => ({ logger, metrics, db }),
+  target: async () => fetchUser(id),
 });
 ```
 
-**Promise-AOP를 사용해야 하는 경우:**
+**주요 이점:**
 
-- 🔐 **인증/권한 부여**를 여러 엔드포인트에 적용할 때
-- 📊 **로깅 및 메트릭** 수집
-- ⚡ **캐싱** 비용이 많이 드는 작업
-- 🔄 **재시도 로직**을 불안정한 서비스에 적용할 때
-- 🛡️ **에러 처리 및 복구**
-- ⏱️ **성능 모니터링**
+-   **관심사 분리**: 비즈니스 로직을 인프라 코드에서 격리
+-   **타입 안전성**: 지능적인 컨텍스트 추론과 완전한 TypeScript 지원
+-   **섹션 기반 잠금**: 공유 컨텍스트에 대한 안전한 동시 접근
+-   **보일러플레이트 감소**: 관심사를 한 번 정의하고 어디든 적용
+-   **중앙화된 제어**: 애플리케이션 전체 정책을 한 곳에서 관리
+-   **향상된 테스트 가능성**: 관련 없는 서비스를 모킹하지 않고 핵심 로직 테스트
 
 ---
 
-## 🧠 핵심 개념
-
-### 어드바이스 타입
-
-Promise-AOP는 함수 라이프사이클의 서로 다른 지점에서 실행되는 다섯 가지 어드바이스 타입을 지원합니다:
-
-```typescript
-const MyAspect = createAspect<Result, Context>((createAdvice) => ({
-  name: "example",
-
-  // 1. Before - 설정 및 검증
-  before: createAdvice({
-    use: ["auth"],
-    advice: async ({ auth }) => {
-      if (!auth.isValid()) throw new Error("인증되지 않음");
-    },
-  }),
-
-  // 2. Around - 전체 실행을 래핑
-  around: createAdvice({
-    use: ["cache"],
-    advice: async ({ cache }, { attachToTarget }) => {
-      attachToTarget((target) => async () => {
-        const cached = await cache.get("key");
-        if (cached) return cached;
-
-        const result = await target();
-        await cache.set("key", result);
-        return result;
-      });
-    },
-  }),
-
-  // 3. AfterReturning - 성공 처리
-  afterReturning: createAdvice({
-    use: ["logger"],
-    advice: async ({ logger }, result) => {
-      logger.info("성공:", result);
-    },
-  }),
-
-  // 4. AfterThrowing - 에러 처리
-  afterThrowing: createAdvice({
-    use: ["logger"],
-    advice: async ({ logger }, error) => {
-      logger.error("실패:", error);
-    },
-  }),
-
-  // 5. After - 정리 (항상 실행됨)
-  after: createAdvice({
-    use: ["metrics"],
-    advice: async ({ metrics }) => {
-      metrics.increment("operation_completed");
-    },
-  }),
-}));
-```
-
-### 실행 플로우
-
-```mermaid
-flowchart TD
-    Start([시작]) --> Before["`**before**
-    설정, 검증, 준비`"]
-
-    Before --> Around["`**around**
-    대상 실행을 래핑`"]
-
-    Around --> Target["`**target**
-    비즈니스 로직`"]
-
-    Target --> Success{성공?}
-
-    Success -->|예| AfterReturning["`**afterReturning**
-    성공 처리`"]
-    Success -->|아니오| AfterThrowing["`**afterThrowing**
-    에러 처리`"]
-
-    AfterReturning --> After["`**after**
-    정리 (항상 실행됨)`"]
-    AfterThrowing --> After
-
-    After --> End([종료])
-
-    style Before fill:#e1f5fe
-    style Around fill:#f3e5f5
-    style Target fill:#fff3e0
-    style AfterReturning fill:#e8f5e8
-    style AfterThrowing fill:#ffebee
-    style After fill:#fafafa
-```
-
-### 컨텍스트 & 섹션 기반 접근
-
-컨텍스트는 공유 상태이며, 안전한 동시 접근을 위해 명명된 섹션으로 나뉩니다:
-
-```typescript
-type MyContext = {
-  database: { query: (sql: string) => Promise<any> };
-  logger: Console;
-  cache: { get: (k: string) => any; set: (k: string, v: any) => void };
-  auth: { userId: string; isAdmin: boolean };
-};
-
-const DatabaseAspect = createAspect<any, MyContext>((createAdvice) => ({
-  name: "database",
-  before: createAdvice({
-    use: ["database", "auth"], // 필요한 섹션을 선언
-    advice: async ({ database, auth }) => {
-      // 여기서는 database와 auth만 사용 가능
-      // 이를 통해 우발적 결합을 방지하고 안전한 병렬 처리 가능
-    },
-  }),
-}));
-```
-
-### 의존성 기반 순서 지정
-
-여러 aspect가 동일한 어드바이스 단계에 영향을 줄 때 실행 순서를 제어합니다:
-
-```typescript
-const AuthAspect = createAspect<any, Context>((createAdvice) => ({
-  name: "auth",
-  before: createAdvice({
-    use: ["auth"],
-    advice: async ({ auth }) => {
-      // 사용자 권한 검증
-    },
-  }),
-}));
-
-const LoggingAspect = createAspect<any, Context>((createAdvice) => ({
-  name: "logging",
-  before: createAdvice({
-    use: ["logger"],
-    dependsOn: ["auth"], // auth aspect 이후에 실행
-    advice: async ({ logger }) => {
-      logger.info("사용자가 인증되었습니다. 작업을 시작합니다");
-    },
-  }),
-}));
-```
-
----
-
-## 📚 일반적인 패턴
-
-### 인증 & 권한 부여
-
-```typescript
-const AuthAspect = createAspect<
-  any,
-  {
-    auth: { token: string; validate: (token: string) => Promise<boolean> };
-    logger: Console;
-  }
->((createAdvice) => ({
-  name: "auth",
-  before: createAdvice({
-    use: ["auth", "logger"],
-    advice: async ({ auth, logger }) => {
-      const isValid = await auth.validate(auth.token);
-      if (!isValid) {
-        logger.warn("인증 실패");
-        throw new Error("인증되지 않은 접근");
-      }
-      logger.info("사용자가 성공적으로 인증되었습니다");
-    },
-  }),
-}));
-```
-
-### Around 어드바이스를 사용한 캐싱
-
-```typescript
-const CacheAspect = createAspect<
-  any,
-  {
-    cache: {
-      get: (key: string) => Promise<any>;
-      set: (key: string, value: any) => Promise<void>;
-    };
-  }
->((createAdvice) => ({
-  name: "cache",
-  around: createAdvice({
-    use: ["cache"],
-    advice: async ({ cache }, { attachToTarget }) => {
-      attachToTarget((target) => async () => {
-        const cacheKey = "operation_result";
-
-        // 먼저 캐시 확인
-        const cached = await cache.get(cacheKey);
-        if (cached) return cached;
-
-        // 대상 실행 후 결과 캐시
-        const result = await target();
-        await cache.set(cacheKey, result);
-        return result;
-      });
-    },
-  }),
-}));
-```
-
-### 에러 처리 & 복구
-
-```typescript
-const ErrorHandlingAspect = createAspect<
-  string,
-  {
-    logger: Console;
-    fallback: { getValue: () => string };
-  }
->((createAdvice) => ({
-  name: "error-handling",
-  afterThrowing: createAdvice({
-    use: ["logger"],
-    advice: async ({ logger }, error) => {
-      logger.error("작업 실패:", error);
-      // 에러 세부 정보 로깅, 모니터링 서비스 전송 등
-    },
-  }),
-}));
-
-// 프로세스 레벨에서 에러 복구 구성
-const process = createProcess({
-  aspects: [ErrorHandlingAspect],
-  processOptions: {
-    resolveHaltRejection: async (context, exit, error) => {
-      // 대체 대상 함수 반환
-      return async () => {
-        const fallback = context().fallback;
-        return fallback.getValue();
-      };
-    },
-  },
-});
-```
-
-### 메트릭 & 성능 모니터링
-
-```typescript
-const MetricsAspect = createAspect<
-  any,
-  {
-    metrics: {
-      startTimer: (name: string) => void;
-      endTimer: (name: string) => void;
-      increment: (name: string) => void;
-    };
-  }
->((createAdvice) => ({
-  name: "metrics",
-  before: createAdvice({
-    use: ["metrics"],
-    advice: async ({ metrics }) => {
-      metrics.startTimer("operation_duration");
-    },
-  }),
-  afterReturning: createAdvice({
-    use: ["metrics"],
-    advice: async ({ metrics }) => {
-      metrics.endTimer("operation_duration");
-      metrics.increment("operation_success");
-    },
-  }),
-  afterThrowing: createAdvice({
-    use: ["metrics"],
-    advice: async ({ metrics }) => {
-      metrics.endTimer("operation_duration");
-      metrics.increment("operation_failure");
-    },
-  }),
-}));
-```
-
----
-
-## 🔧 고급 예제
-
-### 복잡한 Around 어드바이스: 이중 부착 지점
-
-around 어드바이스는 정교한 래퍼 조합을 위한 두 가지 부착 지점을 제공합니다:
-
-```typescript
-const AdvancedCacheAspect = createAspect<
-  number,
-  {
-    cache: {
-      get: (k: string) => Promise<number | null>;
-      set: (k: string, v: number) => Promise<void>;
-    };
-    logger: Console;
-  }
->((createAdvice) => ({
-  name: "advanced-cache",
-  around: createAdvice({
-    use: ["cache", "logger"],
-    advice: async ({ cache, logger }, { attachToTarget, attachToResult }) => {
-      // attachToTarget: 원본 대상 함수를 래핑
-      // 실제 대상에 가장 가깝게 실행됨
-      attachToTarget((target) => async () => {
-        logger.info("🎯 타겟 래퍼: 캐시 확인 중...");
-        const cached = await cache.get("data");
-        if (cached) {
-          logger.info("💾 캐시 히트!");
-          return cached;
-        }
-
-        logger.info("🔍 캐시 미스, 타겟 실행 중...");
-        const result = await target();
-        await cache.set("data", result);
-        return result;
-      });
-
-      // attachToResult: 전체 실행 체인을 래핑
-      // 가장 바깥쪽에서 실행되며, 모든 타겟 래퍼 이후에 실행됨
-      attachToResult((target) => async () => {
-        logger.info("🌟 결과 래퍼: 실행 시작...");
-        const start = Date.now();
-        const result = await target();
-        const duration = Date.now() - start;
-        logger.info(`⚡ 결과 래퍼: ${duration}ms에 완료`);
-        return result * 2; // 최종 결과 변환
-      });
-    },
-  }),
-}));
-
-// 타겟 값 5에 대한 실행 플로우:
-// 🌟 결과 래퍼: 실행 시작...
-// 🎯 타겟 래퍼: 캐시 확인 중...
-// 🔍 캐시 미스, 타겟 실행 중...
-// [원본 타겟 실행: 5]
-// ⚡ 결과 래퍼: 123ms에 완료
-// 최종 결과: 10 (5 * 2 from result wrapper)
-```
-
-### AsyncContext 통합
-
-Promise-AOP는 더 나은 컨텍스트 관리를 위해 완벽한 AsyncContext 통합을 제공합니다:
-
-```typescript
-import { AsyncContext, createProcess, runProcess } from "@h1y/promise-aop";
-
-// 공유 데이터로 AsyncContext 생성
-const asyncContext = AsyncContext.create(() => ({
-  userId: "12345",
-  logger: console,
-  database: myDatabase,
-  requestId: crypto.randomUUID(),
-}));
-
-// runProcess와 함께 사용 (자동 컨텍스트 전파)
-const result = await runProcess({
-  process: myProcess,
-  context: asyncContext, // AsyncContext를 직접 전달
-  target: async () => "Hello World",
-});
-
-// 또는 수동 제어를 위해 AsyncContext.execute 사용
-const manualResult = await AsyncContext.execute(
-  asyncContext,
-  (getContext, exit) => myProcess(getContext, exit, async () => "수동 실행"),
-);
-```
-
-### 여러 Aspect 조합
-
-```typescript
-const AuthAspect = createAspect<ApiResponse, AppContext>((createAdvice) => ({
-  name: "auth",
-  before: createAdvice({
-    use: ["auth"],
-    advice: async ({ auth }) => {
-      if (!auth.isAuthenticated()) throw new Error("로그인하세요");
-    },
-  }),
-}));
-
-const CacheAspect = createAspect<ApiResponse, AppContext>((createAdvice) => ({
-  name: "cache",
-  around: createAdvice({
-    use: ["cache"],
-    advice: async ({ cache }, { attachToTarget }) => {
-      attachToTarget((target) => async () => {
-        const key = "api_response";
-        const cached = await cache.get(key);
-        if (cached) return cached;
-
-        const result = await target();
-        await cache.set(key, result, { ttl: 300 });
-        return result;
-      });
-    },
-  }),
-}));
-
-const LoggingAspect = createAspect<ApiResponse, AppContext>((createAdvice) => ({
-  name: "logging",
-  before: createAdvice({
-    use: ["logger"],
-    dependsOn: ["auth"], // 성공적인 인증 이후에만 로그
-    advice: async ({ logger }) => logger.info("🚀 API 요청 시작"),
-  }),
-  after: createAdvice({
-    use: ["logger"],
-    advice: async ({ logger }) => logger.info("✅ API 요청 완료"),
-  }),
-}));
-
-// 모든 aspect를 함께 조합
-const apiProcess = createProcess<ApiResponse, AppContext>({
-  aspects: [AuthAspect, CacheAspect, LoggingAspect],
-});
-```
-
----
-
-## 🛡️ 에러 처리 전략
-
-Promise-AOP는 세 가지 종류의 rejection으로 구조화된 에러 처리 접근 방식을 제공합니다:
-
-### Rejection 유형
-
-```typescript
-import {
-  Rejection,
-  HaltRejection,
-  ContinuousRejection,
-} from "@h1y/promise-aop";
-
-// 모든 AOP 에러의 기본 클래스
-const rejection = new Rejection({
-  error: new Error("문제가 발생했습니다"),
-  extraInfo: {
-    type: "advice", // "target" | "advice" | "unknown"
-    advice: someAdvice, // type이 "advice"일 때 제공됨
-  },
-});
-
-// 전체 체인을 중단하는 중요한 에러
-const haltRejection = new HaltRejection({
-  error: new Error("인증 실패"),
-  extraInfo: { type: "advice", advice: authAdvice },
-});
-
-// 수집되지만 실행을 중단하지 않는 비중요한 에러
-const continuousRejection = new ContinuousRejection({
-  error: new Error("메트릭 수집 실패"),
-  extraInfo: { type: "advice", advice: metricsAdvice },
-});
-```
-
-### 에러 해결 전략
-
-애플리케이션이 다양한 유형의 에러를 처리하는 방식을 구성합니다:
-
-```typescript
-const robustProcess = createProcess({
-  aspects: [AuthAspect, CacheAspect, MetricsAspect],
-  processOptions: {
-    // 실행을 중단하는 중요한 에러 처리
-    resolveHaltRejection: async (context, exit, error) => {
-      const { logger, fallback } = context();
-      logger.error("중요한 실패:", error.info.error.message);
-
-      // 대체 대상 함수 반환
-      return async () => ({
-        success: false,
-        fallback: true,
-        timestamp: Date.now(),
-        data: fallback.defaultValue,
-      });
-    },
-
-    // 수집된 비중요한 에러 처리
-    resolveContinuousRejection: async (context, exit, errors) => {
-      const { logger, monitoring } = context();
-
-      errors.forEach((error) => {
-        logger.warn("비중요한 에러:", error.info.error.message);
-        monitoring.recordError(error);
-      });
-    },
-  },
-});
-```
-
-### 에러 출처 추적
-
-각 rejection은 출처에 대한 상세한 메타데이터를 포함합니다:
-
-- **`type: "target"`**: 비즈니스 로직에서 발생한 에러
-- **`type: "advice"`**: 특정 aspect에서 발생한 에러 (advice 참조 포함)
-- **`type: "unknown"`**: 예상치 못한 출처에서 발생한 에러
-
-### 고급 에러 처리 패턴
-
-```typescript
-const RobustApiAspect = createAspect<ApiResponse, AppContext>((createAdvice) => ({
-  name: "robust-api",
-  before: createAdvice({
-    use: ["auth", "logger", "monitoring"],
-    advice: async ({ auth, logger, monitoring }) => {
-      try {
-        const isValid = await auth.validateToken();
-        if (!isValid) {
-          // 중요한 에러 - 체인을 중단
-          throw new HaltRejection({
-            error: new Error("유효하지 않은 인증 토큰"),
-            extraInfo: { type: "advice", advice: /* 현재 advice */ }
-          });
-        }
-      } catch (error) {
-        if (error instanceof HaltRejection) throw error;
-
-        // 비중요한 모니터링 실패 - 실행 계속
-        try {
-          monitoring.recordAuthAttempt(false);
-        } catch (monitoringError) {
-          throw new ContinuousRejection({
-            error: monitoringError,
-            extraInfo: { type: "advice", advice: /* 현재 advice */ }
-          });
-        }
-
-        throw error; // 원래 에러 다시 throw
-      }
-    },
-  }),
-}));
-```
-
----
-
-## 📚 완전한 API 참조
+## 📚 API 레퍼런스
 
 ### 핵심 함수
 
-| 함수                                     | 설명                                   | 반환값                     |
-| ---------------------------------------- | -------------------------------------- | -------------------------- |
-| `createAspect<Result, Context>(helper)`  | 횡단 관심사를 가진 Aspect 생성         | `Aspect<Result, Context>`  |
-| `createProcess<Result, Context>(config)` | Aspect들을 실행 가능한 프로세스로 조합 | `Process<Result, Context>` |
-| `runProcess<Result, Context>(props)`     | 컨텍스트와 대상으로 프로세스 실행      | `Promise<Result>`          |
+#### `createAspect<Result, Context>(factory)`
 
-### 내보낸 클래스
+횡단 관심사를 위한 모듈 단위인 aspect를 생성합니다.
 
-| 클래스                  | 설명                                  | 사용처                         |
-| ----------------------- | ------------------------------------- | ------------------------------ |
-| `Rejection`             | 모든 AOP rejection의 기본 에러 클래스 | 사용자 정의 rejection 처리     |
-| `HaltRejection`         | 전체 advice 체인을 중단하는 에러      | 체인 중단이 필요한 중요한 에러 |
-| `ContinuousRejection`   | 실행을 계속하며 집계되는 에러         | 수집용 비중요한 에러           |
-| `AsyncContext<Context>` | 비동기 컨텍스트 관리 유틸리티         | 비동기 작업 간 컨텍스트 전파   |
+**타입 매개변수:**
+- `Result`: 대상 함수의 예상 반환 타입
+- `Context`: 모든 advice에서 사용 가능한 공유 객체 (키가 섹션 이름인 딕셔너리 형태)
 
-### 핵심 타입
+**매개변수:**
+- `factory`: `(createAdvice: AdviceGeneratorHelper<Result, Context>) => Aspect<Result, Context>`
+
+**반환값:** `Aspect<Result, Context>`
 
 ```typescript
-// 대상 함수 타입
-type Target<Result> = () => Promise<Result>;
-
-// around advice용 래퍼 함수
-type TargetWrapper<Result> = (target: Target<Result>) => Target<Result>;
-
-// 컴파일된 실행 가능한 프로세스
-type Process<Result, SharedContext> = (
-  context: ContextAccessor<SharedContext>,
-  exit: ExecutionOuterContext,
-  target: Target<Result>,
-) => Promise<Result>;
-
-// Aspect 정의
 type Aspect<Result, Context> = {
   readonly name: string;
-  readonly before?: AdviceMetadata<Result, Context, "before">;
-  readonly around?: AdviceMetadata<Result, Context, "around">;
-  readonly afterReturning?: AdviceMetadata<Result, Context, "afterReturning">;
-  readonly afterThrowing?: AdviceMetadata<Result, Context, "afterThrowing">;
-  readonly after?: AdviceMetadata<Result, Context, "after">;
+  readonly before?: AdviceMetadata<Result, Context, 'before'>;
+  readonly around?: AdviceMetadata<Result, Context, 'around'>;
+  readonly afterReturning?: AdviceMetadata<Result, Context, 'afterReturning'>;
+  readonly afterThrowing?: AdviceMetadata<Result, Context, 'afterThrowing'>;
+  readonly after?: AdviceMetadata<Result, Context, 'after'>;
 };
+```
 
-// 컨텍스트 접근 제어가 있는 advice 메타데이터
+#### `createAdvice(metadata)` 헬퍼
+
+`createAdvice` 헬퍼 함수는 단일 advice의 동작을 정의합니다.
+
+```typescript
 type AdviceMetadata<Result, Context, AdviceType, Sections> = {
-  readonly use?: Sections; // 선언된 컨텍스트 섹션
-  readonly dependsOn?: readonly string[]; // Aspect 의존성
+  readonly use?: Sections; // 컨텍스트 섹션 이름 배열
+  readonly dependsOn?: readonly string[]; // aspect 이름 배열
   readonly advice: AdviceFunctionWithContext<Result, Context, AdviceType>;
 };
 ```
 
-### 구성 옵션
+**속성:**
+
+| 속성 | 타입 | 설명 |
+|------|------|------|
+| `use?` | `(keyof Context)[]` | 이 advice가 필요로 하는 컨텍스트 섹션. 타입 검사와 섹션 기반 잠금을 활성화. |
+| `dependsOn?` | `string[]` | 이 advice가 (같은 단계에서) 뒤에 실행되어야 하는 aspect 이름들. |
+| `advice` | `AdviceFunction` | 실제 advice 로직. 시그니처는 advice 타입에 따라 다름. |
+
+#### Advice 함수 시그니처
+
+| Advice 타입 | 시그니처 | 목적 |
+|-------------|----------|------|
+| `before` | `(context: Restricted<Context, Sections>) => Promise<void>` | 설정, 검증, 준비 |
+| `around` | `(context: Restricted<Context, Sections>, hooks: AroundHooks) => Promise<void>` | 래핑, 변환, 캐싱 |
+| `afterReturning` | `(context: Restricted<Context, Sections>, result: Result) => Promise<void>` | 성공 처리, 정리 |
+| `afterThrowing` | `(context: Restricted<Context, Sections>, error: unknown) => Promise<void>` | 에러 처리, 로깅 |
+| `after` | `(context: Restricted<Context, Sections>) => Promise<void>` | 항상 실행, 최종 정리 |
+
+**Around Advice 훅:**
+```typescript
+type AroundHooks<Result> = {
+  attachToTarget: (wrapper: TargetWrapper<Result>) => void;
+  attachToResult: (wrapper: TargetWrapper<Result>) => void;
+};
+
+type TargetWrapper<Result> = (target: Target<Result>) => Target<Result>;
+type Target<Result> = () => Promise<Result>;
+```
+
+#### `createProcess<Result, Context>(config)`
+
+aspect 집합을 실행 가능한 process로 컴파일합니다.
+
+**타입 매개변수:**
+- `Result`: 대상 함수들의 예상 반환 타입
+- `Context`: 공유 컨텍스트 타입
+
+**매개변수:**
+```typescript
+type CreateProcessConfig<Result, Context> = {
+  readonly aspects: readonly Aspect<Result, Context>[];
+  readonly buildOptions?: BuildOptions;
+  readonly processOptions?: ProcessOptions<Result, Context>;
+};
+```
+
+**반환값:** `Process<Result, Context>`
 
 ```typescript
-// advice 타입별 빌드타임 구성
+type Process<Result, Context> = (
+  context: ContextAccessor<Context>,
+  exit: ExecutionOuterContext, 
+  target: Target<Result>
+) => Promise<Result>;
+```
+
+#### `runProcess<Result, Context>(props)`
+
+대상 함수와 컨텍스트로 process를 실행합니다.
+
+**매개변수:**
+```typescript
+type RunProcessProps<Result, Context> = {
+  readonly process: Process<Result, Context>;
+  readonly target: Target<Result>; // () => Promise<Result>
+  readonly context: ContextGenerator<Context> | AsyncContext<Context>;
+};
+
+type ContextGenerator<Context> = () => Context;
+```
+
+**반환값:** `Promise<Result>`
+
+**컨텍스트 타입:**
+- `ContextGenerator<Context>`: 컨텍스트를 반환하는 간단한 함수
+- `AsyncContext<Context>`: 비동기 경계를 넘어 자동 전파
+
+**예시:**
+```typescript
+// 컨텍스트 생성기 사용
+const result = await runProcess({
+  process,
+  target: async () => fetchUserData(id),
+  context: () => ({ logger: console, db })
+});
+
+// AsyncContext 사용하여 전파
+const asyncCtx = AsyncContext.create(() => ({ logger, db }));
+const result = await runProcess({
+  process,
+  target: async () => fetchUserData(id), 
+  context: asyncCtx
+});
+```
+
+### 설정 옵션
+
+#### `BuildOptions`
+
+각 advice 타입의 실행 전략과 에러 처리를 제어합니다.
+
+```typescript
 type BuildOptions = {
-  advice: {
-    [advice in Advice]: {
-      execution: "parallel" | "sequential";
-      error: {
-        aggregation: "unit" | "all";
-        runtime: {
-          afterThrow: "halt" | "continue";
+  readonly advice?: {
+    readonly [AdviceType in Advice]?: {
+      readonly execution?: ExecutionStrategy;
+      readonly error?: {
+        readonly aggregation?: AggregationUnit;
+        readonly runtime?: {
+          readonly afterThrow?: ErrorAfter;
         };
       };
     };
   };
 };
 
-// 프로세스 레벨 에러 해결
-type ProcessOptions<Result, SharedContext> = {
-  resolveHaltRejection?: (
-    context: ContextAccessor<SharedContext>,
-    exit: ExecutionOuterContext,
-    error: HaltRejection,
-  ) => Promise<Target<Result>>;
+type ExecutionStrategy = "parallel" | "sequential";
+type AggregationUnit = "unit" | "all";
+type ErrorAfter = "halt" | "continue";
+```
 
-  resolveContinuousRejection?: (
-    context: ContextAccessor<SharedContext>,
-    exit: ExecutionOuterContext,
-    errors: ContinuousRejection[],
-  ) => Promise<void>;
+**기본 설정:**
+
+| Advice 타입 | 실행 | 집계 | 에러 후 | 비고 |
+|-------------|------|------|---------|------|
+| `before` | `parallel` | `unit` | `halt` | 첫 번째 에러에서 빠르게 실패 |
+| `around` | `sequential` | `unit` | `halt` | 순차적으로 래핑 |
+| `afterReturning` | `parallel` | `all` | `continue` | 모든 에러 수집 |
+| `afterThrowing` | `parallel` | `all` | `continue` | 모든 에러 수집 |
+| `after` | `parallel` | `all` | `continue` | 항상 실행 |
+
+**에러 설정 옵션:**
+- `aggregation: "unit"`: 첫 번째 에러에서 중단
+- `aggregation: "all"`: 모든 에러 수집
+- `afterThrow: "halt"`: 에러 시 실행 중단
+- `afterThrow: "continue"`: 에러에도 불구하고 계속
+
+**섹션 잠금:** 병렬 advice가 같은 컨텍스트 섹션을 사용하면 Promise-AOP는 런타임 에러를 던집니다. 해결 방법:
+1. 실행을 `sequential`로 만들기
+2. `dependsOn` 관계 설정
+3. 다른 컨텍스트 섹션 사용
+
+#### `ProcessOptions`
+
+중앙화된 에러 처리 및 복구 설정입니다.
+
+```typescript
+type ProcessOptions<Result, Context> = {
+  readonly determineError?: (props: {
+    context: ContextAccessor<Context>;
+    exit: ExecutionOuterContext;
+    errors: unknown[];
+    info: ErrorInfo;
+  }) => Promise<unknown>;
+  
+  readonly handleError?: (props: {
+    context: ContextAccessor<Context>;
+    exit: ExecutionOuterContext; 
+    error: unknown;
+  }) => Promise<Result>;
+  
+  readonly handleContinuedErrors?: (props: {
+    context: ContextAccessor<Context>;
+    exit: ExecutionOuterContext;
+    errors: readonly (readonly [unknown[], ErrorInfo])[]; 
+  }) => Promise<void>;
 };
 ```
 
-### 기본 구성
+**에러 처리 흐름:**
 
-| Advice 타입      | 실행 방식    | 에러 집계 | 에러 런타임 |
-| ---------------- | ------------ | --------- | ----------- |
-| `before`         | `parallel`   | `unit`    | `halt`      |
-| `around`         | `sequential` | `unit`    | `halt`      |
-| `afterReturning` | `parallel`   | `all`     | `continue`  |
-| `afterThrowing`  | `parallel`   | `all`     | `continue`  |
-| `after`          | `parallel`   | `all`     | `continue`  |
+```mermaid
+flowchart TD
+    A["여러 에러 발생"] --> B["determineError"]
+    B --> C["주요 에러 선택"]
+    C --> D["handleError"]
+    D --> E{"복구 결정"}
+    E -->|"값 반환"| F["성공 결과"]
+    E -->|"에러 던지기"| G["실패 결과"]
+    
+    A --> H["handleContinuedErrors"]
+    H --> I["부차적 에러 로그/모니터링"]
+```
+
+**핸들러 설명:**
+
+| 핸들러 | 목적 | 반환 동작 |
+|--------|------|-----------|
+| `determineError` | 여러 실패에서 주요 에러 선택 | 가장 중요한 에러 반환 |
+| `handleError` | 핵심 복구 로직 | `Result` 반환하여 복구, 던져서 실패 |
+| `handleContinuedErrors` | 부차적 에러 처리 | 로깅/모니터링 전용 |
+
+**기본 동작:**
+- `determineError`: 첫 번째 에러 반환
+- `handleError`: 에러 재던지기 (복구 없음)
+- `handleContinuedErrors`: 아무것도 하지 않음
+
+<details>
+<summary><strong>고급 에러 처리 예시</strong></summary>
+
+```typescript
+class DatabaseError extends Error { name = 'DatabaseError'; }
+class LoggingError extends Error { name = 'LoggingError'; }
+
+const process = createProcess<string, AppContext>({
+  aspects: [DatabaseAspect, LoggingAspect],
+  processOptions: {
+    // 로깅 에러보다 데이터베이스 에러 우선순위
+    determineError: async ({ errors }) => {
+      return errors.find(e => e instanceof DatabaseError) ?? errors[0];
+    },
+    
+    // 복구 전략 구현
+    handleError: async ({ context, error }) => {
+      const { logger, cache } = context();
+      
+      if (error instanceof DatabaseError) {
+        logger.error('데이터베이스 실패, 캐시 사용', error);
+        return cache.get('fallback-value');
+      }
+      
+      throw error; // 복구할 수 없는 에러 재던지기
+    },
+    
+    // 모니터링을 위한 부차적 에러 로그
+    handleContinuedErrors: async ({ context, errors }) => {
+      const { metrics } = context();
+      errors.forEach(([errorList]) => {
+        errorList.forEach(error => {
+          metrics.incrementCounter('secondary_errors', { type: error.constructor.name });
+        });
+      });
+    }
+  }
+});
+```
+
+</details>
+
+### 타입 레퍼런스
+
+#### 핵심 타입
+
+```typescript
+// 주요 내보내기
+export { createAspect, createProcess, runProcess, AsyncContext };
+
+// 에러 타입  
+export { Rejection, HaltRejection, ContinuousRejection };
+
+// 설정 타입
+export type { BuildOptions, ProcessOptions };
+export type { Aspect, Process, Target };
+export type { Advice, AdviceMetadata };
+```
+
+#### 컨텍스트 타입
+
+```typescript
+type ContextGenerator<Context> = () => Context;
+type ContextAccessor<Context> = () => Context;
+type SectionsUsed<Context> = readonly (keyof Context)[];
+type Restricted<Context, Sections extends SectionsUsed<Context>> = Context extends object
+  ? { readonly [key in Sections[number]]: Context[key] }
+  : Context;
+```
+
+#### 유틸리티 타입
+
+```typescript
+type ExecutionOuterContext = <SharedContext>(
+  callback: () => SharedContext
+) => SharedContext;
+```
 
 ---
 
 ## 🔬 고급 주제
 
-### 에러 구성 심화 분석
+<details>
+<summary><strong>🎯 Around Advice 컴포지션</strong></summary>
 
-Promise-AOP의 에러 처리 구성을 이해하는 것은 견고한 애플리케이션 구축에 중요합니다. 주요 개념들을 살펴보겠습니다:
+`around` advice는 가장 강력하며, 대상 함수의 실행을 래핑할 수 있습니다. 두 가지 훅을 제공합니다:
 
-#### 에러 집계: `unit` vs `all`
+-   `attachToTarget(wrapper)`: 원본 대상 함수를 래핑합니다. 이 래퍼들은 대상에 가장 가깝게 실행됩니다.
+-   `attachToResult(wrapper)`: 다른 `around` advice를 포함한 *전체* 실행 체인을 래핑합니다. 이 래퍼들은 가장 바깥 레이어에서 실행됩니다.
 
-**에러 집계**는 동일한 advice 단계 내에서 여러 에러가 수집되고 처리되는 방식을 결정합니다:
+래퍼들은 양파처럼 구성됩니다: 마지막에 붙인 것이 첫 번째로 실행됩니다 (LIFO).
 
 ```typescript
-// 에러 집계: "unit"
-// - 첫 번째 에러가 즉시 실행을 중단
-// - 하나의 에러만 캡처되고 처리됨
-// - 기본값: before, around
+const AdvancedAspect = createAspect<number, { log: Console }>((createAdvice) => ({
+  name: "advanced",
+  around: createAdvice({
+    use: ["log"],
+    advice: async ({ log }, { attachToTarget, attachToResult }) => {
+      // 1. Result 래퍼 (가장 바깥)
+      attachToResult((target) => async () => {
+        log.info("Result 래퍼: 시작");
+        const result = await target(); // 대상 래퍼들 + 원본 대상 실행
+        log.info("Result 래퍼: 종료");
+        return result * 10;
+      });
 
-// 에러 집계: "all"
-// - 단계 내에서 발생하는 모든 에러 수집
-// - 개별 실패에도 불구하고 단계의 모든 advice 실행 시도
-// - 모든 에러를 수집하여 함께 처리
-// - 기본값: after, afterReturning, afterThrowing
+      // 2. Target 래퍼 (가장 안쪽)
+      attachToTarget((target) => async () => {
+        log.info("Target 래퍼: 시작");
+        const result = await target(); // 원본 대상 실행
+        log.info("Target 래퍼: 종료");
+        return result + 1;
+      });
+    },
+  }),
+}));
+
+// 원본 대상이 5를 반환하면:
+// 콘솔 출력:
+// > Result 래퍼: 시작
+// > Target 래퍼: 시작
+// > Target 래퍼: 종료
+// > Result 래퍼: 종료
+// 최종 결과: (5 + 1) * 10 = 60
 ```
 
-**실제 예제:**
+**컴포지션 시각화:**
+```mermaid
+graph TD
+    A["Result 래퍼 (가장 바깥)"] --> B["Target 래퍼"] --> C["원본 대상"] 
+    C --> D["+ 1 반환"] --> E["* 10 반환"] --> F["최종 결과"]
+```
+
+</details>
+
+<details>
+<summary><strong>⚡ 성능 및 최적화</strong></summary>
+
+### 컨텍스트 최적화
+-   **최소 컨텍스트**: `use`를 통해 필요한 섹션만 요청하여 오버헤드 감소 및 섹션 충돌 방지
+-   **섹션 격리**: 더 나은 병렬화를 위해 세분화된 섹션으로 컨텍스트 설계
+
+### 실행 전략
+-   **기본적으로 병렬**: 대부분의 advice 타입은 더 나은 성능을 위해 병렬로 실행
+-   **전략적 순차**: 순서가 중요할 때만 (예: 데이터베이스 트랜잭션) `execution: "sequential"` 사용
+
+### 프로세스 재사용
+-   **프로세스 메모이제이션**: `createProcess`는 계산 집약적 - 한 번 생성하고 어디서나 재사용
+-   **상태 없는 설계**: 프로세스는 상태가 없고 스레드 안전 - 요청 간 안전하게 공유
 
 ```typescript
-const LoggingAspects = [
-  createAspect<any, { logger: Console }>((createAdvice) => ({
-    name: "file-logger",
-    after: createAdvice({
-      use: ["logger"],
-      advice: async ({ logger }) => {
-        throw new Error("파일 로깅 실패"); // 에러 1
-      },
-    }),
-  })),
-  createAspect<any, { logger: Console }>((createAdvice) => ({
-    name: "email-logger",
-    after: createAdvice({
-      use: ["logger"],
-      advice: async ({ logger }) => {
-        throw new Error("이메일 로깅 실패"); // 에러 2
-      },
-    }),
-  })),
+// ✅ 좋음: 한 번 생성하고 재사용
+const commonProcess = createProcess({ aspects: [LoggingAspect, MetricsAspect] });
+
+const processUserRequest = (data) => runProcess({
+  process: commonProcess, // 재사용
+  target: async () => processUser(data),
+  context: () => ({ logger, metrics, db })
+});
+
+// ❌ 나쁨: 매번 프로세스 생성
+const processUserRequest = (data) => runProcess({
+  process: createProcess({ aspects: [LoggingAspect, MetricsAspect] }), // 재생성
+  target: async () => processUser(data),
+  context: () => ({ logger, metrics, db })
+});
+```
+
+</details>
+
+<details>
+<summary><strong>🔧 실제 패턴들</strong></summary>
+
+### 계층형 아키텍처 패턴
+```typescript
+// 인프라 레이어
+const InfrastructureAspects = [
+  LoggingAspect,
+  MetricsAspect, 
+  TracingAspect
 ];
 
-const process = createProcess({
-  aspects: LoggingAspects,
-  buildOptions: {
-    advice: {
-      after: {
-        execution: "parallel",
-        error: {
-          aggregation: "all", // ✅ 두 에러 모두 수집됨
-          runtime: { afterThrow: "continue" },
-        },
-      },
-    },
-  },
-});
-
-// 결과: 두 에러 모두 resolveContinuousRejection으로 전달됨
-// aggregation이 "unit"이었다면 첫 번째 에러만 캡처됨
-```
-
-#### 에러 런타임: `halt` vs `continue`
-
-**에러 런타임** (`afterThrow`)는 advice가 에러를 던질 때 어떤 일이 일어나는지 결정합니다:
-
-```typescript
-// 에러 런타임: "halt"
-// - 에러가 전체 advice 체인을 즉시 중단
-// - resolveHaltRejection 트리거
-// - before/around에서 에러 발생 시 대상이 실행되지 않을 수 있음
-// - 기본값: before, around
-
-// 에러 런타임: "continue"
-// - 에러가 수집되지만 실행을 중단하지 않음
-// - 체인이 다음 단계로 계속 진행
-// - 수집된 에러들은 resolveContinuousRejection으로 전달
-// - 기본값: after, afterReturning, afterThrowing
-```
-
-#### 구성 매트릭스
-
-| Advice 단계      | 기본 실행 방식 | 기본 집계 방식 | 기본 런타임 | 이유                                  |
-| ---------------- | -------------- | -------------- | ----------- | ------------------------------------- |
-| `before`         | `parallel`     | `unit`         | `halt`      | 설정 실패는 실행을 중단해야 함        |
-| `around`         | `sequential`   | `unit`         | `halt`      | 래퍼 실패는 중요함                    |
-| `afterReturning` | `parallel`     | `all`          | `continue`  | 성공 로깅이 결과를 방해하면 안됨      |
-| `afterThrowing`  | `parallel`     | `all`          | `continue`  | 에러 로깅이 원본 에러를 숨기면 안됨   |
-| `after`          | `parallel`     | `all`          | `continue`  | 정리 작업 실패가 결과에 영향주면 안됨 |
-
-#### 사용자 정의 에러 동작
-
-특정 요구사항에 맞게 기본값을 재정의할 수 있습니다:
-
-```typescript
-const customProcess = createProcess({
-  aspects: [MyAspect],
-  buildOptions: {
-    advice: {
-      // after 단계가 에러 시 중단되도록 설정 (특수한 경우)
-      after: {
-        execution: "parallel",
-        error: {
-          aggregation: "unit", // 첫 번째 정리 에러에서 중단
-          runtime: { afterThrow: "halt" }, // 정리 실패 시 체인 중단
-        },
-      },
-      // before 단계가 에러 시에도 계속되도록 설정 (검증 에러 수집)
-      before: {
-        execution: "parallel",
-        error: {
-          aggregation: "all", // 모든 검증 에러 수집
-          runtime: { afterThrow: "continue" }, // 중단하지 않고 에러와 함께 계속
-        },
-      },
-    },
-  },
-});
-```
-
-### 섹션 잠금 & 충돌 해결
-
-Promise-AOP는 병렬 advice 실행 내에서 동일한 컨텍스트 섹션에 대한 동시 접근을 방지합니다:
-
-```typescript
-// ❌ 섹션 충돌을 일으키는 코드
-const ConflictingAspects = [
-  createAspect<any, { db: Database }>((createAdvice) => ({
-    name: "aspect-a",
-    before: createAdvice({
-      use: ["db"], // 두 aspect 모두 db 접근 원함
-      advice: async ({ db }) => {
-        /* ... */
-      },
-    }),
-  })),
-  createAspect<any, { db: Database }>((createAdvice) => ({
-    name: "aspect-b",
-    before: createAdvice({
-      use: ["db"], // 두 aspect 모두 db 접근 원함
-      advice: async ({ db }) => {
-        /* ... */
-      },
-    }),
-  })),
+// 비즈니스 레이어  
+const BusinessAspects = [
+  ValidationAspect,
+  AuthorizationAspect,
+  CachingAspect
 ];
 
-// ✅ 해결 전략:
+// 특화된 프로세스들 생성
+const infraProcess = createProcess({ aspects: InfrastructureAspects });
+const businessProcess = createProcess({ aspects: BusinessAspects });
+const fullProcess = createProcess({ aspects: [...InfrastructureAspects, ...BusinessAspects] });
+```
 
-// 옵션 1: 순차 실행
-const process = createProcess({
-  aspects: ConflictingAspects,
-  buildOptions: {
-    advice: {
-      before: { execution: "sequential" }, // before advice를 순차적으로 실행
-    },
-  },
-});
-
-// 옵션 2: 의존성 순서 지정
-const OrderedAspect = createAspect<any, { db: Database }>((createAdvice) => ({
-  name: "aspect-b",
+### 조건부 Advice 패턴
+```typescript
+const ConditionalAspect = createAspect<User, AppContext>((createAdvice) => ({
+  name: "conditional",
   before: createAdvice({
-    use: ["db"],
-    dependsOn: ["aspect-a"], // aspect-a 이후에 실행
-    advice: async ({ db }) => {
-      /* ... */
-    },
-  }),
+    use: ["config", "logger"],
+    advice: async ({ config, logger }) => {
+      if (config.enableDetailedLogging) {
+        logger.info("상세 로깅 활성화됨");
+      }
+    }
+  })
 }));
 ```
 
-### Around Advice 조합 메커니즘
-
-여러 래퍼의 실행 순서 이해하기:
-
+### 에러 복구 패턴
 ```typescript
-const CompositionExample = createAspect<number, { log: Console }>(
-  (createAdvice) => ({
-    name: "composition",
-    around: createAdvice({
-      use: ["log"],
-      advice: async ({ log }, { attachToTarget, attachToResult }) => {
-        // 타겟 래퍼들: 마지막에 부착된 것이 타겟 래퍼 중 가장 바깥쪽에서 실행
-        attachToTarget((target) => async () => {
-          log.info("타겟 래퍼 1: 이전");
-          const result = await target();
-          log.info("타겟 래퍼 1: 이후");
-          return result + 100;
-        });
-
-        attachToTarget((target) => async () => {
-          log.info("타겟 래퍼 2: 이전"); // 이것이 먼저 실행됨 (외부)
-          const result = await target();
-          log.info("타겟 래퍼 2: 이후"); // 이것이 마지막에 실행됨 (외부)
-          return result + 10;
-        });
-
-        // 결과 래퍼들: 마지막에 부착된 것이 결과 래퍼 중 가장 바깥쪽에서 실행
-        attachToResult((target) => async () => {
-          log.info("결과 래퍼 1: 이전");
-          const result = await target();
-          log.info("결과 래퍼 1: 이후");
-          return result * 2;
-        });
-
-        attachToResult((target) => async () => {
-          log.info("결과 래퍼 2: 이전"); // 이것이 먼저 실행됨 (외부)
-          const result = await target();
-          log.info("결과 래퍼 2: 이후"); // 이것이 마지막에 실행됨 (외부)
-          return result * 3;
-        });
-      },
-    }),
-  }),
-);
-
-// 타겟 값 5에 대한 실행 순서:
-// 결과 래퍼 2: 이전    (가장 바깥쪽 결과 래퍼)
-// 결과 래퍼 1: 이전
-// 타겟 래퍼 2: 이전    (가장 바깥쪽 타겟 래퍼)
-// 타겟 래퍼 1: 이전
-// [원본 타겟: 5]
-// 타겟 래퍼 1: 이후     → 5 + 100 = 105
-// 타겟 래퍼 2: 이후     → 105 + 10 = 115
-// 결과 래퍼 1: 이후     → 115 * 2 = 230
-// 결과 래퍼 2: 이후     → 230 * 3 = 690
-```
-
-### 성능 최적화
-
-#### 컨텍스트 섹션 최소화
-
-```typescript
-// ❌ 과도하게 넓은 컨텍스트 접근
-const InefficientAspect = createAspect<any, LargeContext>((createAdvice) => ({
-  name: "inefficient",
-  before: createAdvice({
-    use: ["db", "cache", "logger", "auth", "metrics"], // 너무 많은 섹션
-    advice: async (context) => {
-      // logger만 사용함
-      context.logger.info("작업 시작");
-    },
-  }),
-}));
-
-// ✅ 최소한의 컨텍스트 접근
-const EfficientAspect = createAspect<any, LargeContext>((createAdvice) => ({
-  name: "efficient",
-  before: createAdvice({
-    use: ["logger"], // 필요한 것만
-    advice: async ({ logger }) => {
-      logger.info("작업 시작");
-    },
-  }),
+const RetryAspect = createAspect<Data, AppContext>((createAdvice) => ({
+  name: "retry",
+  around: createAdvice({
+    use: ["logger"],
+    advice: async ({ logger }, { attachToTarget }) => {
+      attachToTarget((target) => async () => {
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (attempts < maxAttempts) {
+          try {
+            return await target();
+          } catch (error) {
+            attempts++;
+            if (attempts >= maxAttempts) throw error;
+            
+            logger.warn(`시도 ${attempts} 실패, 재시도 중...`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+          }
+        }
+      });
+    }
+  })
 }));
 ```
 
-#### 순차 모드에서 작업 배치
-
-```typescript
-// 순차 실행을 사용해야 할 때는 작업을 배치하세요:
-const BatchedDatabaseAspect = createAspect<any, { db: Database }>(
-  (createAdvice) => ({
-    name: "batched-db",
-    before: createAdvice({
-      use: ["db"],
-      advice: async ({ db }) => {
-        // 여러 작업을 단일 데이터베이스 호출로 배치
-        await db.executeBatch([
-          "INSERT INTO audit_log (event) VALUES ('operation_started')",
-          "UPDATE stats SET operations = operations + 1",
-          "DELETE FROM temp_cache WHERE expires_at < NOW()",
-        ]);
-      },
-    }),
-  }),
-);
-```
-
-### AsyncContext 심화
-
-AsyncContext는 비동기 작업을 통해 자동 컨텍스트 전파를 제공합니다:
-
-```typescript
-import { AsyncContext } from "@h1y/promise-aop";
-
-// 비동기 경계를 넘어 지속되는 컨텍스트 생성
-const requestContext = AsyncContext.create(() => ({
-  requestId: crypto.randomUUID(),
-  userId: getCurrentUserId(),
-  startTime: Date.now(),
-}));
-
-// 모든 비동기 작업을 통해 컨텍스트가 자동으로 흐름
-await AsyncContext.execute(requestContext, async (getContext) => {
-  const { requestId } = getContext();
-
-  // 모든 중첩된 비동기 호출이 동일한 컨텍스트를 상속
-  await someAsyncOperation(); // requestId에 접근 가능
-  await anotherAsyncOperation(); // 역시 requestId에 접근 가능
-
-  // setTimeout도 컨텍스트를 보존함
-  setTimeout(() => {
-    const { requestId: sameId } = getContext();
-    console.log(sameId); // 동일한 requestId!
-  }, 1000);
-});
-```
+</details>
 
 ---
 
@@ -1107,104 +724,12 @@ yarn install
 # 테스트 실행
 yarn test
 
-# watch 모드로 테스트 실행
-yarn test --watch
-
-# 타입 검사
-yarn check-types
-
 # 라이브러리 빌드
 yarn build
-
-# 코드 린트
-yarn lint
-
-# 코드 포맷팅
-yarn format
 ```
-
-### 프로젝트 구조
-
-```
-src/
-├── index.ts                    # 공개 API 내보내기
-├── createAspect.ts            # Aspect 생성
-├── createProcess.ts           # Process 컴파일
-├── runProcess.ts              # Process 실행
-└── lib/
-    ├── models/                # 타입 정의
-    ├── features/              # 핵심 기능
-    │   ├── chaining/         # Advice 체인 실행
-    │   ├── organizing/       # Aspect 조직화
-    │   └── processing/       # Advice 처리
-    └── utils/                # 유틸리티 함수
-```
-
----
-
-## 🧱 호환성
-
-- **Node.js**: 16.0.0 이상 (AsyncLocalStorage 필요)
-- **TypeScript**: 4.7.0 이상
-- **모듈 시스템**: export map을 통한 ESM 및 CommonJS
-- **브라우저**: async/await를 지원하는 모던 브라우저
-
-### 번들 크기
-
-- **ESM**: ~15KB minified
-- **CommonJS**: ~16KB minified
-- **런타임 의존성 없음**
-
----
-
-## 🤝 기여
-
-기여를 환영합니다! 시작하는 방법은 다음과 같습니다:
-
-### 개발 환경 설정
-
-1. **저장소 포크 및 클론**
-2. **의존성 설치**: `yarn install`
-3. **테스트 실행**: `yarn test`
-4. **변경 사항 작성**
-5. **새로운 기능에 대한 테스트 추가**
-6. **모든 테스트 통과 확인**: `yarn test`
-7. **타입 검사**: `yarn check-types`
-8. **코드 린트**: `yarn lint`
-
-### 기여 가이드라인
-
-- **모든 새로운 기능과 버그 수정에 대한 테스트 작성**
-- **엄격한 타입 검사로 TypeScript 모범 사례 따르기**
-- **새로운 API나 중요한 변경사항에 대한 문서 추가**
-- **원자적인 커밋 유지**와 명확한 커밋 메시지 작성
-- **사용자 대상 변경사항에 대해 CHANGELOG.md 업데이트**
-
-### 이슈 보고
-
-버그를 보고할 때 다음을 포함해 주세요:
-
-- **최소한의 재현** 예제
-- **예상되는 동작 vs 실제 동작**
-- **환경 세부 사항** (Node.js 버전, TypeScript 버전)
-- **해당하는 경우 스택 트레이스**
 
 ---
 
 ## 📝 라이선스
 
 MIT © [h1ylabs](https://github.com/h1ylabs)
-
----
-
-## 🙏 감사의 말
-
-Promise-AOP는 다음에서 영감을 받았습니다:
-
-- **Spring AOP** - aspect-oriented programming 개념
-- **AsyncLocalStorage** - 컨텍스트 전파 패턴
-- **TypeScript** - JavaScript 개발을 즐겁게 만드는 것
-
----
-
-**Promise-AOP와 함께 즐거운 코딩하세요! 🚀**

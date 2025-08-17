@@ -49,12 +49,9 @@ export async function processBatchAdvice<
 
     switch (aggregation) {
       case "unit":
-        throw new Rejection({
-          error: errors,
-          extraInfo: {
-            type: "advice",
-            advice: adviceType,
-          },
+        throw new Rejection(errors, {
+          occurredFrom: "advice",
+          advice: adviceType,
         });
       case "all":
         errorCollected.push(...errors);
@@ -66,12 +63,9 @@ export async function processBatchAdvice<
 
   // throw errors if there are errors collected
   if (errorCollected.length > 0) {
-    throw new Rejection({
-      error: errorCollected,
-      extraInfo: {
-        type: "advice",
-        advice: adviceType,
-      },
+    throw new Rejection(errorCollected, {
+      occurredFrom: "advice",
+      advice: adviceType,
     });
   }
 }
