@@ -1,37 +1,34 @@
 import { Advice } from "./advice";
 
 export class Rejection extends Error {
-  constructor(public readonly info: RejectionInfo) {
+  constructor(
+    public readonly errors: unknown[],
+    public readonly info: ErrorInfo,
+  ) {
     super();
   }
 }
 
 export class HaltRejection extends Rejection {
-  constructor(info: RejectionInfo) {
-    super(info);
+  constructor(errors: unknown[], info: ErrorInfo) {
+    super(errors, info);
   }
 }
 
 export class ContinuousRejection extends Rejection {
-  constructor(info: RejectionInfo) {
-    super(info);
+  constructor(errors: unknown[], info: ErrorInfo) {
+    super(errors, info);
   }
 }
 
-export type RejectionInfo = {
-  error: unknown;
-  extraInfo:
-    | {
-        // error occurred in target
-        type: "target";
-      }
-    | {
-        // error occurred in unknown
-        type: "unknown";
-      }
-    | {
-        // error occurred in advice
-        type: "advice";
-        advice: Advice;
-      };
-};
+export type ErrorInfo =
+  | {
+      occurredFrom: "target";
+    }
+  | {
+      occurredFrom: "unknown";
+    }
+  | {
+      occurredFrom: "advice";
+      advice: Advice;
+    };

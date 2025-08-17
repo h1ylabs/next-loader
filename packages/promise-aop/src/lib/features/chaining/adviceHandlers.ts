@@ -30,22 +30,23 @@ export function handleRejection<Result, SharedContext>(
     // if rejection is thrown from advice, handle rejection
     else if (
       error instanceof Rejection &&
-      error.info.extraInfo.type === "advice"
+      error.info.occurredFrom === "advice"
     ) {
       const afterThrow = validateType(
         ErrorAfter,
-        chain().buildOptions.advice[error.info.extraInfo.advice].error.runtime
-          .afterThrow,
+        chain().buildOptions.advice[error.info.advice].error.runtime.afterThrow,
       );
 
       switch (afterThrow) {
         // halt the total advice chain
         case "halt":
-          chain().haltRejection = new HaltRejection(error.info);
+          chain().haltRejection = new HaltRejection(error.errors, error.info);
           break;
         // continue the advice chain
         case "continue":
-          chain().continueRejections.push(new ContinuousRejection(error.info));
+          chain().continueRejections.push(
+            new ContinuousRejection(error.errors, error.info),
+          );
           break;
         default:
           exhaustiveCheckType(afterThrow);
@@ -54,11 +55,8 @@ export function handleRejection<Result, SharedContext>(
 
     // if error is unknown, halt immediately
     else {
-      chain().haltRejection = new HaltRejection({
-        error,
-        extraInfo: {
-          type: "unknown",
-        },
+      chain().haltRejection = new HaltRejection([error], {
+        occurredFrom: "unknown",
       });
     }
 

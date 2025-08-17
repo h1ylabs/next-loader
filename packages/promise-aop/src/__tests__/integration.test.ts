@@ -42,16 +42,14 @@ describe("Integration – Promise-AOP", () => {
       const LoggingAspect = createLoggingTestAspect<number>();
       const fallbackValue = -999;
 
-      const resolveHaltRejection = jest
-        .fn()
-        .mockResolvedValue(async () => fallbackValue);
+      const resolveHaltRejection = jest.fn().mockResolvedValue(fallbackValue);
       const resolveContinuousRejection = jest.fn().mockResolvedValue(undefined);
 
       const process = createProcess<number, StandardTestContext>({
         aspects: [LoggingAspect],
         processOptions: {
-          resolveHaltRejection,
-          resolveContinuousRejection,
+          handleError: resolveHaltRejection,
+          handleContinuedErrors: resolveContinuousRejection,
         },
       });
 
@@ -109,10 +107,8 @@ describe("Integration – Promise-AOP", () => {
       const process = createProcess<number, StandardTestContext>({
         aspects: [ErrorRecoveryAspect],
         processOptions: {
-          resolveHaltRejection: jest
-            .fn()
-            .mockResolvedValue(async () => fallbackValue),
-          resolveContinuousRejection: jest.fn().mockResolvedValue(undefined),
+          handleError: jest.fn().mockResolvedValue(fallbackValue),
+          handleContinuedErrors: jest.fn().mockResolvedValue(undefined),
         },
       });
 
@@ -421,9 +417,7 @@ describe("Integration – Promise-AOP", () => {
           target: createFailingTestTarget("target error"),
           processOptions: {
             ...createFallbackProcessOptions<number, StandardTestContext>(),
-            resolveHaltRejection: jest
-              .fn()
-              .mockResolvedValue(async () => expectedFallback),
+            handleError: jest.fn().mockResolvedValue(expectedFallback),
           },
         },
       );

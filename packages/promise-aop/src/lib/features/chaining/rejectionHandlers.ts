@@ -6,28 +6,37 @@ export function resolveHaltRejection<Result, SharedContext>(
   chain: () => AdviceChainContext<Result, SharedContext>,
 ) {
   return async (error: unknown) => {
-    if (error instanceof HaltRejection) {
-      const fallback = await chain().processOptions.resolveHaltRejection(
-        chain().context,
-        chain().exit,
-        error,
-      );
-
-      return fallback();
+    if (!(error instanceof HaltRejection)) {
+      throw error;
     }
 
-    throw error;
+    // determine which error to propagate
+    const determinedError = await chain().processOptions.determineError({
+      context: chain().context,
+      exit: chain().exit,
+      errors: error.errors,
+      info: error.info,
+    });
+
+    // handle the error
+    return chain().processOptions.handleError({
+      context: chain().context,
+      exit: chain().exit,
+      error: determinedError,
+    });
   };
 }
 
 export function handleContinuousRejection<Result, SharedContext>(
   chain: () => AdviceChainContext<Result, SharedContext>,
 ) {
-  return async () => {
-    await chain().processOptions.resolveContinuousRejection(
-      chain().context,
-      chain().exit,
-      chain().continueRejections,
-    );
-  };
+  return async () =>
+    chain().processOptions.handleContinuedErrors({
+      context: chain().context,
+      exit: chain().exit,
+      errors: chain().continueRejections.map((rejection) => [
+        rejection.errors,
+        rejection.info,
+      ]),
+    });
 }

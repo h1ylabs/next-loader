@@ -8,11 +8,9 @@ import type { AdviceChainContext } from "./context";
 export function beforeAdviceTask<Result, SharedContext>(
   chain: () => AdviceChainContext<Result, SharedContext>,
 ) {
-  const beforeAdvice = async () => {
-    await chain().advices.before(chain().context());
-  };
-
   return async () => {
+    const beforeAdvice = async () => chain().advices.before(chain().context());
+
     return Promise.resolve().then(beforeAdvice).catch(handleRejection(chain));
   };
 }
@@ -74,11 +72,8 @@ export function afterThrowingAdviceTask<Result, SharedContext>(
 
     // explicitly propagate the error from the target.
     const targetRejection = async () => {
-      throw (chain().haltRejection = new HaltRejection({
-        error,
-        extraInfo: {
-          type: "target",
-        },
+      throw (chain().haltRejection = new HaltRejection([error], {
+        occurredFrom: "target",
       }));
     };
 
@@ -96,11 +91,11 @@ export function afterThrowingAdviceTask<Result, SharedContext>(
 export function afterAdviceTask<Result, SharedContext>(
   chain: () => AdviceChainContext<Result, SharedContext>,
 ) {
-  const afterAdvice = async () => {
-    await chain().advices.after(chain().context());
-  };
-
   return async () => {
+    const afterAdvice = async () => {
+      await chain().advices.after(chain().context());
+    };
+
     return Promise.resolve().then(afterAdvice).catch(handleRejection(chain));
   };
 }

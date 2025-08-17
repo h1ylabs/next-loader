@@ -72,9 +72,8 @@ describe("adviceHandlers", () => {
     });
 
     it("should throw haltRejection when it exists", async () => {
-      const haltRejection = new HaltRejection({
-        error: new Error("halted"),
-        extraInfo: { type: "unknown" },
+      const haltRejection = new HaltRejection([new Error("halted")], {
+        occurredFrom: "unknown",
       });
       const context = createMockChainContext({
         haltRejection,
@@ -89,9 +88,8 @@ describe("adviceHandlers", () => {
 
   describe("handleRejection", () => {
     it("should propagate HaltRejection without modification", async () => {
-      const haltRejection = new HaltRejection({
-        error: new Error("already halted"),
-        extraInfo: { type: "unknown" },
+      const haltRejection = new HaltRejection([new Error("already halted")], {
+        occurredFrom: "unknown",
       });
       const context = createMockChainContext();
       const chain = () => context;
@@ -105,12 +103,9 @@ describe("adviceHandlers", () => {
 
     describe("Rejection handling", () => {
       it("should handle Rejection with halt strategy", async () => {
-        const rejection = new Rejection({
-          error: ["test error"],
-          extraInfo: {
-            type: "advice",
-            advice: "before",
-          },
+        const rejection = new Rejection(["test error"], {
+          occurredFrom: "advice",
+          advice: "before",
         });
 
         const buildOptions = createMockBuildOptions();
@@ -125,17 +120,14 @@ describe("adviceHandlers", () => {
           HaltRejection,
         );
         expect(context.haltRejection).toBeInstanceOf(HaltRejection);
-        expect(context.haltRejection?.info).toBe(rejection.info);
+        expect(context.haltRejection?.errors).toEqual(rejection.errors);
         expect(context.continueRejections).toHaveLength(0);
       });
 
       it("should handle Rejection with continue strategy", async () => {
-        const rejection = new Rejection({
-          error: ["test error"],
-          extraInfo: {
-            type: "advice",
-            advice: "after",
-          },
+        const rejection = new Rejection(["test error"], {
+          occurredFrom: "advice",
+          advice: "after",
         });
 
         const buildOptions = createMockBuildOptions();
@@ -151,7 +143,9 @@ describe("adviceHandlers", () => {
         expect(context.continueRejections[0]).toBeInstanceOf(
           ContinuousRejection,
         );
-        expect(context.continueRejections[0]?.info).toBe(rejection.info);
+        expect((context.continueRejections[0] as Rejection).errors).toEqual(
+          rejection.errors,
+        );
       });
     });
 
@@ -166,8 +160,8 @@ describe("adviceHandlers", () => {
       );
 
       expect(context.haltRejection).toBeInstanceOf(HaltRejection);
-      expect(context.haltRejection?.info.error).toBe(unknownError);
-      expect(context.haltRejection?.info.extraInfo.type).toBe("unknown");
+      expect(context.haltRejection?.errors).toEqual([unknownError]);
+      expect(context.haltRejection?.info.occurredFrom).toBe("unknown");
       expect(context.continueRejections).toHaveLength(0);
     });
 
@@ -182,8 +176,8 @@ describe("adviceHandlers", () => {
       );
 
       expect(context.haltRejection).toBeInstanceOf(HaltRejection);
-      expect(context.haltRejection?.info.error).toBe(unknownError);
-      expect(context.haltRejection?.info.extraInfo.type).toBe("unknown");
+      expect(context.haltRejection?.errors).toEqual([unknownError]);
+      expect(context.haltRejection?.info.occurredFrom).toBe("unknown");
       expect(context.continueRejections).toHaveLength(0);
     });
 
@@ -198,8 +192,8 @@ describe("adviceHandlers", () => {
       );
 
       expect(context.haltRejection).toBeInstanceOf(HaltRejection);
-      expect(context.haltRejection?.info.error).toBe(stringError);
-      expect(context.haltRejection?.info.extraInfo.type).toBe("unknown");
+      expect(context.haltRejection?.errors).toEqual([stringError]);
+      expect(context.haltRejection?.info.occurredFrom).toBe("unknown");
     });
 
     it("should handle null errors by wrapping in HaltRejection", async () => {
@@ -210,20 +204,20 @@ describe("adviceHandlers", () => {
       await expect(handleTask(null)).rejects.toBeInstanceOf(HaltRejection);
 
       expect(context.haltRejection).toBeInstanceOf(HaltRejection);
-      expect(context.haltRejection?.info.error).toBeNull();
-      expect(context.haltRejection?.info.extraInfo.type).toBe("unknown");
+      expect(context.haltRejection?.errors).toEqual([null]);
+      expect(context.haltRejection?.info.occurredFrom).toBe("unknown");
     });
   });
 
   describe("integration scenarios", () => {
     it("should handle mixed error types in sequence", async () => {
-      const continueRejection = new Rejection({
-        error: ["continue error"],
-        extraInfo: { type: "advice", advice: "after" },
+      const continueRejection = new Rejection(["continue error"], {
+        occurredFrom: "advice",
+        advice: "after",
       });
-      const haltRejection = new Rejection({
-        error: ["halt error"],
-        extraInfo: { type: "advice", advice: "before" },
+      const haltRejection = new Rejection(["halt error"], {
+        occurredFrom: "advice",
+        advice: "before",
       });
 
       const buildOptions = createMockBuildOptions();
@@ -248,9 +242,9 @@ describe("adviceHandlers", () => {
     });
 
     it("should preserve existing continue rejections when halt occurs", async () => {
-      const existingRejection = new ContinuousRejection({
-        error: ["existing error"],
-        extraInfo: { type: "advice", advice: "after" },
+      const existingRejection = new ContinuousRejection(["existing error"], {
+        occurredFrom: "advice",
+        advice: "after",
       });
       const targetError = new Error("target error");
 

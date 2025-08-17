@@ -206,12 +206,13 @@ export const createCommonAdvices = <Result, SharedContext>(
 export const createProcessOptionsMock = <Result, SharedContext>(
   overrides: Partial<RequiredProcessOptions<Result, SharedContext>> = {},
 ): RequiredProcessOptions<Result, SharedContext> => ({
-  resolveHaltRejection: jest
+  determineError: jest.fn().mockImplementation(async ({ errors }) => errors[0]),
+  handleError: jest
     .fn()
-    .mockResolvedValue(() =>
-      Promise.reject(new Error("Default mock - should be overridden in tests")),
+    .mockRejectedValue(
+      new Error("Default mock - should be overridden in tests"),
     ),
-  resolveContinuousRejection: jest.fn().mockResolvedValue(undefined),
+  handleContinuedErrors: jest.fn().mockResolvedValue(undefined),
   ...overrides,
 });
 
@@ -238,10 +239,8 @@ export const createFallbackProcessOptions = <Result, SharedContext>(
   fallbackValue?: Result,
 ) =>
   createProcessOptionsMock<Result, SharedContext>({
-    resolveHaltRejection: jest
-      .fn()
-      .mockResolvedValue(async () => fallbackValue ?? (-999 as Result)),
-    resolveContinuousRejection: jest.fn().mockResolvedValue(undefined),
+    handleError: jest.fn().mockResolvedValue(fallbackValue ?? (-999 as Result)),
+    handleContinuedErrors: jest.fn().mockResolvedValue(undefined),
   });
 
 // Wrapper builders for around advice tests
