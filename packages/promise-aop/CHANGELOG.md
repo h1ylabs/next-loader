@@ -1,5 +1,11 @@
 # @h1y/promise-aop
 
+## 3.0.1
+
+### Patch Changes
+
+- [#42](https://github.com/h1ylabs/next-loader/pull/42) [`7a7ac1f`](https://github.com/h1ylabs/next-loader/commit/7a7ac1f30b86f65ee64514716560dc39f93c7764) Thanks [@cutehammond772](https://github.com/cutehammond772)! - fixed async advice execution by adding explicit await to ensure afterThrowing completes before error propagation.
+
 ## 3.0.0
 
 ### Major Changes
