@@ -6,7 +6,7 @@ import { checkRejection, handleRejection } from "./adviceHandlers";
 import type { AdviceChainContext } from "./context";
 
 export function beforeAdviceTask<Result, SharedContext>(
-  chain: () => AdviceChainContext<Result, SharedContext>
+  chain: () => AdviceChainContext<Result, SharedContext>,
 ) {
   return async () => {
     const beforeAdvice = async () => chain().advices.before(chain().context());
@@ -17,7 +17,7 @@ export function beforeAdviceTask<Result, SharedContext>(
 
 export function aroundAdviceTask<Result, SharedContext>(
   chain: () => AdviceChainContext<Result, SharedContext>,
-  process = processAroundAdvice
+  process = processAroundAdvice,
 ) {
   return async () => {
     const resolve = await process({
@@ -47,7 +47,7 @@ export function executeTargetTask<Result>(target: Target<Result>) {
 }
 
 export function afterReturningAdviceTask<Result, SharedContext>(
-  chain: () => AdviceChainContext<Result, SharedContext>
+  chain: () => AdviceChainContext<Result, SharedContext>,
 ) {
   return async (result: Result) => {
     const afterReturningAdvice = async () =>
@@ -62,7 +62,7 @@ export function afterReturningAdviceTask<Result, SharedContext>(
 }
 
 export function afterThrowingAdviceTask<Result, SharedContext>(
-  chain: () => AdviceChainContext<Result, SharedContext>
+  chain: () => AdviceChainContext<Result, SharedContext>,
 ) {
   return async (error: unknown) => {
     const afterThrowingAdvice = async () => {
@@ -91,7 +91,7 @@ export function afterThrowingAdviceTask<Result, SharedContext>(
 }
 
 export function afterAdviceTask<Result, SharedContext>(
-  chain: () => AdviceChainContext<Result, SharedContext>
+  chain: () => AdviceChainContext<Result, SharedContext>,
 ) {
   return async () => {
     const afterAdvice = async () => chain().advices.after(chain().context());

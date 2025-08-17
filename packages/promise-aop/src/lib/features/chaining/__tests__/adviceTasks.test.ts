@@ -36,7 +36,7 @@ describe("adviceTasks", () => {
     createIdDataContext("test", 42);
 
   const createMockAdvices = (
-    overrides: Partial<AspectOrganization<TestResult, TestSharedContext>> = {}
+    overrides: Partial<AspectOrganization<TestResult, TestSharedContext>> = {},
   ): AspectOrganization<TestResult, TestSharedContext> =>
     createCommonAdvices<TestResult, TestSharedContext>(overrides);
 
@@ -49,7 +49,7 @@ describe("adviceTasks", () => {
   > => createProcessOptionsMock<TestResult, TestSharedContext>();
 
   const createMockChainContext = (
-    overrides: Partial<AdviceChainContext<TestResult, TestSharedContext>> = {}
+    overrides: Partial<AdviceChainContext<TestResult, TestSharedContext>> = {},
   ): (() => AdviceChainContext<TestResult, TestSharedContext>) => {
     const context: AdviceChainContext<TestResult, TestSharedContext> = {
       target: createMockTarget(100),
@@ -144,7 +144,7 @@ describe("adviceTasks", () => {
         const finalTarget = result(nextChain);
         const wrappedResult = await finalTarget();
         expect(wrappedResult).toBe(expectedResult);
-      }
+      },
     );
 
     it("should handle fallback resolver correctly", async () => {
@@ -155,7 +155,7 @@ describe("adviceTasks", () => {
           (_: Target<TestResult>) =>
             (_: (t: Target<TestResult>) => Target<TestResult>) =>
             async () =>
-              fallbackValue
+              fallbackValue,
         );
       const chainContext = createMockChainContext();
 
@@ -210,7 +210,7 @@ describe("adviceTasks", () => {
           id: "test",
           data: 42,
         },
-        42
+        42,
       );
       expect(result).toBe(42);
     });

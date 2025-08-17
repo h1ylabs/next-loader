@@ -14,12 +14,12 @@ export type RequiredProcessOptions<Result, SharedContext> = {
   readonly resolveHaltRejection: (
     context: ContextAccessor<SharedContext>,
     exit: ExecutionOuterContext,
-    error: HaltRejection
+    error: HaltRejection,
   ) => Promise<Target<Result>>;
   readonly resolveContinuousRejection: (
     context: ContextAccessor<SharedContext>,
     exit: ExecutionOuterContext,
-    error: ContinuousRejection[]
+    error: ContinuousRejection[],
   ) => Promise<void>;
 };
 
@@ -32,7 +32,7 @@ export function normalizeProcessOptions<Result, SharedContext>(
   defaultOptions: RequiredProcessOptions<
     Result,
     SharedContext
-  > = defaultProcessOptions()
+  > = defaultProcessOptions(),
 ): RequiredProcessOptions<Result, SharedContext> {
   return normalizeOptions(defaultOptions, options);
 }

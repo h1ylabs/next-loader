@@ -6,17 +6,12 @@
     "source.fixAll.eslint": "always",
     "source.organizeImports": "always"
   },
-  "markdownlint.config": {
-    "MD009": false,
-    "MD041": false
-  },
   "eslint.validate": [
     "javascript",
     "javascriptreact",
     "typescript",
     "typescriptreact"
   ],
-  "eslint.format.enable": true,
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
@@ -32,4 +27,6 @@
   "[json]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
+  "prettier.requireConfig": true,
+  "prettier.useEditorConfig": false,
 }
