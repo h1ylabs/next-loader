@@ -10,7 +10,7 @@ declare global {
   // Next.js fetch 타입 정의
   function fetch(
     input: RequestInfo | URL,
-    init?: RequestInit
+    init?: RequestInit,
   ): Promise<Response>;
 }
 
