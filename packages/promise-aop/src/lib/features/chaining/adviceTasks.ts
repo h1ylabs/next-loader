@@ -8,9 +8,11 @@ import type { AdviceChainContext } from "./context";
 export function beforeAdviceTask<Result, SharedContext>(
   chain: () => AdviceChainContext<Result, SharedContext>,
 ) {
-  return async () => {
-    const beforeAdvice = async () => chain().advices.before(chain().context());
+  const beforeAdvice = async () => {
+    await chain().advices.before(chain().context());
+  };
 
+  return async () => {
     return Promise.resolve().then(beforeAdvice).catch(handleRejection(chain));
   };
 }
@@ -50,8 +52,9 @@ export function afterReturningAdviceTask<Result, SharedContext>(
   chain: () => AdviceChainContext<Result, SharedContext>,
 ) {
   return async (result: Result) => {
-    const afterReturningAdvice = async () =>
-      chain().advices.afterReturning(chain().context(), result);
+    const afterReturningAdvice = async () => {
+      await chain().advices.afterReturning(chain().context(), result);
+    };
 
     return Promise.resolve()
       .then(checkRejection(chain))
@@ -66,7 +69,7 @@ export function afterThrowingAdviceTask<Result, SharedContext>(
 ) {
   return async (error: unknown) => {
     const afterThrowingAdvice = async () => {
-      chain().advices.afterThrowing(chain().context(), error);
+      await chain().advices.afterThrowing(chain().context(), error);
     };
 
     // explicitly propagate the error from the target.
@@ -93,9 +96,11 @@ export function afterThrowingAdviceTask<Result, SharedContext>(
 export function afterAdviceTask<Result, SharedContext>(
   chain: () => AdviceChainContext<Result, SharedContext>,
 ) {
-  return async () => {
-    const afterAdvice = async () => chain().advices.after(chain().context());
+  const afterAdvice = async () => {
+    await chain().advices.after(chain().context());
+  };
 
+  return async () => {
     return Promise.resolve().then(afterAdvice).catch(handleRejection(chain));
   };
 }

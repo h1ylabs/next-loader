@@ -230,11 +230,89 @@ describe("adviceTasks", () => {
   });
 
   describe("afterThrowingAdviceTask", () => {
-    it("should be tested through integration tests due to error class restrictions", () => {
-      // afterThrowingAdviceTask internally creates TargetError objects which cannot be instantiated in tests
-      // This function is properly tested through the executeAdviceChain integration tests
-      expect(afterThrowingAdviceTask).toBeDefined();
-      expect(typeof afterThrowingAdviceTask).toBe("function");
+    it("should wait for afterThrowing advice to complete before propagating error", async () => {
+      let afterThrowingCompleted = false;
+      const mockAdvices = createMockAdvices({
+        afterThrowing: jest.fn().mockImplementation(async () => {
+          // simulate real async work - use setImmediate to ensure true async behavior
+          await new Promise((resolve) => setImmediate(resolve));
+          afterThrowingCompleted = true;
+        }),
+      });
+      const chainContext = createMockChainContext({ advices: mockAdvices });
+
+      const task = afterThrowingAdviceTask(chainContext);
+
+      // afterThrowingAdviceTask always throws an error, so handle with catch
+      await expect(task(new Error("test"))).rejects.toThrow();
+
+      // verify that afterThrowing completed before the error was thrown
+      expect(afterThrowingCompleted).toBe(true);
+      expect(mockAdvices.afterThrowing).toHaveBeenCalledTimes(1);
+    });
+
+    it("should ensure afterThrowing completes before targetRejection", async () => {
+      const executionOrder: string[] = [];
+
+      const mockAdvices = createMockAdvices({
+        afterThrowing: jest.fn().mockImplementation(async () => {
+          executionOrder.push("afterThrowing-start");
+          await new Promise((resolve) => setImmediate(resolve)); // real async work
+          executionOrder.push("afterThrowing-end");
+        }),
+      });
+      const chainContext = createMockChainContext({ advices: mockAdvices });
+
+      const task = afterThrowingAdviceTask(chainContext);
+
+      await expect(task(new Error("test"))).rejects.toThrow();
+
+      // error should only occur after afterThrowing has completely finished
+      expect(executionOrder).toEqual([
+        "afterThrowing-start",
+        "afterThrowing-end",
+      ]);
+    });
+
+    it("should allow afterThrowing to complete its side effects", async () => {
+      let sideEffectValue = 0;
+
+      const mockAdvices = createMockAdvices({
+        afterThrowing: jest.fn().mockImplementation(async () => {
+          // simulate async side effects
+          await new Promise((resolve) => setImmediate(resolve));
+          sideEffectValue = 42;
+        }),
+      });
+      const chainContext = createMockChainContext({ advices: mockAdvices });
+
+      const task = afterThrowingAdviceTask(chainContext);
+
+      await expect(task(new Error("test"))).rejects.toThrow();
+
+      // verify that side effects have been completed
+      expect(sideEffectValue).toBe(42);
+      expect(mockAdvices.afterThrowing).toHaveBeenCalledWith(
+        { id: "test", data: 42 },
+        expect.any(Error),
+      );
+    });
+
+    it("should propagate correct error type and context", async () => {
+      const testError = new Error("custom test error");
+      const mockAdvices = createMockAdvices({
+        afterThrowing: jest.fn().mockResolvedValue(undefined),
+      });
+      const chainContext = createMockChainContext({ advices: mockAdvices });
+
+      const task = afterThrowingAdviceTask(chainContext);
+
+      await expect(task(testError)).rejects.toThrow();
+
+      expect(mockAdvices.afterThrowing).toHaveBeenCalledWith(
+        { id: "test", data: 42 },
+        testError,
+      );
     });
   });
 

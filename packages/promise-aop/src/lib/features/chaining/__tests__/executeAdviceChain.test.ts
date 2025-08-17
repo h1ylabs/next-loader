@@ -135,6 +135,91 @@ describe("executeAdviceChain", () => {
       expect(mockAdvices.after).toHaveBeenCalledTimes(1);
     });
 
+    it("should wait for async afterThrowing advice to complete before proceeding", async () => {
+      const targetError = new Error("target failed");
+      const fallbackValue = -888;
+      let afterThrowingCompleted = false;
+
+      const mockAdvices = createMockAdvices({
+        afterThrowing: jest.fn().mockImplementation(async () => {
+          // simulate async work
+          await Promise.resolve();
+          afterThrowingCompleted = true;
+        }),
+      });
+
+      const mockProcessOptions = createProcessOptionsMock<
+        TestResult,
+        TestSharedContext
+      >({
+        resolveHaltRejection: jest.fn().mockImplementation(() => {
+          // afterThrowing should be completed when resolveHaltRejection is called
+          expect(afterThrowingCompleted).toBe(true);
+          return Promise.resolve(() => Promise.resolve(fallbackValue));
+        }),
+      });
+
+      const props = createTestProps({
+        target: createErrorTarget(targetError),
+        advices: mockAdvices,
+        processOptions: mockProcessOptions,
+      });
+
+      const result = await executeAdviceChain(props);
+
+      expect(result).toBe(fallbackValue);
+      expect(afterThrowingCompleted).toBe(true);
+      expect(mockAdvices.afterThrowing).toHaveBeenCalledTimes(1);
+    });
+
+    it("should maintain execution order with async afterThrowing advice", async () => {
+      const targetError = new Error("target failed");
+      const fallbackValue = -777;
+      const executionOrder: string[] = [];
+
+      const mockAdvices = createMockAdvices({
+        before: jest.fn().mockImplementation(async () => {
+          executionOrder.push("before");
+        }),
+        afterThrowing: jest.fn().mockImplementation(async () => {
+          executionOrder.push("afterThrowing-start");
+          await Promise.resolve();
+          executionOrder.push("afterThrowing-end");
+        }),
+        after: jest.fn().mockImplementation(async () => {
+          executionOrder.push("after");
+        }),
+      });
+
+      const mockProcessOptions = createProcessOptionsMock<
+        TestResult,
+        TestSharedContext
+      >({
+        resolveHaltRejection: jest.fn().mockImplementation(() => {
+          executionOrder.push("resolveHaltRejection");
+          return Promise.resolve(() => Promise.resolve(fallbackValue));
+        }),
+      });
+
+      const props = createTestProps({
+        target: createErrorTarget(targetError),
+        advices: mockAdvices,
+        processOptions: mockProcessOptions,
+      });
+
+      const result = await executeAdviceChain(props);
+
+      expect(result).toBe(fallbackValue);
+      // next step should only proceed after afterThrowing has completely finished
+      expect(executionOrder).toEqual([
+        "before",
+        "afterThrowing-start",
+        "afterThrowing-end",
+        "after",
+        "resolveHaltRejection",
+      ]);
+    });
+
     it("should handle errors from advice functions", async () => {
       const beforeError = new Error("before error");
       const fallbackValue = -888;
