@@ -1,5 +1,11 @@
 # @h1y/promise-aop
 
+## 4.0.0
+
+### Major Changes
+
+- [#44](https://github.com/h1ylabs/next-loader/pull/44) [`f0430b9`](https://github.com/h1ylabs/next-loader/commit/f0430b9c4ea57412881d685dc6a161334b8f5f0e) Thanks [@cutehammond772](https://github.com/cutehammond772)! - enhanced error handling system
+
 ## 3.0.1
 
 ### Patch Changes
