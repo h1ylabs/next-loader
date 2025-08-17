@@ -12,17 +12,17 @@ Promise-AOP follows a clear execution model where **Aspects** define cross-cutti
 
 ```mermaid
 flowchart TD
-    A["🎯 Target Function<br/>(Your Business Logic)"] 
+    A["🎯 Target Function<br/>(Your Business Logic)"]
     B["📦 Aspect<br/>(Cross-cutting Concern)"]
     C["⚙️ Process<br/>(Compiled Execution Chain)"]
     D["🔄 runProcess<br/>(Execute with Context)"]
     E["📊 Context<br/>(Shared Data)"]
-    
+
     B --> C
     A --> D
     C --> D
     E --> D
-    
+
     subgraph "Advice Types"
         F["before"]
         G["around"]
@@ -30,7 +30,7 @@ flowchart TD
         I["afterReturning"]
         J["afterThrowing"]
     end
-    
+
     B --> F
     B --> G
     B --> H
@@ -49,11 +49,11 @@ sequenceDiagram
     participant AfterReturning
     participant AfterThrowing
     participant After
-    
+
     Context->>Before: Execute (parallel)
     Before->>Around: Setup wrappers
     Around->>Target: Execute wrapped
-    
+
     alt Success
         Target->>AfterReturning: Result
         AfterReturning->>After: Continue
@@ -61,7 +61,7 @@ sequenceDiagram
         Target->>AfterThrowing: Error
         AfterThrowing->>After: Continue
     end
-    
+
     After->>Context: Complete
 ```
 
@@ -131,10 +131,9 @@ console.log(result); // "Hello, AOP World!"
 **What happened here?**
 
 1. **Aspect Definition**: Created a reusable logging concern with `before` and `after` advice
-2. **Process Compilation**: Combined aspects into an executable process  
+2. **Process Compilation**: Combined aspects into an executable process
 3. **Context Provision**: Provided shared services (logger) to all aspects
 4. **Automatic Weaving**: Framework automatically executed advice around your target function
-```
 
 ---
 
@@ -148,11 +147,11 @@ Before diving into Promise-AOP, let's understand the core concepts:
 
 ```mermaid
 graph LR
-    A["Business Logic<br/>(What your app does)"] 
+    A["Business Logic<br/>(What your app does)"]
     B["Cross-cutting Concerns<br/>(How it's monitored/secured/cached)"]
     C["AOP Framework<br/>(Weaves them together)"]
     D["Clean, Maintainable Code"]
-    
+
     A --> C
     B --> C
     C --> D
@@ -174,15 +173,15 @@ Promise-AOP uses a **section-based context system** for thread-safe access:
 
 ```mermaid
 graph TD
-    A["Context: { logger, db, metrics, cache }"] 
-    B["Aspect A<br/>use: ['logger']"] 
-    C["Aspect B<br/>use: ['db', 'metrics']"] 
-    D["Aspect C<br/>use: ['cache']"] 
-    
+    A["Context: { logger, db, metrics, cache }"]
+    B["Aspect A<br/>use: ['logger']"]
+    C["Aspect B<br/>use: ['db', 'metrics']"]
+    D["Aspect C<br/>use: ['cache']"]
+
     A --> B
     A --> C
     A --> D
-    
+
     E["✅ Parallel Execution<br/>(No overlapping sections)"]
     B --> E
     C --> E
@@ -328,7 +327,7 @@ type CreateProcessConfig<Result, Context> = {
 ```typescript
 type Process<Result, Context> = (
   context: ContextAccessor<Context>,
-  exit: ExecutionOuterContext, 
+  exit: ExecutionOuterContext,
   target: Target<Result>
 ) => Promise<Result>;
 ```
@@ -367,7 +366,7 @@ const result = await runProcess({
 const asyncCtx = AsyncContext.create(() => ({ logger, db }));
 const result = await runProcess({
   process,
-  target: async () => fetchUserData(id), 
+  target: async () => fetchUserData(id),
   context: asyncCtx
 });
 ```
@@ -431,17 +430,17 @@ type ProcessOptions<Result, Context> = {
     errors: unknown[];
     info: ErrorInfo;
   }) => Promise<unknown>;
-  
+
   readonly handleError?: (props: {
     context: ContextAccessor<Context>;
-    exit: ExecutionOuterContext; 
+    exit: ExecutionOuterContext;
     error: unknown;
   }) => Promise<Result>;
-  
+
   readonly handleContinuedErrors?: (props: {
     context: ContextAccessor<Context>;
     exit: ExecutionOuterContext;
-    errors: readonly (readonly [unknown[], ErrorInfo])[]; 
+    errors: readonly (readonly [unknown[], ErrorInfo])[];
   }) => Promise<void>;
 };
 ```
@@ -456,7 +455,7 @@ flowchart TD
     D --> E{"Recovery Decision"}
     E -->|"Return Value"| F["Successful Result"]
     E -->|"Throw Error"| G["Failed Result"]
-    
+
     A --> H["handleContinuedErrors"]
     H --> I["Log/Monitor Secondary Errors"]
 ```
@@ -488,19 +487,19 @@ const process = createProcess<string, AppContext>({
     determineError: async ({ errors }) => {
       return errors.find(e => e instanceof DatabaseError) ?? errors[0];
     },
-    
+
     // Implement recovery strategy
     handleError: async ({ context, error }) => {
       const { logger, cache } = context();
-      
+
       if (error instanceof DatabaseError) {
         logger.error('Database failed, using cache', error);
         return cache.get('fallback-value');
       }
-      
+
       throw error; // Re-throw non-recoverable errors
     },
-    
+
     // Log secondary errors for monitoring
     handleContinuedErrors: async ({ context, errors }) => {
       const { metrics } = context();
@@ -524,7 +523,7 @@ const process = createProcess<string, AppContext>({
 // Main exports
 export { createAspect, createProcess, runProcess, AsyncContext };
 
-// Error types  
+// Error types
 export { Rejection, HaltRejection, ContinuousRejection };
 
 // Configuration types
@@ -603,7 +602,7 @@ const AdvancedAspect = createAspect<number, { log: Console }>((createAdvice) => 
 **Composition Visualization:**
 ```mermaid
 graph TD
-    A["Result Wrapper (outermost)"] --> B["Target Wrapper"] --> C["Original Target"] 
+    A["Result Wrapper (outermost)"] --> B["Target Wrapper"] --> C["Original Target"]
     C --> D["Return + 1"] --> E["Return * 10"] --> F["Final Result"]
 ```
 
@@ -652,11 +651,11 @@ const processUserRequest = (data) => runProcess({
 // Infrastructure Layer
 const InfrastructureAspects = [
   LoggingAspect,
-  MetricsAspect, 
+  MetricsAspect,
   TracingAspect
 ];
 
-// Business Layer  
+// Business Layer
 const BusinessAspects = [
   ValidationAspect,
   AuthorizationAspect,
@@ -694,14 +693,14 @@ const RetryAspect = createAspect<Data, AppContext>((createAdvice) => ({
       attachToTarget((target) => async () => {
         let attempts = 0;
         const maxAttempts = 3;
-        
+
         while (attempts < maxAttempts) {
           try {
             return await target();
           } catch (error) {
             attempts++;
             if (attempts >= maxAttempts) throw error;
-            
+
             logger.warn(`Attempt ${attempts} failed, retrying...`);
             await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
           }
