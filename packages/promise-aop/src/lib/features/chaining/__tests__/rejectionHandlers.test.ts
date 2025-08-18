@@ -106,6 +106,7 @@ describe("rejectionHandlers", () => {
       expect(mockProcessOptions.handleError).toHaveBeenCalledWith({
         context: expect.any(Function),
         exit: expect.any(Function),
+        currentTarget: expect.any(Function),
         error: haltRejection.errors[0],
       });
       expect(result).toBe(fallbackValue);
@@ -148,6 +149,7 @@ describe("rejectionHandlers", () => {
       expect(mockProcessOptions.handleError).toHaveBeenCalledWith({
         context: expect.any(Function),
         exit: expect.any(Function),
+        currentTarget: expect.any(Function),
         error: haltRejection.errors[0],
       });
     });
@@ -175,6 +177,7 @@ describe("rejectionHandlers", () => {
       expect(mockProcessOptions.handleError).toHaveBeenCalledWith({
         context: expect.any(Function),
         exit: expect.any(Function),
+        currentTarget: expect.any(Function),
         error: haltRejection.errors[0],
       });
     });
@@ -211,6 +214,7 @@ describe("rejectionHandlers", () => {
       expect(mockProcessOptions.handleError).toHaveBeenCalledWith({
         context: expect.any(Function),
         exit: expect.any(Function),
+        currentTarget: expect.any(Function),
         error: error2,
       });
     });
