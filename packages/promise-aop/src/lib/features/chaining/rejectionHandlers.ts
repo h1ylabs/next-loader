@@ -20,6 +20,7 @@ export function resolveHaltRejection<Result, SharedContext>(
 
     // handle the error
     return chain().processOptions.handleError({
+      currentTarget: chain().target,
       context: chain().context,
       exit: chain().exit,
       error: determinedError,

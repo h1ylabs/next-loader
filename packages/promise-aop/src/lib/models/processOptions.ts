@@ -9,6 +9,7 @@ import {
 
 import type { ErrorInfo } from "./rejection";
 import { Rejection } from "./rejection";
+import type { Target } from "./target";
 
 export type RequiredProcessOptions<Result, SharedContext> = {
   // determines which error to propagate from the collected errors.
@@ -21,6 +22,7 @@ export type RequiredProcessOptions<Result, SharedContext> = {
 
   // handles an error based on a specific error.
   readonly handleError: (props: {
+    currentTarget: Target<Result>;
     context: ContextAccessor<SharedContext>;
     exit: ExecutionOuterContext;
     error: unknown;
