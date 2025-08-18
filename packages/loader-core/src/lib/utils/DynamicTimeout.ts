@@ -8,7 +8,7 @@ export class DynamicTimeout {
 
   constructor(
     private readonly rejectValue: unknown,
-    private initialDelay: number
+    private initialDelay: number,
   ) {
     if (initialDelay < 0) {
       throw new Error(MSG_ERR_DYNAMIC_TIMEOUT_INITIAL_DELAY_NEGATIVE);
