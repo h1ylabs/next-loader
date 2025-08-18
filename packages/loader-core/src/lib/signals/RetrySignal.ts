@@ -1,22 +1,15 @@
-import { TargetWrapper } from "@h1y/promise-aop";
-
 import { Signal, SignalProps } from "../utils/Signal";
 
-export class RetrySignal<Result> extends Signal {
-  public readonly fallback?: TargetWrapper<Result>;
-
-  constructor(props: RetrySignalProps<Result>) {
+export class RetrySignal extends Signal {
+  constructor(props: RetrySignalProps) {
     super({
       ...props,
       message: props?.message ?? MSG_RETRY_SIGNAL_DEFAULT_MESSAGE,
     });
-
-    this.fallback = props.fallback;
   }
 }
 
-export interface RetrySignalProps<Result> extends SignalProps {
-  fallback?: TargetWrapper<Result>;
+export interface RetrySignalProps extends SignalProps {
   message?: string;
 }
 

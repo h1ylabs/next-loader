@@ -34,7 +34,7 @@ export const createRetryAspect = <Result>() =>
     afterThrowing: createAdvice({
       use: ["retry"],
       async advice({ retry }, error) {
-        const isRetryable =
+        const canRetry =
           // error is RetrySignal
           error instanceof RetrySignal ||
           // always retryable when true
@@ -43,7 +43,7 @@ export const createRetryAspect = <Result>() =>
           (typeof retry.canRetryOnError === "function" &&
             retry.canRetryOnError(error));
 
-        if (!isRetryable) {
+        if (!canRetry) {
           return;
         }
 
@@ -53,7 +53,12 @@ export const createRetryAspect = <Result>() =>
         }
 
         retry.count += 1;
-        throw error;
+
+        if (error instanceof RetrySignal) {
+          throw error;
+        }
+
+        throw new RetrySignal({});
       },
     }),
   }));
