@@ -15,7 +15,7 @@ export type TimeoutContext = {
 
 export type TimeoutContextOptions = {
   readonly delay: number;
-  readonly collapsedTime: number;
+  readonly elapsedTime: number;
   readonly resetTimeout: () => void;
 };
 
