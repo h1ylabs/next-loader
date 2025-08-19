@@ -1,3 +1,4 @@
+import { RETRY_SIGNAL_PRIORITY } from "@/lib/models/signal";
 import {
   MSG_RETRY_SIGNAL_DEFAULT_MESSAGE,
   RetrySignal,
@@ -6,26 +7,47 @@ import { Signal } from "@/lib/utils/Signal";
 
 describe("RetrySignal", () => {
   describe("constructor", () => {
-    it("should create signal with default message", () => {
-      const signal = new RetrySignal({});
+    it("should create a signal with default properties when no props are provided", () => {
+      const signal = new RetrySignal();
 
+      expect(signal.retryCount).toBeNaN();
       expect(signal.message).toBe(MSG_RETRY_SIGNAL_DEFAULT_MESSAGE);
+      expect(signal.priority).toBe(RETRY_SIGNAL_PRIORITY);
     });
 
-    it("should create signal with custom message", () => {
-      const customMessage = "Custom retry message";
-      const signal = new RetrySignal({ message: customMessage });
+    it("should create a signal with a specified retryCount", () => {
+      const retryCount = 3;
+      const signal = new RetrySignal({ retryCount });
 
+      expect(signal.retryCount).toBe(retryCount);
+      expect(signal.message).toBe(MSG_RETRY_SIGNAL_DEFAULT_MESSAGE);
+      expect(signal.priority).toBe(RETRY_SIGNAL_PRIORITY);
+    });
+
+    it("should create a signal with a custom message", () => {
+      const customMessage = "Custom retry message";
+      const retryCount = 3;
+      const signal = new RetrySignal({
+        retryCount,
+        message: customMessage,
+      });
+
+      expect(signal.retryCount).toBe(retryCount);
       expect(signal.message).toBe(customMessage);
+      expect(signal.priority).toBe(RETRY_SIGNAL_PRIORITY);
     });
   });
 
   describe("inheritance", () => {
-    it("should extend Signal class", () => {
-      const signal = new RetrySignal({});
+    it("should extend the Signal class", () => {
+      const signal = new RetrySignal();
 
       expect(signal).toBeInstanceOf(Signal);
       expect(signal).toBeInstanceOf(RetrySignal);
+    });
+
+    it("should be identifiable as a Signal", () => {
+      const signal = new RetrySignal();
       expect(Signal.isSignal(signal)).toBe(true);
     });
   });

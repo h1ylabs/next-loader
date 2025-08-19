@@ -1,3 +1,4 @@
+import { MIDDLEWARE_INVALID_SIGNAL_PRIORITY } from "@/lib/models/signal";
 import {
   MiddlewareInvalidContextSignal,
   MSG_MIDDLEWARE_INVALID_CONTEXT_SIGNAL_DEFAULT_MESSAGE,
@@ -6,7 +7,17 @@ import { Signal } from "@/lib/utils/Signal";
 
 describe("MiddlewareInvalidContextSignal", () => {
   describe("constructor", () => {
-    it("should create signal with required middlewareName", () => {
+    it("should create a signal with default properties when no props are provided", () => {
+      const signal = new MiddlewareInvalidContextSignal();
+
+      expect(signal.middlewareName).toBe("");
+      expect(signal.message).toBe(
+        MSG_MIDDLEWARE_INVALID_CONTEXT_SIGNAL_DEFAULT_MESSAGE,
+      );
+      expect(signal.priority).toBe(MIDDLEWARE_INVALID_SIGNAL_PRIORITY);
+    });
+
+    it("should create a signal with a specified middlewareName", () => {
       const middlewareName = "TestMiddleware";
       const signal = new MiddlewareInvalidContextSignal({ middlewareName });
 
@@ -14,9 +25,10 @@ describe("MiddlewareInvalidContextSignal", () => {
       expect(signal.message).toBe(
         MSG_MIDDLEWARE_INVALID_CONTEXT_SIGNAL_DEFAULT_MESSAGE,
       );
+      expect(signal.priority).toBe(MIDDLEWARE_INVALID_SIGNAL_PRIORITY);
     });
 
-    it("should create signal with custom message", () => {
+    it("should create a signal with a custom message", () => {
       const customMessage = "Custom middleware context error";
       const middlewareName = "CustomMiddleware";
       const signal = new MiddlewareInvalidContextSignal({
@@ -26,17 +38,20 @@ describe("MiddlewareInvalidContextSignal", () => {
 
       expect(signal.middlewareName).toBe(middlewareName);
       expect(signal.message).toBe(customMessage);
+      expect(signal.priority).toBe(MIDDLEWARE_INVALID_SIGNAL_PRIORITY);
     });
   });
 
   describe("inheritance", () => {
-    it("should extend Signal class", () => {
-      const signal = new MiddlewareInvalidContextSignal({
-        middlewareName: "TestMiddleware",
-      });
+    it("should extend the Signal class", () => {
+      const signal = new MiddlewareInvalidContextSignal();
 
       expect(signal).toBeInstanceOf(Signal);
       expect(signal).toBeInstanceOf(MiddlewareInvalidContextSignal);
+    });
+
+    it("should be identifiable as a Signal", () => {
+      const signal = new MiddlewareInvalidContextSignal();
       expect(Signal.isSignal(signal)).toBe(true);
     });
   });

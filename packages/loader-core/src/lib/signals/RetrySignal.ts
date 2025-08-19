@@ -1,16 +1,23 @@
+import { RETRY_SIGNAL_PRIORITY } from "../models/signal";
 import { Signal, SignalProps } from "../utils/Signal";
 
 export class RetrySignal extends Signal {
-  constructor(props: RetrySignalProps) {
+  public readonly retryCount: number;
+
+  constructor(props?: RetrySignalProps) {
     super({
-      ...props,
       message: props?.message ?? MSG_RETRY_SIGNAL_DEFAULT_MESSAGE,
+      priority: RETRY_SIGNAL_PRIORITY,
     });
+
+    this.retryCount = props?.retryCount ?? NaN;
   }
 }
 
 export interface RetrySignalProps extends SignalProps {
-  message?: string;
+  /** The number of times to retry. */
+  readonly retryCount?: number;
 }
 
-export const MSG_RETRY_SIGNAL_DEFAULT_MESSAGE = "signal: retry occurred";
+export const MSG_RETRY_SIGNAL_DEFAULT_MESSAGE =
+  "loader retry attempt triggered";

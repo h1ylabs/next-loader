@@ -1,31 +1,54 @@
+import { ANY_SIGNAL_PRIORITY } from "@/lib/models/signal";
 import { MSG_SIGNAL_DEFAULT_MESSAGE, Signal } from "@/lib/utils/Signal";
 
 describe("Signal", () => {
   describe("constructor", () => {
-    it("should create signal with default message", () => {
+    it("should create signal with default properties", () => {
       const signal = new Signal();
 
       expect(signal.message).toBe(MSG_SIGNAL_DEFAULT_MESSAGE);
-      expect(signal.name).toBe("Error");
+      expect(signal.priority).toBe(ANY_SIGNAL_PRIORITY);
+      expect(signal.name).toBe("Signal");
     });
 
-    it("should create signal with custom message", () => {
+    it("should create signal with a custom message", () => {
       const customMessage = "Custom signal message";
       const signal = new Signal({ message: customMessage });
 
       expect(signal.message).toBe(customMessage);
-      expect(signal.name).toBe("Error");
+      expect(signal.priority).toBe(ANY_SIGNAL_PRIORITY);
     });
 
-    it("should create signal with empty message", () => {
+    it("should create signal with a custom priority", () => {
+      const customPriority = 100;
+      const signal = new Signal({ priority: customPriority });
+
+      expect(signal.message).toBe(MSG_SIGNAL_DEFAULT_MESSAGE);
+      expect(signal.priority).toBe(customPriority);
+    });
+
+    it("should create signal with custom message and priority", () => {
+      const customMessage = "Custom signal message";
+      const customPriority = 100;
+      const signal = new Signal({
+        message: customMessage,
+        priority: customPriority,
+      });
+
+      expect(signal.message).toBe(customMessage);
+      expect(signal.priority).toBe(customPriority);
+    });
+
+    it("should create signal with an empty message", () => {
       const signal = new Signal({ message: "" });
 
       expect(signal.message).toBe("");
+      expect(signal.priority).toBe(ANY_SIGNAL_PRIORITY);
     });
   });
 
   describe("inheritance", () => {
-    it("should extend Error class", () => {
+    it("should extend the Error class", () => {
       const signal = new Signal();
 
       expect(signal).toBeInstanceOf(Error);
@@ -36,7 +59,7 @@ describe("Signal", () => {
       const signal = new Signal({ message: "test" });
 
       expect(signal.message).toBe("test");
-      expect(signal.name).toBe("Error");
+      expect(signal.name).toBe("Signal");
       expect(signal.stack).toBeDefined();
     });
   });
@@ -105,7 +128,7 @@ describe("Signal", () => {
   });
 
   describe("edge cases", () => {
-    it("should handle signal with very long message", () => {
+    it("should handle a signal with a very long message", () => {
       const longMessage = "a".repeat(1000);
       const signal = new Signal({ message: longMessage });
 
@@ -113,7 +136,7 @@ describe("Signal", () => {
       expect(Signal.isSignal(signal)).toBe(true);
     });
 
-    it("should handle signal with special characters", () => {
+    it("should handle a signal with special characters", () => {
       const specialMessage = "Signal with 🚨 special chars: @#$%^&*()";
       const signal = new Signal({ message: specialMessage });
 
@@ -121,7 +144,7 @@ describe("Signal", () => {
       expect(Signal.isSignal(signal)).toBe(true);
     });
 
-    it("should work with instanceof operator", () => {
+    it("should work with the instanceof operator", () => {
       const signal = new Signal();
 
       expect(signal instanceof Signal).toBe(true);
