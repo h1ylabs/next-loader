@@ -21,9 +21,9 @@ export type LoaderCoreInput<Result> = {
 };
 
 export type LoaderCoreContext<Result> = {
-  readonly timeout: TimeoutContext;
-  readonly retry: RetryContext<Result>;
-  readonly backoff: BackoffContext;
+  readonly __core__timeout: TimeoutContext;
+  readonly __core__retry: RetryContext<Result>;
+  readonly __core__backoff: BackoffContext;
 };
 
 export function createLoaderCoreContext<Result>({
@@ -32,8 +32,8 @@ export function createLoaderCoreContext<Result>({
   backoff,
 }: LoaderCoreInput<Result>): LoaderCoreContext<Result> {
   return {
-    timeout: createTimeoutContext(timeout),
-    retry: createRetryContext(retry),
-    backoff: createBackoffContext(backoff),
+    __core__timeout: createTimeoutContext(timeout),
+    __core__retry: createRetryContext(retry),
+    __core__backoff: createBackoffContext(backoff),
   };
 }

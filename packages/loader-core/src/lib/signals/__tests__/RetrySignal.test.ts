@@ -10,29 +10,16 @@ describe("RetrySignal", () => {
     it("should create a signal with default properties when no props are provided", () => {
       const signal = new RetrySignal();
 
-      expect(signal.retryCount).toBeNaN();
-      expect(signal.message).toBe(MSG_RETRY_SIGNAL_DEFAULT_MESSAGE);
-      expect(signal.priority).toBe(RETRY_SIGNAL_PRIORITY);
-    });
-
-    it("should create a signal with a specified retryCount", () => {
-      const retryCount = 3;
-      const signal = new RetrySignal({ retryCount });
-
-      expect(signal.retryCount).toBe(retryCount);
       expect(signal.message).toBe(MSG_RETRY_SIGNAL_DEFAULT_MESSAGE);
       expect(signal.priority).toBe(RETRY_SIGNAL_PRIORITY);
     });
 
     it("should create a signal with a custom message", () => {
       const customMessage = "Custom retry message";
-      const retryCount = 3;
       const signal = new RetrySignal({
-        retryCount,
         message: customMessage,
       });
 
-      expect(signal.retryCount).toBe(retryCount);
       expect(signal.message).toBe(customMessage);
       expect(signal.priority).toBe(RETRY_SIGNAL_PRIORITY);
     });
