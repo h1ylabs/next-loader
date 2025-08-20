@@ -52,12 +52,17 @@
     "lint": "eslint --cache --max-warnings=0"
   },
   "devDependencies": {
-    "@h1y/loader-config": "*",
-    "@types/node": "^22.15.17",
+    "@h1y/loader-config": "workspace:*",
+    "@types/node": "catalog:",
     "@types/react": ">=18.2.0",
     "@types/react-dom": "^18.2.0",
-    "tsup": "^8.4.0",
-    "typescript": "^5.8.2"
+    "eslint": "catalog:",
+    "jest": "catalog:",
+    "prettier": "catalog:",
+    "rimraf": "catalog:",
+    "ts-jest": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:"
   },
   "peerDependencies": {
     "next": ">=14.0.0",
