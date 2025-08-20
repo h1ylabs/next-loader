@@ -20,12 +20,7 @@ import {
   LoaderCoreContext,
   type LoaderCoreInput,
 } from "./lib/models/context";
-import {
-  LOADER_BACKOFF_ASPECT,
-  LOADER_RETRY_ASPECT,
-  LOADER_TIMEOUT_ASPECT,
-  type LoaderRetryPropagation,
-} from "./lib/models/loader";
+import { type LoaderRetryPropagation } from "./lib/models/loader";
 import type {
   LoaderMiddleware,
   MiddlewareContext,
@@ -119,9 +114,9 @@ export function loader<const Result>() {
 
     // 1. check for duplicate middleware names.
     const middlewareNames = new Set<string>([
-      LOADER_BACKOFF_ASPECT,
-      LOADER_RETRY_ASPECT,
-      LOADER_TIMEOUT_ASPECT,
+      "__core__backoff",
+      "__core__retry",
+      "__core__timeout",
     ]);
 
     for (const { name } of middlewares) {
