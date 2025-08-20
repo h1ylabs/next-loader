@@ -26,35 +26,11 @@
 
 # https://yarnpkg.com/getting-started/qa#which-files-should-be-gitignored
 # Yarn
-yarn.lock
-.yarn/
-.yarnrc
-
-.yarn-integrity
-.yarn-metadata.json
-yarn-debug.log*
-yarn-error.log*
-.yarn-cache/
-
-.yarn/cache
-.yarn/unplugged
-.yarn/build-state.yml
-.yarn/install-state.gz
 .pnp.*
-
-.yarnrc.yml
-.yarn-update-notifier
-yarn.build.json
-.yarnpath
-.yarn/build
-
-.yarn-metadata
-yarn-conditions.yml
-.yarn/install-state.gz.tmp
-!.yarn/releases
+.yarn/*
 !.yarn/patches
-
 !.yarn/plugins
+!.yarn/releases
 !.yarn/sdks
 !.yarn/versions
 
