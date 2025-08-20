@@ -46,6 +46,6 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@h1y/promise-aop": "^3.0.0"
+    "@h1y/promise-aop": "^4.1.0"
   }
 }
