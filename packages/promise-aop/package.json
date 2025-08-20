@@ -37,12 +37,15 @@
     "test": "jest --coverage"
   },
   "devDependencies": {
-    "@h1y/loader-config": "*",
-    "@types/jest": "^29.5.14",
-    "@types/node": "^22.15.29",
-    "jest": "^30.0.0",
-    "ts-jest": "^29.4.0",
-    "tsup": "^8.5.0",
-    "typescript": "^5.8.3"
+    "@h1y/loader-config": "workspace:*",
+    "@types/jest": "catalog:",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "jest": "catalog:",
+    "prettier": "catalog:",
+    "rimraf": "catalog:",
+    "ts-jest": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:"
   }
 }
