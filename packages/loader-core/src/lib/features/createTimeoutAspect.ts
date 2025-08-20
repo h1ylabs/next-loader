@@ -13,7 +13,11 @@ export const createTimeoutAspect = <Result>() =>
       use: ["__core__timeout"],
       dependsOn: [LOADER_BACKOFF_ASPECT],
       async advice({ __core__timeout: timeout }, { attachToTarget }) {
-        // Always create new timeout instance (no retry for timeout)
+        // if there is already a pending timeout, do nothing
+        if (timeout.pending) {
+          return;
+        }
+
         const pending = (timeout.pending = new DynamicTimeout(
           new TimeoutSignal({ delay: timeout.delay }),
           timeout.delay,
