@@ -1,0 +1,51 @@
+{
+  "name": "@h1y/loader-core",
+  "version": "0.0.0",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "h1ylabs",
+  "keywords": [],
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
+  "exports": {
+    ".": {
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      },
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "yarn clean && tsup",
+    "format": "prettier --cache --write \"./src/**/*.{ts,tsx}\"",
+    "format:file": "prettier --cache --write",
+    "check-types": "bash -c \"tsc --skipLibCheck --noEmit\"",
+    "clean": "rimraf ./dist",
+    "lint": "eslint --cache --max-warnings=0",
+    "test": "jest --coverage"
+  },
+  "devDependencies": {
+    "@h1y/loader-config": "*",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.15.29",
+    "jest": "^30.0.0",
+    "ts-jest": "^29.4.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@h1y/promise-aop": "^4.1.0"
+  }
+}
