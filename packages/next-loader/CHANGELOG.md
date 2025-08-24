@@ -1,5 +1,16 @@
 # @h1y/next-loader
 
+## 5.0.0
+
+### Major Changes
+
+- [#59](https://github.com/h1ylabs/next-loader/pull/59) [`0fbd95c`](https://github.com/h1ylabs/next-loader/commit/0fbd95c8152d76bcd07641a585ffdc5154205333) Thanks [@cutehammond772](https://github.com/cutehammond772)! - version unification
+
+### Patch Changes
+
+- Updated dependencies [[`0fbd95c`](https://github.com/h1ylabs/next-loader/commit/0fbd95c8152d76bcd07641a585ffdc5154205333)]:
+  - @h1y/loader-core@5.0.0
+
 ## 2.0.0
 
 ### Major Changes
