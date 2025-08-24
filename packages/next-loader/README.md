@@ -1,288 +1,1146 @@
-# `@h1y/next-loader`
+# @h1y/next-loader
 
-안녕하세요! 이 라이브러리는 Next.js 개발을 더욱 편리하게 만들어주는 도구입니다. 외부 리소스(API 데이터 등)를 효율적으로 불러오고 관리할 수 있도록 도와드립니다. 복잡한 데이터 관리와 캐싱 문제를 간단하게 해결해보세요!
+**Latest version: v2.0.0**
 
-## 목차
+A powerful, type-safe resource loading library specifically designed for Next.js applications. Build efficient data fetching with built-in caching, revalidation, retry logic, and seamless integration with Next.js server components.
 
-- [`@h1y/next-loader`](#h1ynext-loader)
-  - [목차](#목차)
-  - [설치 방법](#설치-방법)
-  - [이런 기능들을 제공해요](#이런-기능들을-제공해요)
-  - [어떻게 사용하면 될까요?](#어떻게-사용하면-될까요)
-    - [로더 설정하기](#로더-설정하기)
-    - [리소스 빌더 만들기](#리소스-빌더-만들기)
-    - [리소스 사용하기](#리소스-사용하기)
-  - [더 고급 사용법을 알아볼까요?](#더-고급-사용법을-알아볼까요)
-    - [리소스 간 의존성 관리하기](#리소스-간-의존성-관리하기)
-    - [리소스 내에서 로더 중첩 사용하기](#리소스-내에서-로더-중첩-사용하기)
-  - [유용한 유틸리티 함수들](#유용한-유틸리티-함수들)
-    - [계층적 태그 생성하기](#계층적-태그-생성하기)
-  - [라이센스](#라이센스)
+[한국어 문서 (Korean Documentation)](./docs/README-ko.md)
 
-## 설치 방법
+[![npm version](https://badge.fury.io/js/%40h1y%2Fnext-loader.svg)](https://badge.fury.io/js/%40h1y%2Fnext-loader)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-여러분의 프로젝트에 쉽게 추가할 수 있습니다:
+## ✨ Key Features
+
+- **🎯 Next.js Native**: Built specifically for Next.js with first-class server component support
+- **🔄 Smart Caching**: Integrates seamlessly with Next.js cache system and revalidation
+- **⚡ Resource Builder Pattern**: Declarative resource definitions with dependency management
+- **🛡️ Type Safety**: Full TypeScript support with intelligent type inference
+- **🔗 Hierarchical Tags**: Advanced cache invalidation with hierarchical tagging system
+- **⏱️ Retry & Timeout**: Built-in resilience with configurable retry and timeout strategies
+- **🎛️ Middleware Support**: Extensible middleware system for cross-cutting concerns
+
+## 📦 Installation
 
 ```bash
 npm install @h1y/next-loader
-# 또는
+# or
 yarn add @h1y/next-loader
-# 또는
+# or
 pnpm add @h1y/next-loader
 ```
 
-## 이런 기능들을 제공해요
+## 🚀 Quick Start
 
-- **손쉬운 리소스 관리**: 외부 API 호출을 깔끔하게 정리하고 효율적으로 관리해요.
-- **편리한 태그 기반 재검증**: Next.js의 태그 기반 재검증 시스템과 자연스럽게 연동됩니다.
-- **똑똑한 의존성 관리**: 리소스 간 의존성을 쉽게 정의하여 연관된 데이터의 자동 재검증이 가능합니다.
-- **효율적인 요청 메모이제이션**: 같은 서버 요청 생명주기 내에서 동일한 데이터 요청을 똑똑하게 캐싱합니다.
+Get started with @h1y/next-loader in three simple steps:
 
-## 어떻게 사용하면 될까요?
-
-### 로더 설정하기
-
-먼저 로더를 설정해볼까요? 아래의 코드는 Next.js의 캐시 태그 기반 재검증 시스템과 연동하는 방법을 보여줍니다:
+### 1. Set up dependencies and create a global loader
 
 ```typescript
-import { revalidateTag } from 'next/cache'
-import { configureLoader } from '@h1y/next-loader'
+import { revalidateTag } from "next/cache";
+import { cache } from "react";
+import { createLoader, NextJSAdapter } from "@h1y/next-loader";
 
-// 여러분의 서비스에 맞게 로더를 설정해 보세요
-const loader = configureLoader({
-  // 기본 fetch 함수를 사용하거나 여러분만의 fetch 함수를 구현할 수 있어요
-  fetch,
-  
-  // 태그 기반 재검증을 위한 함수입니다
-  revalidate: async (tags) => {
-    "use server"
-    
-    // Next.js의 revalidateTag 함수로 캐시 태그를 갱신합니다
-    tags.forEach(revalidateTag)
+// Create once at module level, reuse everywhere
+const { loader } = createLoader({
+  adapter: NextJSAdapter,
+  revalidate: revalidateTag,
+  memo: cache, // Request deduplication
+});
+```
+
+### 2. Define your resources
+
+```typescript
+import { createResourceBuilder } from "@h1y/next-loader";
+
+const User = createResourceBuilder({
+  tags: (req: { id: string }) => ({ identifier: `user-${req.id}` }),
+  options: { staleTime: 300000 }, // Cache for 5 minutes
+  use: [],
+  load: async ({ req, fetch }) => {
+    const response = await fetch(`/api/users/${req.id}`);
+    if (!response.ok) throw new Error(`Failed to fetch user`);
+    return response.json();
   },
 });
 ```
 
-### 리소스 빌더 만들기
-
-이제 필요한 데이터를 가져오는 리소스 빌더를 정의해 볼까요?
+### 3. Use in your components
 
 ```typescript
-import { buildResource } from '@h1y/next-loader'
-import type { ResourceOptions } from '@h1y/next-loader'
-
-interface UserRequest {
-  userId: string
-}
-
-interface UserResourceOptions extends UserRequest, ResourceOptions {}
-
-// 사용자 정보를 가져오는 리소스 빌더를 만들어 봅시다
-const getUserResource = buildResource(
-  // 요청 파라미터를 리소스 옵션으로 변환하는 함수예요
-  (request: UserRequest) => ({
-    ...request,
-    tags: `user:${request.userId}`, // 이렇게 태그를 설정하면 나중에 재검증할 때 유용해요
-    revalidate: 60,                 // 60초 후에 데이터를 다시 확인할게요
-  }),
-  
-  // 실제 데이터를 로드하는 함수입니다
-  (options: UserResourceOptions) => ({
-    async load(fetch) {
-      // API에서 사용자 정보를 가져옵니다
-      const response = await fetch(`/api/users/${options.userId}`)
-      return response.json()
-    },
-  })
-)
-```
-
-### 리소스 사용하기
-
-서버 컴포넌트에서 리소스를 사용하는 방법은 정말 간단해요:
-
-```typescript
-import { loader, getUserResource } from './your-resources';
-
-// 서버 컴포넌트에서 이렇게 사용해보세요
-async function UserProfile({ userId }) {
-  // 리소스 로드 함수와 재검증 함수를 받아옵니다
-  const [load, revalidate] = loader(getUserResource({ userId }))
-  
-  // 데이터를 로드합니다 - 캐싱과 재검증은 라이브러리가 알아서 처리해줍니다!
-  const [userData] = await load()
+async function UserProfile({ params }: { params: { id: string } }) {
+  const [load, revalidate] = loader(User({ id: params.id }));
+  const [user] = await load();
 
   return (
     <div>
-      <h1>{userData.name}</h1>
-      {/* 사용자 정보를 여기에 표시하세요 */}
-      
-      {/* 데이터를 새로고침하고 싶을 때는 이렇게 재검증 함수를 사용하세요 */}
+      <h1>{user.name}</h1>
+      <p>{user.email}</p>
       <form action={revalidate}>
-        <button type="submit">새로고침</button>
+        <button>Refresh</button>
       </form>
     </div>
   );
 }
 ```
 
-## 더 고급 사용법을 알아볼까요?
+That's it! Your data is now automatically cached, revalidated, and ready for production.
 
-### 리소스 간 의존성 관리하기
+## 🧩 Core Concepts
 
-여러 데이터 사이에 관계가 있나요? 걱정 마세요! 의존성을 쉽게 관리할 수 있습니다:
+### Resource Builder Pattern
+
+Resources are declarative definitions that tell @h1y/next-loader how to fetch, cache, and manage your data:
 
 ```typescript
-// 부모 리소스를 정의합니다
-const parentResource = getResource({ id: 'parent' })
+const BlogPost = createResourceBuilder({
+  // Define cache tags
+  tags: (req: { slug: string }) => ({
+    identifier: `post-${req.slug}`,
+    effects: ["blog-content"], // Invalidate related caches
+  }),
 
-// 자식 리소스를 정의하고 부모에 연결합니다
-const childResource = getResource({ 
-  id: 'child',
-  // 이렇게 연결하면 부모가 업데이트될 때 자식도 자동으로 업데이트됩니다!
-  parents: [parentResource]
-})
+  // Configure caching
+  options: { staleTime: 600000 }, // Cache for 10 minutes
 
-// 서버 컴포넌트에서 리소스 의존성을 관리하는 예시입니다
-async function RelatedDataComponent() {
-  // 여러 리소스를 한 번에 로드하는 것도 가능해요
-  const [loadAll, revalidateAll] = loader(parentResource, childResource)
-  const [parent, child] = await loadAll()
-  
-  return (
-    <div>
-      <h2>{parent.title}</h2>
-      <p>{child.description}</p>
-      <form action={revalidateAll}>
-        <button type="submit">모든 데이터 새로고침</button>
-      </form>
-    </div>
-  );
+  // Declare dependencies
+  use: [], // No dependencies for this resource
+
+  // Define how to load data
+  load: async ({ req, fetch, retry }) => {
+    const response = await fetch(`/api/posts/${req.slug}`);
+    if (!response.ok) {
+      if (response.status >= 500) retry(); // Retry on server errors
+      throw new Error("Failed to load post");
+    }
+    return response.json();
+  },
+});
+```
+
+**Key benefits:**
+
+- **Declarative**: Define what you need, not how to get it
+- **Composable**: Resources can depend on other resources
+- **Cacheable**: Automatic caching with fine-grained control
+- **Resilient**: Built-in retry and error handling
+
+### Two Ways to Handle Loading
+
+@h1y/next-loader provides two distinct approaches for different use cases:
+
+#### `createLoader()` - For Data Fetching
+
+**When to use**: Loading data in server components (most common use case)
+
+```typescript
+const { loader } = createLoader(dependencies);
+
+async function UserPage() {
+  const [load] = loader(User({ id: '123' }));
+  const [data] = await load();
+  return <div>{data.name}</div>;
 }
 ```
 
-### 리소스 내에서 로더 중첩 사용하기
+**Characteristics:**
 
-더 복잡한 데이터 구조를 다룰 때는 리소스 내에서 다른 리소스를 로드할 수도 있어요. 예를 들어, 블로그의 카테고리와 각 카테고리에 속한 글 목록을 불러오는 경우를 생각해볼까요?
+- ✅ Perfect for data fetching with caching
+- ❌ Middleware context not accessible in components
+- 🔧 Default: 60s timeout, no retries
+
+#### `createComponentLoader()` - For Component Resilience
+
+**When to use**: Adding retry/timeout behavior to components themselves
 
 ```typescript
-// 블로그 글 하나에 대한 리소스 정의
-interface PostRequest {
-  categoryId: string
-  postId: string
+const { componentLoader } = createComponentLoader({
+  retry: { maxCount: 3, canRetryOnError: true },
+  timeout: { delay: 5000 }
+});
+
+async function RiskyComponent() {
+  const data = await unreliableApiCall();
+  return <div>{data}</div>;
 }
 
-interface PostOptions extends PostRequest, ResourceOptions {}
-
-const getPostResource = buildResource(
-  (request: PostRequest) => ({
-    ...request,
-    tags: [`category:${request.categoryId}`, `post:${request.postId}`],
-  }),
-  (options: PostOptions) => ({
-    async load(fetch) {
-      // 특정 글의 상세 내용을 가져옵니다
-      const response = await fetch(`/api/categories/${options.categoryId}/posts/${options.postId}`)
-      return response.json()
-    },
-  })
-);
-
-// 카테고리에 속한 모든 글 목록을 가져오는 리소스
-interface CategoryPostsRequest {
-  categoryId: string
-}
-
-interface CategoryPostsOptions extends CategoryPostsRequest, ResourceOptions {}
-
-const getCategoryPostsResource = buildResource(
-  (request: CategoryPostsRequest) => ({
-    ...request,
-    tags: [`category:${request.categoryId}`],
-  }),
-  (options: CategoryPostsOptions) => ({
-    async load(fetch) {
-      // 1. 먼저 카테고리에 속한 글 ID 목록을 가져옵니다
-      const response = await fetch(`/api/categories/${options.categoryId}/posts`)
-      const postIds = await response.json()
-
-      // 2. 각 글에 대한 리소스를 만듭니다
-      const postResources = postIds.map(postId => 
-        getPostResource({
-          categoryId: options.categoryId,
-          postId,
-        })
-      );
-
-      // 3. 중첩으로 로더를 사용하여 모든 글을 로드합니다
-      const [loadAll] = loader(...postResources)
-      return await loadAll()
-    },
-  })
-);
-
-// 서버 컴포넌트에서 사용하는 예시
-async function CategoryPage({ categoryId }) {
-  const [load] = loader(getCategoryPostsResource({ categoryId }))
-  const [posts] = await load()
-
-  return (
-    <div>
-      <h1>카테고리 글 목록</h1>
-      <ul>
-        {posts.map(post => (
-          <li key={post.id}>
-            <h2>{post.title}</h2>
-            <p>{post.summary}</p>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+export default componentLoader(RiskyComponent);
 ```
 
-이런 패턴은 복잡한 데이터 관계가 있을 때 특히 유용합니다. 예를 들어, 상위 리소스가 여러 하위 리소스의 ID 목록만 반환하고, 각 하위 리소스의 상세 정보는 별도 API를 통해 가져와야 하는 경우에 적합해요. 중첩 로더를 사용하면 이런 복잡한 데이터 구조도 효율적으로 관리할 수 있습니다.
+**Characteristics:**
 
-## 유용한 유틸리티 함수들
+- ✅ Component-level retry and timeout handling
+- ✅ Middleware context accessible via `{name}MiddlewareOptions()`
+- 🔧 Default: Infinite timeout, no retries
 
-`@h1y/next-loader`는 리소스 관리를 더 편리하게 만들어주는 여러 유틸리티 함수들도 제공해요. 이 함수들을 활용하면 더 깔끔하고 유지보수하기 쉬운 코드를 작성할 수 있습니다.
+### Smart Cache Invalidation with Hierarchical Tags
 
-### 계층적 태그 생성하기
-
-계층 구조가 있는 데이터를 다룰 때 태그도 계층적으로 관리하면 편리해요. `hierarchicalTags` 함수를 사용하면 쉽게 계층적 태그를 생성할 수 있습니다:
+Organize your cache invalidation strategy with hierarchical tags for precise control:
 
 ```typescript
-import { hierarchicalTags } from "@h1y/next-loader/utils"
+import { hierarchyTag } from "@h1y/next-loader";
 
-// 리소스 빌더 정의
-const getUserResource = buildResource(
-  (request) => ({
-    ...request,
-    // 계층적 태그 생성
-    tags: hierarchicalTags(
-      "user",                        // 최상위 태그
-      `role:${request.role}`,        // 중간 태그
-      `id:${request.userId}`         // 최하위 태그
+const UserComments = createResourceBuilder({
+  tags: (req: { userId: string; postId: string }) => ({
+    identifier: hierarchyTag(
+      "user",
+      req.userId,
+      "posts",
+      req.postId,
+      "comments",
     ),
-    revalidate: 60,
   }),
-  (options) => ({
-    async load(fetch) {
-      // 데이터 로드 로직
-    },
-  })
-)
+  // ... other config
+});
 ```
 
-이렇게 생성된 태그는 다음과 같이 세 가지 형태로 자동 등록됩니다:
+**How it works:**
 
-- `user`: 모든 사용자 데이터에 대한 태그
-- `user/role:admin`: 관리자 역할을 가진 사용자들에 대한 태그
-- `user/role:admin/id:123`: 특정 ID를 가진 관리자에 대한 태그
+```typescript
+// hierarchyTag('user', '123', 'posts', '456', 'comments') creates:
+// ['user', 'user/123', 'user/123/posts', 'user/123/posts/456', 'user/123/posts/456/comments']
+```
 
-이렇게 계층적 태그를 사용하면 특정 수준에서 재검증이 필요할 때 유연하게 대응할 수 있어요. 예를 들어, 모든 관리자 정보를 갱신하고 싶다면 `user/role:admin` 태그만 재검증하면 됩니다.
+**Invalidation at any level:**
 
-## 라이센스
+```typescript
+revalidateTag("user"); // All user data
+revalidateTag("user/123/posts"); // All posts for user 123
+revalidateTag("user/123/posts/456"); // Specific post
+```
 
-MIT 라이센스로 제공됩니다.
+## 🎯 Advanced Examples
+
+### Resource Dependencies
+
+Build complex data flows by composing resources:
+
+```typescript
+// Base user resource
+const User = createResourceBuilder({
+  tags: (req: { id: string }) => ({ identifier: `user-${req.id}` }),
+  options: { staleTime: 300000 },
+  use: [],
+  load: async ({ req, fetch }) => {
+    const response = await fetch(`/api/users/${req.id}`);
+    return response.json();
+  },
+});
+
+// Posts that depend on user data
+const UserPosts = createResourceBuilder({
+  tags: (req: { userId: string }) => ({
+    identifier: hierarchyTag('user', req.userId, 'posts'),
+    effects: ['activity-feed'] // Invalidate activity feed when posts change
+  }),
+  options: { staleTime: 180000 },
+  use: [User({ id: req.userId })], // Declare dependency
+  load: async ({ req, fetch, use: [user] }) => {
+    const userData = await user;
+
+    // Skip loading if user is inactive
+    if (!userData.isActive) {
+      return { posts: [], reason: 'User inactive' };
+    }
+
+    const response = await fetch(`/api/users/${req.userId}/posts`);
+    return {
+      posts: await response.json(),
+      author: userData.name,
+    };
+  },
+});
+
+// Use both resources
+async function UserDashboard({ userId }: { userId: string }) {
+  const [load, revalidate] = loader(
+    User({ id: userId }),
+    UserPosts({ userId })
+  );
+
+  const [user, posts] = await load();
+
+  return (
+    <div>
+      <h1>{user.name}'s Dashboard</h1>
+      <p>{posts.posts.length} posts</p>
+      <form action={revalidate}>
+        <button>Refresh</button>
+      </form>
+    </div>
+  );
+}
+```
+
+### Error Handling and Resilience
+
+```typescript
+const { loader } = createLoader(dependencies, {
+  retry: {
+    maxCount: 3,
+    canRetryOnError: (error) => error.status >= 500, // Only retry server errors
+  },
+  timeout: { delay: 10000 },
+});
+
+const Product = createResourceBuilder({
+  tags: (req: { id: string }) => ({ identifier: `product-${req.id}` }),
+  options: { staleTime: 120000 },
+  use: [],
+  load: async ({ req, fetch, retry, loaderOptions }) => {
+    try {
+      const response = await fetch(`/api/products/${req.id}`);
+      if (!response.ok) {
+        if (response.status >= 500) retry(); // Trigger retry for server errors
+        throw new Error(`Product not found: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      const options = loaderOptions();
+
+      // Return error state with retry info
+      return {
+        id: req.id,
+        error: true,
+        message: error.message,
+        retryCount: options.retry.count,
+      };
+    }
+  },
+});
+```
+
+## 🎛️ Middleware System
+
+Add cross-cutting concerns like logging, metrics, and monitoring to your loaders with a powerful middleware system built on [@h1y/promise-aop](https://github.com/h1ylabs/next-loader/tree/main/packages/promise-aop).
+
+### Why Middleware?
+
+**Middleware** provides clean separation of concerns:
+
+- **Simplified API**: Easy-to-use interfaces for common patterns
+- **Type Safety**: Full TypeScript support with automatic context inference
+- **Integration**: Seamless integration with Next.js caching
+- **Isolation**: Each middleware has its own isolated context
+
+### Creating Custom Middleware
+
+#### For Data Loaders
+
+```typescript
+import { createLoaderMiddleware } from "@h1y/next-loader";
+
+// Performance monitoring middleware
+const performanceMiddleware = createLoaderMiddleware({
+  name: "performance",
+  contextGenerator: () => ({ startTime: 0 }),
+
+  before: async (context) => {
+    context.startTime = performance.now();
+    console.log("🚀 Loading started");
+  },
+
+  complete: async (context, result) => {
+    const duration = performance.now() - context.startTime;
+    console.log(`✅ Completed in ${duration.toFixed(2)}ms`);
+  },
+
+  failure: async (context, error) => {
+    const duration = performance.now() - context.startTime;
+    console.error(`❌ Failed after ${duration.toFixed(2)}ms:`, error.message);
+  },
+});
+
+// Apply to your loader
+const { loader } = createLoader(dependencies, loaderConfig, [
+  performanceMiddleware,
+]);
+```
+
+#### For Component Loaders
+
+```typescript
+import { createComponentMiddleware } from "@h1y/next-loader";
+
+// Metrics collection middleware
+const metricsMiddleware = createComponentMiddleware({
+  name: "metrics",
+  contextGenerator: () => ({ renderStart: 0, componentName: "Unknown" }),
+
+  before: async (context) => {
+    context.renderStart = Date.now();
+  },
+
+  complete: async (context) => {
+    const renderTime = Date.now() - context.renderStart;
+    analytics.track("component.render.success", {
+      component: context.componentName,
+      renderTimeMs: renderTime,
+    });
+  },
+
+  failure: async (context, error) => {
+    analytics.track("component.render.failure", {
+      component: context.componentName,
+      error: error.message,
+    });
+  },
+});
+
+// Apply to component loader
+const { componentLoader } = createComponentLoader(componentConfig, [
+  metricsMiddleware,
+]);
+```
+
+### Advanced Patterns
+
+#### Conditional Logic
+
+```typescript
+const debugMiddleware = createLoaderMiddleware({
+  name: "debug",
+  contextGenerator: () => ({
+    shouldLog: process.env.NODE_ENV === "development",
+  }),
+
+  before: async (context) => {
+    if (context.shouldLog) console.log("🔍 Starting loader");
+  },
+
+  complete: async (context, result) => {
+    if (context.shouldLog) console.log("✅ Result:", result);
+  },
+});
+```
+
+#### Error Recovery
+
+```typescript
+const recoveryMiddleware = createLoaderMiddleware({
+  name: "recovery",
+  contextGenerator: () => ({ attempts: 0 }),
+
+  failure: async (context, error) => {
+    context.attempts++;
+    if (error.code === "NETWORK_ERROR") {
+      console.warn(`Network error (attempt ${context.attempts}), will retry`);
+    }
+  },
+});
+```
+
+### Key Features
+
+- **🔒 Isolated Contexts**: Each middleware has its own private context
+- **🔁 Lifecycle Hooks**: Hook into before, complete, failure, and cleanup phases
+- **🎯 Composable**: Stack multiple middleware for complex behaviors
+- **🛡️ Type Safe**: Full TypeScript support with automatic inference
+
+### Best Practices
+
+- Keep middleware **focused** on a single concern
+- Use **descriptive names** for easier debugging
+- Keep context data **minimal** to reduce memory usage
+- **Test middleware independently** from business logic
+
+## 📖 API Reference
+
+### `createLoader(dependencies, options?, middlewares?)`
+
+Creates a global data loader for fetching and caching resources.
+
+**Dependencies** (required):
+
+```typescript
+{
+  adapter: NextJSAdapter,        // Data fetching integration
+  revalidate: revalidateTag,     // Cache invalidation (from 'next/cache')
+  memo?: cache                   // Request deduplication (from 'react')
+}
+```
+
+**Options** (optional):
+
+```typescript
+{
+  retry: {
+    maxCount: number;                              // Max retry attempts (default: 0)
+    canRetryOnError: boolean | ((error) => boolean); // When to retry (default: false)
+    onRetryEach?: () => void;                      // Called on each retry
+  };
+  timeout: {
+    delay: number;                                 // Timeout in ms (default: 60000)
+    onTimeout?: () => void;                        // Called on timeout
+  };
+  backoff?: {
+    strategy: Backoff;                             // Delay strategy between retries
+    initialDelay: number;                          // First retry delay in ms
+  };
+}
+```
+
+**Returns:** `{ loader }` - The loader function
+
+**Example:**
+
+```typescript
+const { loader } = createLoader(
+  { adapter: NextJSAdapter, revalidate: revalidateTag },
+  { retry: { maxCount: 3, canRetryOnError: (error) => error.status >= 500 } },
+);
+```
+
+### `createComponentLoader(options?, middlewares?)`
+
+Wraps server components with retry and timeout behavior.
+
+**Options** (optional):
+
+```typescript
+{
+  retry: {
+    maxCount: number;                              // Max retries (default: 0)
+    canRetryOnError: boolean | ((error) => boolean); // Retry condition
+    fallback?: React.ReactElement;                 // Loading component
+  };
+  timeout: {
+    delay: number;                                 // Timeout in ms (default: Infinity)
+  };
+  backoff?: {
+    strategy: Backoff;                             // Delay strategy
+    initialDelay: number;                          // Initial delay
+  };
+}
+```
+
+**Returns:**
+
+- `componentLoader`: Function to wrap components
+- `retryComponent`: Trigger manual retry
+- `componentOptions`: Access current state
+
+```typescript
+// Create component loader globally
+const { componentLoader, retryComponent, componentOptions, componentState } = createComponentLoader({
+  retry: {
+    maxCount: 2,
+    canRetryOnError: true,
+    fallback: <div>Loading...</div>
+  },
+  timeout: { delay: 30000 }
+});
+
+// Define component separately
+async function UserProfile({ userId }: { userId: string }) {
+  const user = await fetchUser(userId);
+  return <div>Hello, {user.name}!</div>;
+}
+
+// Wrap and export
+export default componentLoader(UserProfile);
+```
+
+### `createResourceBuilder(config)`
+
+Defines how to fetch, cache, and manage data resources.
+
+**Configuration:**
+
+```typescript
+{
+  tags: (req) => ({                                 // Cache tag generation
+    identifier: string;                            // Primary cache tag
+    effects?: string[];                            // Additional tags to invalidate
+  });
+
+  options: {
+    staleTime: number;                             // Cache duration in ms
+    revalidate?: boolean | number;                 // Next.js ISR setting
+  };
+
+  use: ResourceBuilder[];                          // Resource dependencies
+
+  load: async ({ req, fetch, use, retry }) => {    // Data loading function
+    // req: Request parameters
+    // fetch: Next.js enhanced fetch
+    // use: Resolved dependencies
+    // retry: Manual retry trigger
+  };
+}
+```
+
+**Example:**
+
+```typescript
+const UserPosts = createResourceBuilder({
+  tags: (req: { userId: string }) => ({
+    identifier: hierarchyTag("user", req.userId, "posts"),
+  }),
+  options: { staleTime: 180000 },
+  use: [User({ id: req.userId })],
+  load: async ({ req, fetch, use: [user] }) => {
+    const userData = await user;
+    if (!userData.isActive) return { posts: [] };
+
+    const response = await fetch(`/api/users/${req.userId}/posts`);
+    return { posts: await response.json() };
+  },
+});
+```
+
+### `hierarchyTag(...segments)`
+
+Builds hierarchical cache tags for precise invalidation control.
+
+**Usage:**
+
+```typescript
+// Creates: ['user', 'user/123', 'user/123/posts']
+const tags = hierarchyTag("user", "123", "posts");
+
+// In resource builders:
+const UserProfile = createResourceBuilder({
+  tags: (req: { userId: string }) => ({
+    identifier: hierarchyTag("user", req.userId, "profile"),
+    effects: hierarchyTag("user", req.userId), // Parent levels
+  }),
+});
+```
+
+**Invalidation:**
+
+```typescript
+revalidateTag("user"); // All user data
+revalidateTag("user/123"); // All data for user 123
+revalidateTag("user/123/profile"); // Only user 123's profile
+```
+
+### Backoff Strategies
+
+Backoff strategies control the delay between retry attempts. All strategies are imported from `@h1y/loader-core`.
+
+```typescript
+import {
+  FIXED_BACKOFF,
+  LINEAR_BACKOFF,
+  EXPONENTIAL_BACKOFF,
+} from "@h1y/next-loader"; // Re-exported from loader-core
+```
+
+**Available Strategies:**
+
+| Strategy        | Function                          | Description                    | Example Delays         |
+| --------------- | --------------------------------- | ------------------------------ | ---------------------- |
+| **Fixed**       | `FIXED_BACKOFF`                   | Same delay between all retries | 1000ms, 1000ms, 1000ms |
+| **Linear**      | `LINEAR_BACKOFF(increment)`       | Delay increases linearly       | 1000ms, 2000ms, 3000ms |
+| **Exponential** | `EXPONENTIAL_BACKOFF(multiplier)` | Delay multiplies exponentially | 1000ms, 2000ms, 4000ms |
+
+**Usage Examples:**
+
+```typescript
+// Fixed delay: always wait 2 seconds between retries
+const { loader } = createLoader(dependencies, {
+  retry: { maxCount: 3, canRetryOnError: true },
+  backoff: {
+    strategy: FIXED_BACKOFF,
+    initialDelay: 2000 // 2 seconds
+  }
+});
+
+// Linear backoff: 1s, 3s, 5s delays
+const { loader } = createLoader(dependencies, {
+  retry: { maxCount: 3, canRetryOnError: true },
+  backoff: {
+    strategy: LINEAR_BACKOFF(2000), // Add 2 seconds each retry
+    initialDelay: 1000 // Start with 1 second
+  }
+});
+
+// Exponential backoff: 500ms, 1s, 2s, 4s delays
+const { loader } = createLoader(dependencies, {
+  retry: { maxCount: 4, canRetryOnError: true },
+  backoff: {
+    strategy: EXPONENTIAL_BACKOFF(2), // Double delay each retry
+    initialDelay: 500 // Start with 500ms
+  }
+});
+
+// Component loader with exponential backoff
+const { componentLoader } = createComponentLoader({
+  retry: {
+    maxCount: 3,
+    canRetryOnError: true,
+    fallback: <div>Retrying...</div>
+  },
+  backoff: {
+    strategy: EXPONENTIAL_BACKOFF(1.5), // Multiply by 1.5 each retry
+    initialDelay: 1000
+  }
+});
+```
+
+**Backoff Best Practices:**
+
+1. **API Calls**: Use exponential backoff to reduce server load during outages
+2. **Database Operations**: Use linear backoff for predictable retry intervals
+3. **Quick Operations**: Use fixed backoff for consistent user experience
+4. **Rate Limited APIs**: Use exponential backoff with longer initial delays
+
+### Middleware Creation Functions
+
+#### `createLoaderMiddleware(config)`
+
+Creates middleware for data loaders with lifecycle hooks around data fetching operations.
+
+**Parameters:**
+
+- `config`: **Required** middleware configuration object:
+  ```typescript
+  {
+    name: string;                                    // Unique middleware identifier
+    contextGenerator: () => Context;                 // Factory function for middleware context
+    before?: (context: Context) => Promise<void>;   // Called before loader execution
+    complete?: (context: Context, result: Result) => Promise<void>; // Called after successful execution
+    failure?: (context: Context, error: unknown) => Promise<void>;  // Called when loader fails
+    cleanup?: (context: Context) => Promise<void>;  // Always called for cleanup
+  }
+  ```
+
+**Returns:** Middleware instance for use with `createLoader`
+
+#### `createComponentMiddleware(config)`
+
+Creates middleware for component loaders with lifecycle hooks around component rendering.
+
+**Parameters:**
+
+- `config`: **Required** middleware configuration object:
+  ```typescript
+  {
+    name: string;                                    // Unique middleware identifier
+    contextGenerator: () => Context;                 // Factory function for middleware context
+    before?: (context: Context) => Promise<void>;   // Called before component rendering
+    complete?: (context: Context, result: React.ReactElement) => Promise<void>; // Called after successful render
+    failure?: (context: Context, error: unknown) => Promise<void>;              // Called when component fails
+    cleanup?: (context: Context) => Promise<void>;  // Always called for cleanup
+  }
+  ```
+
+**Returns:** Middleware instance for use with `createComponentLoader`
+
+**Middleware Lifecycle:**
+
+1. `contextGenerator()` - Creates isolated context for this middleware instance
+2. `before(context)` - Setup, validation, preparation
+3. **Target execution** (loader or component)
+4. `complete(context, result)` **OR** `failure(context, error)` - Result handling
+5. `cleanup(context)` - Always executed for resource cleanup
+
+## 🔄 Next.js Integration & Caching Behavior
+
+### Understanding ISR and Cache Behavior
+
+**Important**: The retry process might not be visible to users due to Next.js caching mechanisms.
+
+Next.js uses an ISR (Incremental Static Regeneration) approach similar to `stale-while-revalidate`:
+
+1. **No cache exists**: Request triggers rendering, then caches the result
+2. **Cache exists**: Returns cached content immediately
+3. **Revalidation triggered**:
+   - **Current request** gets the stale cached content
+   - **Background** performs new rendering
+   - **Next request** gets fresh content if rendering succeeded
+   - **Failed rendering** keeps stale cache and retries on next request
+
+This means users might not see retry processes because they're getting cached results.
+
+### When Will Users See Retries?
+
+Retries become visible in these scenarios:
+
+- **Dynamic rendering**: Using `force-dynamic` or functions like `headers()`, `cookies()`
+- **Fresh requests**: No cache exists yet
+- **Cache misses**: Cache expired and no stale content available
+
+```typescript
+// Example: Dynamic rendering where retries are visible
+import { headers } from 'next/headers';
+
+// Global loader with retry configuration
+const { loader } = createLoader(dependencies, {
+  retry: { maxCount: 3, canRetryOnError: true }, // Users will see these retries
+  timeout: { delay: 5000 }
+});
+
+async function DynamicUserPage({ id }: { id: string }) {
+  const headersList = await headers();
+  const userAgent = headersList.get('user-agent'); // Forces dynamic rendering
+
+  const [load] = loader(User({ id }));
+  const [userData] = await load();
+
+  return <div>Hello {userData.name}! (UA: {userAgent})</div>;
+}
+```
+
+## 🎯 Advanced Examples
+
+### Complex Resource Dependencies
+
+```typescript
+// Global loader instance
+const { loader } = createLoader(dependencies);
+
+// User resource
+const User = createResourceBuilder({
+  tags: (req: { id: string }) => ({ identifier: `user-${req.id}` }),
+  options: { staleTime: 300000 },
+  use: [],
+  load: async ({ req, fetch }) => {
+    const response = await fetch(`/api/users/${req.id}`);
+    return response.json();
+  },
+});
+
+// Posts with user dependency and hierarchical tags
+const UserPosts = createResourceBuilder({
+  tags: (req: { userId: string }) => ({
+    identifier: hierarchyTag('user', req.userId, 'posts'),
+    effects: ['activity-feed']
+  }),
+  options: { staleTime: 180000 },
+  use: [User({ id: req.userId })],
+  load: async ({ req, fetch, use: [user], retry }) => {
+    const userData = await user;
+
+    if (!userData.isActive) {
+      retry(); // Retry if user inactive
+    }
+
+    const response = await fetch(`/api/users/${req.userId}/posts`);
+    const posts = await response.json();
+
+    return {
+      posts,
+      author: userData.name,
+      totalPosts: posts.length
+    };
+  },
+});
+
+// Usage in server component
+async function UserDashboard({ userId }: { userId: string }) {
+  const [load, revalidate] = loader(
+    User({ id: userId }),
+    UserPosts({ userId })
+  );
+
+  const [userData, postsData] = await load();
+
+  return (
+    <div>
+      <h1>{userData.name}'s Dashboard</h1>
+      <p>{postsData.totalPosts} posts by {postsData.author}</p>
+      <form action={revalidate}>
+        <button>Refresh</button>
+      </form>
+    </div>
+  );
+}
+```
+
+### Error Handling and Fallbacks
+
+```typescript
+// Global loader with smart error handling
+const { loader } = createLoader(dependencies, {
+  retry: {
+    maxCount: 3,
+    canRetryOnError: (error) => error.status >= 500
+  },
+  timeout: { delay: 10000 }
+});
+
+// Product resource with multiple fallback strategies
+const Product = createResourceBuilder({
+  tags: (req: { id: string }) => ({
+    identifier: `product-${req.id}`,
+    effects: ['inventory']
+  }),
+  options: { staleTime: 120000 },
+  use: [],
+  load: async ({ req, fetch, retry, loaderOptions }) => {
+    const options = loaderOptions();
+
+    try {
+      const response = await fetch(`/api/products/${req.id}`);
+      if (!response.ok) {
+        if (response.status >= 500) retry();
+        throw new Error(`API Error: ${response.status}`);
+      }
+
+      const product = await response.json();
+
+      // Try to get live inventory, fallback to cached
+      let stock;
+      try {
+        const invResponse = await fetch(`/api/inventory/${req.id}`);
+        stock = invResponse.ok ? await invResponse.json() : product.cachedStock;
+      } catch {
+        stock = product.cachedStock;
+      }
+
+      return {
+        ...product,
+        stock,
+        available: stock > 0,
+        retries: options.retry.count
+      };
+
+    } catch (error) {
+      // Return error state with retry info
+      return {
+        id: req.id,
+        error: true,
+        message: error.message,
+        retries: options.retry.count,
+        stock: 0,
+        available: false
+      };
+    }
+  },
+});
+
+// Usage with error handling
+async function ProductPage({ id }: { id: string }) {
+  const [load, revalidate] = loader(Product({ id }));
+  const [product] = await load();
+
+  if (product.error) {
+    return (
+      <div>
+        <h1>Product Unavailable</h1>
+        <p>{product.message}</p>
+        <p>Retried {product.retries} times</p>
+        <form action={revalidate}>
+          <button>Try Again</button>
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <p>${product.price}</p>
+      <p>{product.available ? `${product.stock} in stock` : 'Out of stock'}</p>
+      {product.retries > 0 && <small>Loaded after {product.retries} retries</small>}
+    </div>
+  );
+}
+```
+
+### Component-Level Resilience
+
+```typescript
+import { createComponentLoader, middleware } from '@h1y/next-loader';
+
+// Performance monitoring middleware
+const perfMiddleware = middleware<React.ReactElement>().withOptions({
+  name: 'perf',
+  contextGenerator: () => ({ startTime: 0 }),
+  before: async (context) => {
+    context.startTime = Date.now();
+  },
+  complete: async (context) => {
+    console.log(`Rendered in ${Date.now() - context.startTime}ms`);
+  },
+});
+
+// Create component loader with middleware and fallback
+const { componentLoader, retryComponent, componentOptions } = createComponentLoader({
+  retry: {
+    maxCount: 3,
+    canRetryOnError: (error) => error.status >= 500,
+    fallback: <div>Loading dashboard...</div>
+  },
+  timeout: { delay: 10000 }
+}, [perfMiddleware]);
+
+// Dashboard component with manual retry logic
+async function UserDashboard({ userId }: { userId: string }) {
+  const options = componentOptions();
+
+  try {
+    const [profile, notifications] = await Promise.all([
+      fetch(`/api/users/${userId}/profile`).then(r => r.json()),
+      fetch(`/api/users/${userId}/notifications`).then(r => r.json())
+    ]);
+
+    // Trigger retry if data is stale
+    if (!profile.isActive && options.retry.count === 0) {
+      retryComponent();
+    }
+
+    return (
+      <div>
+        <h1>Welcome, {profile.name}!</h1>
+        <div>
+          <p>{notifications.length} notifications</p>
+          {options.retry.count > 0 && (
+            <small>Loaded after {options.retry.count} retries</small>
+          )}
+        </div>
+      </div>
+    );
+
+  } catch (error) {
+    return (
+      <div>
+        <h2>Dashboard Error</h2>
+        <p>{error.message}</p>
+        <p>Retried {options.retry.count} times</p>
+      </div>
+    );
+  }
+}
+
+// Export wrapped component
+export default componentLoader(UserDashboard);
+```
+
+## ⚠️ Important Considerations & Caveats
+
+### Middleware Context Access
+
+- **`createLoader()`**: Middleware context is **NOT accessible** from your server component
+- **`createComponentLoader()`**: Middleware context **IS accessible** from wrapped component using the `{name}MiddlewareOptions()` function returned from `createComponentLoader`
+
+### Context Propagation Limitations
+
+- **Fallback Elements**: Do not share context with the main component
+- **Children Components**: Context is not propagated to child components
+- **Isolated Execution**: Each retry creates a fresh execution context
+
+### Retry/Timeout Reset
+
+While you can reset retry and timeout programmatically, **it's not recommended** as it can lead to unpredictable behavior:
+
+```typescript
+// ❌ Not recommended
+const [load] = loader(SomeResource({ id: "123" }));
+await load();
+
+// Reset (not recommended)
+loaderOptions().retry.resetRetryCount();
+loaderOptions().timeout.resetTimeout();
+```
+
+## 🤔 FAQ
+
+### Q: Why don't I see retry attempts in my Next.js app?
+
+**A:** This is due to Next.js caching behavior. When content is cached, users get the cached version immediately while revalidation happens in the background. Retries are only visible during:
+
+- Dynamic rendering (using `force-dynamic` or dynamic functions)
+- Fresh requests without cache
+- Cache misses or expired content
+
+### Q: How can I make retry processes visible to users?
+
+**A:** Use dynamic rendering patterns:
+
+```typescript
+import { headers } from 'next/headers';
+
+// Global loader instance
+const { loader } = createLoader(dependencies, {
+  retry: { maxCount: 3, canRetryOnError: true }
+});
+
+async function DynamicComponent() {
+  await headers(); // Forces dynamic rendering
+
+  const [load] = loader(SomeResource({ id: '123' }));
+  const [data] = await load();
+  // Now retries will be visible to users
+
+  return <div>{data.content}</div>;
+}
+```
+
+Or use PPR to limit dynamic rendering to specific sections.
+
+### Q: What's the difference between `identifier` and `effects` in tags?
+
+**A:**
+
+- `identifier`: Primary cache tag for this specific resource
+- `effects`: Additional tags that should be invalidated when this resource changes
+
+```typescript
+tags: (req) => ({
+  identifier: `user-${req.id}`, // Specific to this user
+  effects: ["user-list", "activity-feed"], // Related caches to invalidate
+});
+```
+
+### Q: Can I use multiple resource builders with the same tags?
+
+**A:** Yes, but be careful about cache conflicts. Use hierarchical tags to organize related resources:
+
+```typescript
+const UserProfile = createResourceBuilder({
+  tags: (req: { id: string }) => ({
+    identifier: hierarchyTag("user", req.id, "profile"),
+  }),
+  options: { staleTime: 300000 },
+  use: [],
+  load: async ({ req, fetch }) => {
+    const response = await fetch(`/api/users/${req.id}/profile`);
+    return response.json();
+  },
+});
+
+const UserSettings = createResourceBuilder({
+  tags: (req: { id: string }) => ({
+    identifier: hierarchyTag("user", req.id, "settings"),
+  }),
+  options: { staleTime: 180000 },
+  use: [],
+  load: async ({ req, fetch }) => {
+    const response = await fetch(`/api/users/${req.id}/settings`);
+    return response.json();
+  },
+});
+```
+
+### Q: How do I optimize performance with many resources?
+
+**A:**
+
+1. **Use appropriate staleTime** values based on data freshness needs
+2. **Leverage hierarchical tags** for efficient invalidation
+3. **Batch related resources** in single loader calls
+4. **Consider PPR** to limit dynamic rendering scope
+
+### Q: When should I use componentLoader vs loader?
+
+**A:**
+
+- **Use `createLoader()`** for data fetching with caching (most common use case). **Always create loader instances globally** and reuse them across components.
+- **Use `createComponentLoader()`** when you need component-level retry behavior or access to middleware context within the component
+
+## 🙏 Related Packages
+
+This library is built on top of other packages in the @h1y ecosystem:
+
+- [@h1y/loader-core](https://github.com/h1ylabs/next-loader/tree/main/packages/loader-core) - Core loading functionality with retry/timeout
+- [@h1y/promise-aop](https://github.com/h1ylabs/next-loader/tree/main/packages/promise-aop) - Promise-based AOP framework
+- [@h1y/loader-tag](https://github.com/h1ylabs/next-loader/tree/main/packages/loader-tag) - Type-safe tagging utilities
+
+## 📄 License
+
+MIT © [h1ylabs](https://github.com/h1ylabs)
