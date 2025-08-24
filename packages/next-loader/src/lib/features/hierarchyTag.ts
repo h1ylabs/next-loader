@@ -1,15 +1,15 @@
 /**
  * Creates hierarchical cache tags by joining tags with forward slashes.
  * This allows for granular cache invalidation where parent tags can invalidate child resources.
- * 
+ *
  * @param tags - Array of string tags to create a hierarchy from
  * @returns Array of hierarchical tags where each tag includes all previous levels
- * 
+ *
  * @example
  * ```typescript
  * // Creates hierarchical tags: ['user', 'user/posts', 'user/posts/comments']
  * const tags = hierarchyTag('user', 'posts', 'comments');
- * 
+ *
  * // Usage in resource builder
  * const UserComments = createResourceBuilder({
  *   tags: (req) => ({ identifier: hierarchyTag('user', req.userId, 'comments') }),
