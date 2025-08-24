@@ -4,7 +4,7 @@
 
 A powerful, type-safe resource loading library specifically designed for Next.js applications. Build efficient data fetching with built-in caching, revalidation, retry logic, and seamless integration with Next.js server components.
 
-[한국어 문서 (Korean Documentation)](./docs/README-ko.md)
+[한국어 문서 (Korean Documentation)](https://github.com/h1ylabs/next-loader/tree/main/packages/next-loader/docs/README-ko.md)
 
 [![npm version](https://badge.fury.io/js/%40h1y%2Fnext-loader.svg)](https://badge.fury.io/js/%40h1y%2Fnext-loader)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -1137,9 +1137,9 @@ const UserSettings = createResourceBuilder({
 
 This library is built on top of other packages in the @h1y ecosystem:
 
-- [@h1y/loader-core](https://github.com/h1ylabs/next-loader/tree/main/packages/loader-core) - Core loading functionality with retry/timeout
+- [@h1y/loader-core](https://github.com/h1ylabs/next-loader/tree/main/packages/core) - Core loading functionality with retry/timeout
 - [@h1y/promise-aop](https://github.com/h1ylabs/next-loader/tree/main/packages/promise-aop) - Promise-based AOP framework
-- [@h1y/loader-tag](https://github.com/h1ylabs/next-loader/tree/main/packages/loader-tag) - Type-safe tagging utilities
+- [@h1y/loader-tag](https://github.com/h1ylabs/next-loader/tree/main/packages/tag) - Type-safe tagging utilities
 
 ## 📄 License
 
