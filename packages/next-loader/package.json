@@ -24,16 +24,6 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       }
-    },
-    "./utils": {
-      "require": {
-        "types": "./dist/utils/index.d.cts",
-        "default": "./dist/utils/index.cjs"
-      },
-      "import": {
-        "types": "./dist/utils/index.d.ts",
-        "default": "./dist/utils/index.js"
-      }
     }
   },
   "files": [
@@ -49,7 +39,8 @@
     "format:file": "prettier --cache --write",
     "check-types": "bash -c \"tsc --skipLibCheck --noEmit\"",
     "clean": "rimraf ./dist",
-    "lint": "eslint --cache --max-warnings=0"
+    "lint": "eslint --cache --max-warnings=0",
+    "test": "jest --coverage"
   },
   "devDependencies": {
     "@h1y/loader-config": "workspace:*",
@@ -65,8 +56,10 @@
     "typescript": "catalog:"
   },
   "peerDependencies": {
-    "next": ">=14.0.0",
     "react": ">=18.2.0",
     "react-dom": ">=18.2.0"
+  },
+  "dependencies": {
+    "@h1y/loader-core": "workspace:*"
   }
 }
