@@ -1,5 +1,7 @@
 # @h1y/next-loader
 
+**최신 버전: v2.0.0**
+
 Next.js 애플리케이션을 위해 특별히 설계된 강력하고 타입 안전한 리소스 로딩 라이브러리입니다. 내장된 캐싱, 재검증, 재시도 로직, 그리고 Next.js 서버 컴포넌트와의 원활한 통합을 통해 효율적인 데이터 페칭을 구현할 수 있습니다.
 
 [![npm version](https://badge.fury.io/js/%40h1y%2Fnext-loader.svg)](https://badge.fury.io/js/%40h1y%2Fnext-loader)
@@ -32,22 +34,22 @@ pnpm add @h1y/next-loader
 ### 1. 의존성 설정 및 전역 로더 생성
 
 ```typescript
-import { revalidateTag } from 'next/cache';
-import { cache } from 'react';
-import { createLoader, NextJSAdapter } from '@h1y/next-loader';
+import { revalidateTag } from "next/cache";
+import { cache } from "react";
+import { createLoader, NextJSAdapter } from "@h1y/next-loader";
 
 // 모듈 레벨에서 한 번 생성하여 어디서나 재사용
 const { loader } = createLoader({
   adapter: NextJSAdapter,
   revalidate: revalidateTag,
-  memo: cache // 요청 중복 제거
+  memo: cache, // 요청 중복 제거
 });
 ```
 
 ### 2. 리소스 정의
 
 ```typescript
-import { createResourceBuilder } from '@h1y/next-loader';
+import { createResourceBuilder } from "@h1y/next-loader";
 
 const User = createResourceBuilder({
   tags: (req: { id: string }) => ({ identifier: `user-${req.id}` }),
@@ -55,7 +57,7 @@ const User = createResourceBuilder({
   use: [],
   load: async ({ req, fetch }) => {
     const response = await fetch(`/api/users/${req.id}`);
-    if (!response.ok) throw new Error('사용자를 불러올 수 없습니다');
+    if (!response.ok) throw new Error("사용자를 불러올 수 없습니다");
     return response.json();
   },
 });
@@ -67,7 +69,7 @@ const User = createResourceBuilder({
 async function UserProfile({ params }: { params: { id: string } }) {
   const [load, revalidate] = loader(User({ id: params.id }));
   const [user] = await load();
-  
+
   return (
     <div>
       <h1>{user.name}</h1>
@@ -91,23 +93,23 @@ async function UserProfile({ params }: { params: { id: string } }) {
 ```typescript
 const BlogPost = createResourceBuilder({
   // 캐시 태그 정의
-  tags: (req: { slug: string }) => ({ 
+  tags: (req: { slug: string }) => ({
     identifier: `post-${req.slug}`,
-    effects: ['blog-content'] // 관련 캐시 무효화
+    effects: ["blog-content"], // 관련 캐시 무효화
   }),
-  
+
   // 캐싱 구성
   options: { staleTime: 600000 }, // 10분 캐시
-  
+
   // 의존성 선언
   use: [], // 이 리소스는 의존성이 없음
-  
+
   // 데이터 로드 방법 정의
   load: async ({ req, fetch, retry }) => {
     const response = await fetch(`/api/posts/${req.slug}`);
     if (!response.ok) {
       if (response.status >= 500) retry(); // 서버 오류 시 재시도
-      throw new Error('게시글을 불러올 수 없습니다');
+      throw new Error("게시글을 불러올 수 없습니다");
     }
     return response.json();
   },
@@ -115,6 +117,7 @@ const BlogPost = createResourceBuilder({
 ```
 
 **주요 장점:**
+
 - **선언적**: 어떻게가 아닌 무엇을 원하는지 정의
 - **조합 가능**: 리소스끼리 의존 관계 형성 가능
 - **캐시 가능**: 세밀한 제어가 가능한 자동 캐싱
@@ -125,6 +128,7 @@ const BlogPost = createResourceBuilder({
 @h1y/next-loader는 서로 다른 용도에 따라 두 가지 접근법을 제공합니다:
 
 #### `createLoader()` - 데이터 페칭용
+
 **언제 사용**: 서버 컴포넌트에서 데이터 로딩 (가장 일반적인 사용 사례)
 
 ```typescript
@@ -138,11 +142,13 @@ async function UserPage() {
 ```
 
 **특징:**
+
 - ✅ 캐싱을 통한 데이터 페칭에 완벽
 - ❌ 컴포넌트에서 미들웨어 컨텍스트 접근 불가
 - 🔧 기본값: 60초 타임아웃, 재시도 없음
 
 #### `createComponentLoader()` - 컴포넌트 복원력용
+
 **언제 사용**: 컴포넌트 자체에 재시도/타임아웃 동작 추가
 
 ```typescript
@@ -160,6 +166,7 @@ export default componentLoader(RiskyComponent);
 ```
 
 **특징:**
+
 - ✅ 컴포넌트 레벨 재시도 및 타임아웃 처리
 - ✅ `{name}MiddlewareOptions()`를 통한 미들웨어 컨텍스트 접근 가능
 - 🔧 기본값: 무한 타임아웃, 재시도 없음
@@ -169,27 +176,35 @@ export default componentLoader(RiskyComponent);
 계층적 태그로 정밀한 제어가 가능한 캐시 무효화 전략을 구성하세요:
 
 ```typescript
-import { hierarchyTag } from '@h1y/next-loader';
+import { hierarchyTag } from "@h1y/next-loader";
 
 const UserComments = createResourceBuilder({
-  tags: (req: { userId: string, postId: string }) => ({
-    identifier: hierarchyTag('user', req.userId, 'posts', req.postId, 'comments')
+  tags: (req: { userId: string; postId: string }) => ({
+    identifier: hierarchyTag(
+      "user",
+      req.userId,
+      "posts",
+      req.postId,
+      "comments",
+    ),
   }),
   // ... 기타 설정
 });
 ```
 
 **작동 원리:**
+
 ```typescript
 // hierarchyTag('user', '123', 'posts', '456', 'comments')는 다음을 생성:
 // ['user', 'user/123', 'user/123/posts', 'user/123/posts/456', 'user/123/posts/456/comments']
 ```
 
 **모든 레벨에서 무효화 가능:**
+
 ```typescript
-revalidateTag('user');                    // 모든 사용자 데이터
-revalidateTag('user/123/posts');          // 사용자 123의 모든 게시물
-revalidateTag('user/123/posts/456');      // 특정 게시물
+revalidateTag("user"); // 모든 사용자 데이터
+revalidateTag("user/123/posts"); // 사용자 123의 모든 게시물
+revalidateTag("user/123/posts/456"); // 특정 게시물
 ```
 
 ## 🎯 고급 예제
@@ -220,12 +235,12 @@ const UserPosts = createResourceBuilder({
   use: [User({ id: req.userId })], // 의존성 선언
   load: async ({ req, fetch, use: [user] }) => {
     const userData = await user;
-    
+
     // 비활성 사용자는 로딩 생략
     if (!userData.isActive) {
       return { posts: [], reason: '사용자 비활성' };
     }
-    
+
     const response = await fetch(`/api/users/${req.userId}/posts`);
     return {
       posts: await response.json(),
@@ -240,9 +255,9 @@ async function UserDashboard({ userId }: { userId: string }) {
     User({ id: userId }),
     UserPosts({ userId })
   );
-  
+
   const [user, posts] = await load();
-  
+
   return (
     <div>
       <h1>{user.name}님의 대시보드</h1>
@@ -259,11 +274,11 @@ async function UserDashboard({ userId }: { userId: string }) {
 
 ```typescript
 const { loader } = createLoader(dependencies, {
-  retry: { 
-    maxCount: 3, 
-    canRetryOnError: (error) => error.status >= 500 // 서버 오류만 재시도
+  retry: {
+    maxCount: 3,
+    canRetryOnError: (error) => error.status >= 500, // 서버 오류만 재시도
   },
-  timeout: { delay: 10000 }
+  timeout: { delay: 10000 },
 });
 
 const Product = createResourceBuilder({
@@ -277,17 +292,17 @@ const Product = createResourceBuilder({
         if (response.status >= 500) retry(); // 서버 오류 시 재시도 트리거
         throw new Error(`제품을 찾을 수 없습니다: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       const options = loaderOptions();
-      
+
       // 재시도 정보와 함께 오류 상태 반환
       return {
         id: req.id,
         error: true,
         message: error.message,
-        retryCount: options.retry.count
+        retryCount: options.retry.count,
       };
     }
   },
@@ -301,6 +316,7 @@ const Product = createResourceBuilder({
 ### 미들웨어를 사용하는 이유
 
 **미들웨어**는 깨끗한 관심사 분리를 제공합니다:
+
 - **단순화된 API**: 일반적인 패턴을 위한 사용하기 쉬운 인터페이스
 - **타입 안전성**: 자동 컨텍스트 추론을 통한 완전한 TypeScript 지원
 - **통합**: Next.js 캐싱과의 원활한 통합
@@ -311,71 +327,70 @@ const Product = createResourceBuilder({
 #### 데이터 로더용
 
 ```typescript
-import { createLoaderMiddleware } from '@h1y/next-loader';
+import { createLoaderMiddleware } from "@h1y/next-loader";
 
 // 성능 모니터링 미들웨어
 const performanceMiddleware = createLoaderMiddleware({
-  name: 'performance',
+  name: "performance",
   contextGenerator: () => ({ startTime: 0 }),
-  
+
   before: async (context) => {
     context.startTime = performance.now();
-    console.log('🚀 로딩 시작');
+    console.log("🚀 로딩 시작");
   },
-  
+
   complete: async (context, result) => {
     const duration = performance.now() - context.startTime;
     console.log(`✅ 완료 ${duration.toFixed(2)}ms`);
   },
-  
+
   failure: async (context, error) => {
     const duration = performance.now() - context.startTime;
     console.error(`❌ 실패 ${duration.toFixed(2)}ms 후:`, error.message);
-  }
+  },
 });
 
 // 로더에 적용
 const { loader } = createLoader(dependencies, loaderConfig, [
-  performanceMiddleware
+  performanceMiddleware,
 ]);
 ```
 
 #### 컴포넌트 로더용
 
 ```typescript
-import { createComponentMiddleware } from '@h1y/next-loader';
+import { createComponentMiddleware } from "@h1y/next-loader";
 
 // 메트릭 수집 미들웨어
 const metricsMiddleware = createComponentMiddleware({
-  name: 'metrics',
-  contextGenerator: () => ({ renderStart: 0, componentName: 'Unknown' }),
-  
+  name: "metrics",
+  contextGenerator: () => ({ renderStart: 0, componentName: "Unknown" }),
+
   before: async (context) => {
     context.renderStart = Date.now();
   },
-  
+
   complete: async (context) => {
     const renderTime = Date.now() - context.renderStart;
-    analytics.track('component.render.success', {
+    analytics.track("component.render.success", {
       component: context.componentName,
-      renderTimeMs: renderTime
+      renderTimeMs: renderTime,
     });
   },
-  
+
   failure: async (context, error) => {
-    analytics.track('component.render.failure', {
+    analytics.track("component.render.failure", {
       component: context.componentName,
-      error: error.message
+      error: error.message,
     });
-  }
+  },
 });
 
 // 컴포넌트 로더에 적용
 const { componentLoader } = createComponentLoader(componentConfig, [
-  metricsMiddleware
+  metricsMiddleware,
 ]);
 ```
-
 
 ### 고급 미들웨어 패턴
 
@@ -383,45 +398,44 @@ const { componentLoader } = createComponentLoader(componentConfig, [
 
 ```typescript
 const conditionalMiddleware = createLoaderMiddleware({
-  name: 'conditional-logging',
+  name: "conditional-logging",
   contextGenerator: () => ({ shouldLog: false }),
-  
+
   before: async (context) => {
     // 개발 환경이거나 디버그 플래그가 설정된 경우에만 로깅
-    context.shouldLog = process.env.NODE_ENV === 'development' || 
-                       process.env.DEBUG === 'true';
-    
+    context.shouldLog =
+      process.env.NODE_ENV === "development" || process.env.DEBUG === "true";
+
     if (context.shouldLog) {
-      console.log('🔍 디버그 모드: 로더 시작');
+      console.log("🔍 디버그 모드: 로더 시작");
     }
   },
-  
+
   complete: async (context, result) => {
     if (context.shouldLog) {
-      console.log('🔍 디버그 모드: 로더 결과:', result);
+      console.log("🔍 디버그 모드: 로더 결과:", result);
     }
-  }
+  },
 });
 ```
-
 
 #### 오류 복구 미들웨어
 
 ```typescript
 const errorRecoveryMiddleware = createLoaderMiddleware({
-  name: 'error-recovery',
+  name: "error-recovery",
   contextGenerator: () => ({ fallbackUsed: false }),
-  
+
   failure: async (context, error) => {
     // 특정 오류 유형에 대해서만 복구 시도
     if (error instanceof NetworkError && !context.fallbackUsed) {
       context.fallbackUsed = true;
-      console.warn('네트워크 오류 감지됨, 폴백 전략 시도 중');
-      
+      console.warn("네트워크 오류 감지됨, 폴백 전략 시도 중");
+
       // 여기서 재시도를 트리거하거나 폴백 데이터를 설정할 수 있습니다
       // 이것은 단순히 실패를 로깅/모니터링하기 위한 것입니다
     }
-  }
+  },
 });
 ```
 
@@ -431,19 +445,19 @@ const errorRecoveryMiddleware = createLoaderMiddleware({
 
 ```typescript
 const middlewareA = createLoaderMiddleware({
-  name: 'middleware-a',
-  contextGenerator: () => ({ data: 'A' }),
+  name: "middleware-a",
+  contextGenerator: () => ({ data: "A" }),
   complete: async (context, result) => {
-    context.data = 'Modified A'; // 미들웨어 A의 컨텍스트에만 영향
-  }
+    context.data = "Modified A"; // 미들웨어 A의 컨텍스트에만 영향
+  },
 });
 
 const middlewareB = createLoaderMiddleware({
-  name: 'middleware-b', 
-  contextGenerator: () => ({ data: 'B' }),
+  name: "middleware-b",
+  contextGenerator: () => ({ data: "B" }),
   complete: async (context, result) => {
     console.log(context.data); // 항상 'B'를 로그, 미들웨어 A의 영향 받지 않음
-  }
+  },
 });
 ```
 
@@ -463,6 +477,7 @@ const middlewareB = createLoaderMiddleware({
 리소스를 페치하고 캐시하기 위한 전역 데이터 로더를 생성합니다.
 
 **의존성** (필수):
+
 ```typescript
 {
   adapter: NextJSAdapter,        // 데이터 페칭 통합
@@ -472,6 +487,7 @@ const middlewareB = createLoaderMiddleware({
 ```
 
 **옵션** (선택):
+
 ```typescript
 {
   retry: {
@@ -492,7 +508,8 @@ const middlewareB = createLoaderMiddleware({
 
 **반환값:** `{ loader }` - 로더 함수
 }
-```
+
+````
 
 **예제:**
 ```typescript
@@ -500,13 +517,14 @@ const { loader } = createLoader(
   { adapter: NextJSAdapter, revalidate: revalidateTag },
   { retry: { maxCount: 3, canRetryOnError: (error) => error.status >= 500 } }
 );
-```
+````
 
 ### `createComponentLoader(options?, middlewares?)`
 
 재시도 및 타임아웃 동작으로 서버 컴포넌트를 래핑합니다.
 
 **옵션** (선택):
+
 ```typescript
 {
   retry: {
@@ -525,18 +543,22 @@ const { loader } = createLoader(
 ```
 
 **반환값:**
+
 - `componentLoader`: 컴포넌트를 래핑하는 함수
 - `retryComponent`: 수동 재시도 트리거
 - `componentOptions`: 현재 상태 접근
-    timeout: {
-      delay: number;                                 // 밀리초 단위 타임아웃 (기본값: Infinity)
-      onTimeout?: () => void;                        // 타임아웃 발생 시 호출됨
-    };
-    backoff?: {
-      strategy: Backoff;                             // 재시도 지연을 위한 백오프 전략
-      initialDelay: number;                          // 첫 번째 재시도 전 초기 지연 시간
-    };
+  timeout: {
+  delay: number; // 밀리초 단위 타임아웃 (기본값: Infinity)
+  onTimeout?: () => void; // 타임아웃 발생 시 호출됨
+  };
+  backoff?: {
+  strategy: Backoff; // 재시도 지연을 위한 백오프 전략
+  initialDelay: number; // 첫 번째 재시도 전 초기 지연 시간
+  };
   }
+
+  ```
+
   ```
 
 - `middlewares?`: **선택적** `createComponentMiddleware`로 생성된 컴포넌트 미들웨어 인스턴스 배열. 컴포넌트 렌더링 주변에서 생명주기 훅을 제공
@@ -546,10 +568,10 @@ const { loader } = createLoader(
 ```typescript
 // 전역으로 컴포넌트 로더 생성
 const { componentLoader, retryComponent, componentOptions, componentState } = createComponentLoader({
-  retry: { 
-    maxCount: 2, 
+  retry: {
+    maxCount: 2,
     canRetryOnError: true,
-    fallback: <div>로딩 중...</div> 
+    fallback: <div>로딩 중...</div>
   },
   timeout: { delay: 30000 }
 });
@@ -577,14 +599,14 @@ export default componentLoader(UserProfile);
       identifier: string;                            // 이 리소스의 기본 캐시 태그
       effects?: string[];                            // 이 리소스가 변경될 때 무효화할 추가 태그
     };
-    
+
     options: {
       staleTime: number;                             // 밀리초 단위 캐시 지속 시간
       revalidate?: boolean | number;                 // Next.js 재검증 설정
     };
-    
+
     use: ResourceBuilder[];                          // 먼저 로드해야 하는 의존 리소스 배열
-    
+
     load: (context: {                                // 데이터 페칭 함수
       req: Request;                                  // 리소스에 전달된 요청 매개변수
       fetch: typeof fetch;                           // Next.js 캐시 통합이 포함된 향상된 fetch 함수
@@ -597,29 +619,29 @@ export default componentLoader(UserProfile);
 
 ```typescript
 const UserPosts = createResourceBuilder({
-  tags: (req: { userId: string }) => ({ 
-    identifier: hierarchyTag('user', req.userId, 'posts')
+  tags: (req: { userId: string }) => ({
+    identifier: hierarchyTag("user", req.userId, "posts"),
   }),
   options: { staleTime: 180000 }, // 3분
   use: [User({ id: req.userId })], // User 리소스에 의존
   load: async ({ req, fetch, use: [user] }) => {
     // 의존성을 구조분해하고 기다림
     const userData = await user;
-    
+
     // 사용자가 활성 상태일 때만 게시물 페치
     if (!userData.isActive) {
-      return { posts: [], reason: '사용자가 비활성 상태입니다' };
+      return { posts: [], reason: "사용자가 비활성 상태입니다" };
     }
-    
+
     const response = await fetch(`/api/users/${req.userId}/posts`);
     const posts = await response.json();
-    
+
     return {
       posts,
       userInfo: {
         name: userData.name,
-        memberSince: userData.createdAt
-      }
+        memberSince: userData.createdAt,
+      },
     };
   },
 });
@@ -630,32 +652,34 @@ const UserPosts = createResourceBuilder({
 세밀한 무효화 전략을 위한 계층적 캐시 태그를 생성합니다.
 
 **매개변수:**
+
 - `...tags`: **필수** 계층 경로를 형성하는 가변 개수의 문자열 인수
 
 **반환값:** `string[]` - 가장 일반적인 것부터 가장 구체적인 것까지의 계층적 캐시 태그 배열
 
 **동작:**
+
 - 각 레벨을 `/`로 연결하여 누적 태그를 생성합니다
 - 계층의 모든 레벨에서 무효화를 활성화합니다
 - 각 레벨에는 모든 상위 레벨이 포함됩니다
 
 ```typescript
-// 생성: ['api', 'api/v1', 'api/v1/users', 'api/v1/users/123']  
-const tags = hierarchyTag('api', 'v1', 'users', '123');
+// 생성: ['api', 'api/v1', 'api/v1/users', 'api/v1/users/123']
+const tags = hierarchyTag("api", "v1", "users", "123");
 
 // 리소스 빌더에서 사용
 const UserProfile = createResourceBuilder({
   tags: (req: { userId: string }) => ({
-    identifier: hierarchyTag('user', req.userId, 'profile')[3], // 가장 구체적: 'user/123/profile'
-    effects: hierarchyTag('user', req.userId)                   // 모든 레벨: ['user', 'user/123']
+    identifier: hierarchyTag("user", req.userId, "profile")[3], // 가장 구체적: 'user/123/profile'
+    effects: hierarchyTag("user", req.userId), // 모든 레벨: ['user', 'user/123']
   }),
   // ... 나머지 구성
 });
 
 // 무효화 예제:
-revalidateTag('user');           // 모든 사용자 관련 데이터 무효화
-revalidateTag('user/123');       // 사용자 123의 모든 데이터 무효화
-revalidateTag('user/123/profile'); // 사용자 123의 프로필만 무효화
+revalidateTag("user"); // 모든 사용자 관련 데이터 무효화
+revalidateTag("user/123"); // 사용자 123의 모든 데이터 무효화
+revalidateTag("user/123/profile"); // 사용자 123의 프로필만 무효화
 ```
 
 ### 백오프 전략
@@ -665,18 +689,18 @@ revalidateTag('user/123/profile'); // 사용자 123의 프로필만 무효화
 ```typescript
 import {
   FIXED_BACKOFF,
-  LINEAR_BACKOFF, 
-  EXPONENTIAL_BACKOFF
-} from '@h1y/next-loader'; // loader-core에서 재내보냄
+  LINEAR_BACKOFF,
+  EXPONENTIAL_BACKOFF,
+} from "@h1y/next-loader"; // loader-core에서 재내보냄
 ```
 
 **사용 가능한 전략:**
 
-| 전략 | 함수 | 설명 | 예제 지연 시간 |
-|----------|----------|-------------|----------------|
-| **고정** | `FIXED_BACKOFF` | 모든 재시도 간 동일한 지연 시간 | 1000ms, 1000ms, 1000ms |
-| **선형** | `LINEAR_BACKOFF(increment)` | 지연 시간이 선형적으로 증가 | 1000ms, 2000ms, 3000ms |
-| **지수** | `EXPONENTIAL_BACKOFF(multiplier)` | 지연 시간이 지수적으로 증가 | 1000ms, 2000ms, 4000ms |
+| 전략     | 함수                              | 설명                            | 예제 지연 시간         |
+| -------- | --------------------------------- | ------------------------------- | ---------------------- |
+| **고정** | `FIXED_BACKOFF`                   | 모든 재시도 간 동일한 지연 시간 | 1000ms, 1000ms, 1000ms |
+| **선형** | `LINEAR_BACKOFF(increment)`       | 지연 시간이 선형적으로 증가     | 1000ms, 2000ms, 3000ms |
+| **지수** | `EXPONENTIAL_BACKOFF(multiplier)` | 지연 시간이 지수적으로 증가     | 1000ms, 2000ms, 4000ms |
 
 **사용 예제:**
 
@@ -690,7 +714,7 @@ const { loader } = createLoader(dependencies, {
   }
 });
 
-// 선형 백오프: 1초, 3초, 5초 지연  
+// 선형 백오프: 1초, 3초, 5초 지연
 const { loader } = createLoader(dependencies, {
   retry: { maxCount: 3, canRetryOnError: true },
   backoff: {
@@ -710,8 +734,8 @@ const { loader } = createLoader(dependencies, {
 
 // 지수 백오프를 사용하는 컴포넌트 로더
 const { componentLoader } = createComponentLoader({
-  retry: { 
-    maxCount: 3, 
+  retry: {
+    maxCount: 3,
     canRetryOnError: true,
     fallback: <div>재시도 중...</div>
   },
@@ -772,6 +796,7 @@ const { componentLoader } = createComponentLoader({
 **반환값:** `createComponentLoader`와 함께 사용할 미들웨어 인스턴스
 
 **미들웨어 생명주기:**
+
 1. `contextGenerator()` - 이 미들웨어 인스턴스를 위한 격리된 컨텍스트 생성
 2. `before(context)` - 설정, 검증, 준비
 3. **대상 실행** (로더 또는 컴포넌트)
@@ -788,7 +813,7 @@ Next.js는 `stale-while-revalidate`와 유사한 ISR(Incremental Static Regenera
 
 1. **캐시가 없는 경우**: 요청이 렌더링을 트리거한 다음 결과를 캐시합니다
 2. **캐시가 있는 경우**: 캐시된 콘텐츠를 즉시 반환합니다
-3. **재검증이 트리거된 경우**: 
+3. **재검증이 트리거된 경우**:
    - **현재 요청**은 오래된 캐시된 콘텐츠를 받습니다
    - **백그라운드**에서 새로운 렌더링을 수행합니다
    - **다음 요청**은 렌더링이 성공한 경우 새로운 콘텐츠를 받습니다
@@ -817,10 +842,10 @@ const { loader } = createLoader(dependencies, {
 async function DynamicUserPage({ id }: { id: string }) {
   const headersList = await headers();
   const userAgent = headersList.get('user-agent'); // 동적 렌더링 강제
-  
+
   const [load] = loader(User({ id }));
   const [userData] = await load();
-  
+
   return <div>안녕하세요 {userData.name}님! (UA: {userAgent})</div>;
 }
 ```
@@ -854,14 +879,14 @@ const UserPosts = createResourceBuilder({
   use: [User({ id: req.userId })],
   load: async ({ req, fetch, use: [user], retry }) => {
     const userData = await user;
-    
+
     if (!userData.isActive) {
       retry(); // 사용자가 비활성 상태면 재시도
     }
-    
+
     const response = await fetch(`/api/users/${req.userId}/posts`);
     const posts = await response.json();
-    
+
     return {
       posts,
       author: userData.name,
@@ -876,9 +901,9 @@ async function UserDashboard({ userId }: { userId: string }) {
     User({ id: userId }),
     UserPosts({ userId })
   );
-  
+
   const [userData, postsData] = await load();
-  
+
   return (
     <div>
       <h1>{userData.name}님의 대시보드</h1>
@@ -896,8 +921,8 @@ async function UserDashboard({ userId }: { userId: string }) {
 ```typescript
 // 스마트 오류 처리를 가진 전역 로더
 const { loader } = createLoader(dependencies, {
-  retry: { 
-    maxCount: 3, 
+  retry: {
+    maxCount: 3,
     canRetryOnError: (error) => error.status >= 500
   },
   timeout: { delay: 10000 }
@@ -905,24 +930,24 @@ const { loader } = createLoader(dependencies, {
 
 // 여러 폴백 전략을 가진 제품 리소스
 const Product = createResourceBuilder({
-  tags: (req: { id: string }) => ({ 
+  tags: (req: { id: string }) => ({
     identifier: `product-${req.id}`,
-    effects: ['inventory'] 
+    effects: ['inventory']
   }),
   options: { staleTime: 120000 },
   use: [],
   load: async ({ req, fetch, retry, loaderOptions }) => {
     const options = loaderOptions();
-    
+
     try {
       const response = await fetch(`/api/products/${req.id}`);
       if (!response.ok) {
         if (response.status >= 500) retry();
         throw new Error(`API 오류: ${response.status}`);
       }
-      
+
       const product = await response.json();
-      
+
       // 실시간 재고를 가져오려고 시도, 캐시된 것으로 폴백
       let stock;
       try {
@@ -931,14 +956,14 @@ const Product = createResourceBuilder({
       } catch {
         stock = product.cachedStock;
       }
-      
+
       return {
         ...product,
         stock,
         available: stock > 0,
         retries: options.retry.count
       };
-      
+
     } catch (error) {
       // 재시도 정보와 함께 오류 상태 반환
       return {
@@ -957,7 +982,7 @@ const Product = createResourceBuilder({
 async function ProductPage({ id }: { id: string }) {
   const [load, revalidate] = loader(Product({ id }));
   const [product] = await load();
-  
+
   if (product.error) {
     return (
       <div>
@@ -970,7 +995,7 @@ async function ProductPage({ id }: { id: string }) {
       </div>
     );
   }
-  
+
   return (
     <div>
       <h1>{product.name}</h1>
@@ -1001,8 +1026,8 @@ const perfMiddleware = middleware<React.ReactElement>().withOptions({
 
 // 미들웨어와 폴백을 가진 컴포넌트 로더 생성
 const { componentLoader, retryComponent, componentOptions } = createComponentLoader({
-  retry: { 
-    maxCount: 3, 
+  retry: {
+    maxCount: 3,
     canRetryOnError: (error) => error.status >= 500,
     fallback: <div>대시보드 로딩 중...</div>
   },
@@ -1012,18 +1037,18 @@ const { componentLoader, retryComponent, componentOptions } = createComponentLoa
 // 수동 재시도 로직을 가진 대시보드 컴포넌트
 async function UserDashboard({ userId }: { userId: string }) {
   const options = componentOptions();
-  
+
   try {
     const [profile, notifications] = await Promise.all([
       fetch(`/api/users/${userId}/profile`).then(r => r.json()),
       fetch(`/api/users/${userId}/notifications`).then(r => r.json())
     ]);
-    
+
     // 데이터가 오래되었으면 재시도 트리거
     if (!profile.isActive && options.retry.count === 0) {
       retryComponent();
     }
-    
+
     return (
       <div>
         <h1>환영합니다, {profile.name}님!</h1>
@@ -1035,7 +1060,7 @@ async function UserDashboard({ userId }: { userId: string }) {
         </div>
       </div>
     );
-    
+
   } catch (error) {
     return (
       <div>
@@ -1070,7 +1095,7 @@ export default componentLoader(UserDashboard);
 
 ```typescript
 // ❌ 권장하지 않음
-const [load] = loader(SomeResource({ id: '123' }));
+const [load] = loader(SomeResource({ id: "123" }));
 await load();
 
 // 재설정 (권장하지 않음)
@@ -1083,6 +1108,7 @@ loaderOptions().timeout.resetTimeout();
 ### Q: Next.js 앱에서 재시도 시도가 왜 보이지 않나요?
 
 **A:** 이는 Next.js 캐싱 동작 때문입니다. 콘텐츠가 캐시되면 사용자는 재검증이 백그라운드에서 일어나는 동안 캐시된 버전을 즉시 받습니다. 재시도는 다음과 같은 경우에만 보입니다:
+
 - 동적 렌더링 (`force-dynamic` 사용 또는 동적 함수 사용)
 - 캐시가 없는 새로운 요청
 - 캐시 누락 또는 만료된 콘텐츠
@@ -1101,11 +1127,11 @@ const { loader } = createLoader(dependencies, {
 
 async function DynamicComponent() {
   await headers(); // 동적 렌더링 강제
-  
+
   const [load] = loader(SomeResource({ id: '123' }));
   const [data] = await load();
   // 이제 재시도가 사용자에게 보일 것입니다
-  
+
   return <div>{data.content}</div>;
 }
 ```
@@ -1114,15 +1140,16 @@ async function DynamicComponent() {
 
 ### Q: 태그에서 `identifier`와 `effects`의 차이점은 무엇인가요?
 
-**A:** 
+**A:**
+
 - `identifier`: 이 특정 리소스의 기본 캐시 태그
 - `effects`: 이 리소스가 변경될 때 무효화되어야 하는 추가 태그
 
 ```typescript
 tags: (req) => ({
   identifier: `user-${req.id}`, // 이 사용자에 특정됨
-  effects: ['user-list', 'activity-feed'] // 무효화할 관련 캐시
-})
+  effects: ["user-list", "activity-feed"], // 무효화할 관련 캐시
+});
 ```
 
 ### Q: 동일한 태그를 가진 여러 리소스 빌더를 사용할 수 있나요?
@@ -1131,33 +1158,34 @@ tags: (req) => ({
 
 ```typescript
 const UserProfile = createResourceBuilder({
-  tags: (req: { id: string }) => ({ 
-    identifier: hierarchyTag('user', req.id, 'profile') 
+  tags: (req: { id: string }) => ({
+    identifier: hierarchyTag("user", req.id, "profile"),
   }),
   options: { staleTime: 300000 },
   use: [],
   load: async ({ req, fetch }) => {
     const response = await fetch(`/api/users/${req.id}/profile`);
     return response.json();
-  }
+  },
 });
 
 const UserSettings = createResourceBuilder({
-  tags: (req: { id: string }) => ({ 
-    identifier: hierarchyTag('user', req.id, 'settings') 
+  tags: (req: { id: string }) => ({
+    identifier: hierarchyTag("user", req.id, "settings"),
   }),
   options: { staleTime: 180000 },
   use: [],
   load: async ({ req, fetch }) => {
     const response = await fetch(`/api/users/${req.id}/settings`);
     return response.json();
-  }
+  },
 });
 ```
 
 ### Q: 많은 리소스로 성능을 어떻게 최적화하나요?
 
 **A:**
+
 1. 데이터 신선도 요구사항에 따라 **적절한 staleTime** 값 사용
 2. 효율적인 무효화를 위해 **계층적 태그** 활용
 3. 단일 로더 호출에서 **관련 리소스 일괄 처리**
@@ -1165,7 +1193,8 @@ const UserSettings = createResourceBuilder({
 
 ### Q: componentLoader vs loader를 언제 사용해야 하나요?
 
-**A:** 
+**A:**
+
 - 캐싱을 통한 데이터 페칭에는 **`createLoader()` 사용** (가장 일반적인 사용 사례). **항상 로더 인스턴스를 전역으로 생성**하고 컴포넌트 간에 재사용하세요.
 - 컴포넌트 레벨 재시도 동작이나 컴포넌트 내에서 미들웨어 컨텍스트에 대한 접근이 필요할 때 **`createComponentLoader()` 사용**
 
@@ -1180,4 +1209,3 @@ const UserSettings = createResourceBuilder({
 ## 📄 라이선스
 
 MIT © [h1ylabs](https://github.com/h1ylabs)
-
