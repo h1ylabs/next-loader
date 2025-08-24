@@ -1,5 +1,7 @@
 # @h1y/loader-core
 
+**최신 버전: v1.1.0**
+
 내장된 retry, timeout, backoff 전략을 갖춘 견고한 Promise AOP 기반 loader 라이브러리입니다. [@h1y/promise-aop](https://github.com/h1ylabs/next-loader/tree/main/packages/promise-aop) 위에 구축된 이 core 라이브러리는 middleware 지원과 함께 탄력적인 비동기 작업을 생성하기 위한 기반을 제공합니다.
 
 ## 설치
@@ -89,12 +91,8 @@ const { execute } = loader().withOptions({
 });
 
 // 다른 API endpoint에 재사용
-const users = await execute(() =>
-  fetch("/api/users").then((r) => r.json()),
-);
-const posts = await execute(() =>
-  fetch("/api/posts").then((r) => r.json()),
-);
+const users = await execute(() => fetch("/api/users").then((r) => r.json()));
+const posts = await execute(() => fetch("/api/posts").then((r) => r.json()));
 const comments = await execute(() =>
   fetch("/api/comments").then((r) => r.json()),
 );
@@ -125,9 +123,7 @@ const { execute: robustExecute } = loader().withOptions({
 
 // 작업의 중요도에 따라 적절한 loader 사용
 const quickData = await fastExecute(() => getCacheableData());
-const criticalData = await robustExecute(() =>
-  getBusinessCriticalData(),
-);
+const criticalData = await robustExecute(() => getBusinessCriticalData());
 ```
 
 #### 효율적인 Batch 작업
@@ -161,15 +157,16 @@ Loader는 동시에 발생하는 여러 실패를 관리하기 위해 정교한 
 ```typescript
 // Signal 우선순위 (명확성을 위한 이진 표현)
 const MIDDLEWARE_INVALID_SIGNAL_PRIORITY = 0b1000_0000_0000_0000; // 32768
-const TIMEOUT_SIGNAL_PRIORITY =            0b0100_0000_0000_0000; // 16384  
-const RETRY_EXCEEDED_SIGNAL_PRIORITY =     0b0010_0000_0000_0000; // 8192
-const RETRY_SIGNAL_PRIORITY =              0b0001_0000_0000_0000; // 4096
-const ERROR_PRIORITY =                     0b0000_0000_0000_0000; // 0
+const TIMEOUT_SIGNAL_PRIORITY = 0b0100_0000_0000_0000; // 16384
+const RETRY_EXCEEDED_SIGNAL_PRIORITY = 0b0010_0000_0000_0000; // 8192
+const RETRY_SIGNAL_PRIORITY = 0b0001_0000_0000_0000; // 4096
+const ERROR_PRIORITY = 0b0000_0000_0000_0000; // 0
 ```
 
 **우선순위 순서 (높은 순):**
+
 1. **`MiddlewareInvalidContextSignal`** - 중요한 시스템 error, middleware context 손상
-2. **`TimeoutSignal`** - 작업 timeout, 시간에 민감한 실패  
+2. **`TimeoutSignal`** - 작업 timeout, 시간에 민감한 실패
 3. **`RetryExceededSignal`** - 모든 retry 시도 소진
 4. **`RetrySignal`** - Retry 시도 요청
 5. **일반 `Error`** - Application level error
@@ -187,7 +184,7 @@ async determineError({ errors }) {
 
   // Error를 우선순위로 정렬 (signal 우선, 그 다음 우선순위 값으로)
   const prioritizedErrors = errors
-    .map((error) => 
+    .map((error) =>
       Signal.isSignal(error)
         ? [error.priority, error]  // Signal의 우선순위 사용
         : [ERROR_PRIORITY, error]  // 일반 error는 최저 우선순위
@@ -204,8 +201,8 @@ async determineError({ errors }) {
 
   // Signal이 없으면, 사용자 제공 onDetermineError에 위임
   // 또는 첫 번째 error를 기본값으로 사용
-  return onDetermineError 
-    ? await onDetermineError(errors) 
+  return onDetermineError
+    ? await onDetermineError(errors)
     : highestPriorityError;
 }
 ```
@@ -215,6 +212,7 @@ async determineError({ errors }) {
 시스템은 **Signal**과 일반 **Error**를 다르게 처리합니다:
 
 **Signal** (내부적으로 처리):
+
 - 내장된 우선순위와 특별한 처리 로직을 가집니다
 - `RetrySignal`: 자동 retry 메커니즘 트리거
 - `TimeoutSignal`: Timeout이 발생했음을 나타냄
@@ -222,8 +220,9 @@ async determineError({ errors }) {
 - `MiddlewareInvalidContextSignal`: 중요한 middleware 상태 error
 
 **일반 Error** (사용자 제어):
+
 - 항상 최저 우선순위(0)를 가집니다
-- `canRetryOnError` 평가 대상입니다  
+- `canRetryOnError` 평가 대상입니다
 - `onDetermineError`와 `onHandleError`를 통해 커스터마이징 가능합니다
 
 #### 예시: 동시 다중 실패
@@ -238,13 +237,16 @@ const { execute } = loader().withOptions({
   },
   propagateRetry: false,
   middlewares: [],
-  
+
   onDetermineError: async (errors) => {
-    console.log("Multiple error 발생:", errors.map(e => e.constructor.name));
+    console.log(
+      "Multiple error 발생:",
+      errors.map((e) => e.constructor.name),
+    );
     // 이 함수는 Signal이 없을 때만 호출됩니다
     return errors[0];
   },
-  
+
   onHandleError: async (error) => {
     console.log("최종 error 처리:", error.constructor.name);
     if (error instanceof TimeoutSignal) {
@@ -256,7 +258,7 @@ const { execute } = loader().withOptions({
 
 const result = await execute(async () => {
   // 이것은 timeout과 error를 모두 발생시킵니다
-  await new Promise(resolve => setTimeout(resolve, 200)); // 100ms timeout 초과
+  await new Promise((resolve) => setTimeout(resolve, 200)); // 100ms timeout 초과
   throw new Error("Business logic error");
 });
 
@@ -273,6 +275,7 @@ const result = await execute(async () => {
 ### Retry 전파 이해하기
 
 `RetrySignal`이 발생할 때 (`retry()`를 통해 수동으로 또는 retry 메커니즘에 의해 자동으로), `propagateRetry` 설정은 해당 signal이 다음 중 어떻게 처리되어야 하는지를 결정합니다:
+
 - **로컬에서 처리** (현재 수준에서 retry 시도로 변환)
 - **상위로 전파** (부모/호출 context로 그대로 전달)
 
@@ -284,13 +287,19 @@ const result = await execute(async () => {
 
 ```typescript
 const { execute: childExecute } = loader().withOptions({
-  input: { retry: { maxCount: 2, canRetryOnError: true }, timeout: { delay: 1000 } },
+  input: {
+    retry: { maxCount: 2, canRetryOnError: true },
+    timeout: { delay: 1000 },
+  },
   propagateRetry: false, // Retry signal을 로컬에서 처리
   middlewares: [],
 });
 
 const { execute: parentExecute } = loader().withOptions({
-  input: { retry: { maxCount: 1, canRetryOnError: true }, timeout: { delay: 5000 } },
+  input: {
+    retry: { maxCount: 1, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
   propagateRetry: false,
   middlewares: [],
 });
@@ -309,13 +318,19 @@ await parentExecute(async () => {
 
 ```typescript
 const { execute: childExecute } = loader().withOptions({
-  input: { retry: { maxCount: 2, canRetryOnError: true }, timeout: { delay: 1000 } },
+  input: {
+    retry: { maxCount: 2, canRetryOnError: true },
+    timeout: { delay: 1000 },
+  },
   propagateRetry: true, // 모든 retry signal을 상위로 전파
   middlewares: [],
 });
 
 const { execute: parentExecute } = loader().withOptions({
-  input: { retry: { maxCount: 3, canRetryOnError: true }, timeout: { delay: 5000 } },
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
   propagateRetry: false, // 자식으로부터 전파된 signal 처리
   middlewares: [],
 });
@@ -335,13 +350,19 @@ await parentExecute(async () => {
 
 ```typescript
 const { execute: childExecute } = loader().withOptions({
-  input: { retry: { maxCount: 2, canRetryOnError: true }, timeout: { delay: 1000 } },
+  input: {
+    retry: { maxCount: 2, canRetryOnError: true },
+    timeout: { delay: 1000 },
+  },
   propagateRetry: "HAS_OUTER_CONTEXT", // 부모 loader가 존재할 때만 전파
   middlewares: [],
 });
 
 const { execute: parentExecute } = loader().withOptions({
-  input: { retry: { maxCount: 3, canRetryOnError: true }, timeout: { delay: 5000 } },
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
   propagateRetry: false, // 전파된 signal을 로컬에서 처리
   middlewares: [],
 });
@@ -366,28 +387,36 @@ await childExecute(async () => {
 ```typescript
 // 재사용 가능한 loader instance 생성
 const { execute: reusableExecute } = loader().withOptions({
-  input: { retry: { maxCount: 2, canRetryOnError: true }, timeout: { delay: 1000 } },
+  input: {
+    retry: { maxCount: 2, canRetryOnError: true },
+    timeout: { delay: 1000 },
+  },
   propagateRetry: "HAS_SAME_OUTER_CONTEXT", // 동일한 loader instance에게만 전파
   middlewares: [],
 });
 
 // 다른 loader instance 생성
 const { execute: differentExecute } = loader().withOptions({
-  input: { retry: { maxCount: 3, canRetryOnError: true }, timeout: { delay: 2000 } },
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 2000 },
+  },
   propagateRetry: false,
   middlewares: [],
 });
 
 // 동일한 loader instance - signal 전파
 await reusableExecute(async () => {
-  return await reusableExecute(async () => {  // 같은 execute 함수
+  return await reusableExecute(async () => {
+    // 같은 execute 함수
     throw new Error("외부 reusableExecute로 전파됩니다");
   });
 });
 
 // 다른 loader instance - signal 로컬 처리
 await differentExecute(async () => {
-  return await reusableExecute(async () => {  // 다른 execute 함수
+  return await reusableExecute(async () => {
+    // 다른 execute 함수
     throw new Error("로컬에서 처리되며 전파되지 않습니다");
   });
 });
@@ -396,14 +425,16 @@ await differentExecute(async () => {
 async function processNestedData(data: any[], depth = 0): Promise<any[]> {
   return reusableExecute(async () => {
     if (depth > 5) throw new Error("최대 깊이 도달");
-    
-    return Promise.all(data.map(async (item) => {
-      if (Array.isArray(item)) {
-        // 재귀 호출은 동일한 loader 사용 - retry가 상위로 전파
-        return processNestedData(item, depth + 1);
-      }
-      return processItem(item);
-    }));
+
+    return Promise.all(
+      data.map(async (item) => {
+        if (Array.isArray(item)) {
+          // 재귀 호출은 동일한 loader 사용 - retry가 상위로 전파
+          return processNestedData(item, depth + 1);
+        }
+        return processItem(item);
+      }),
+    );
   });
 }
 ```
@@ -415,13 +446,19 @@ async function processNestedData(data: any[], depth = 0): Promise<any[]> {
 ```typescript
 // 독립적으로 retry되어야 하는 API 호출
 const { execute: apiCall } = loader().withOptions({
-  input: { retry: { maxCount: 3, canRetryOnError: (e) => e.status >= 500 }, timeout: { delay: 2000 } },
+  input: {
+    retry: { maxCount: 3, canRetryOnError: (e) => e.status >= 500 },
+    timeout: { delay: 2000 },
+  },
   propagateRetry: false, // 각 API 호출이 독립적으로 retry
   middlewares: [],
 });
 
 const { execute: batchProcess } = loader().withOptions({
-  input: { retry: { maxCount: 1, canRetryOnError: true }, timeout: { delay: 30000 } },
+  input: {
+    retry: { maxCount: 1, canRetryOnError: true },
+    timeout: { delay: 30000 },
+  },
   propagateRetry: false,
   middlewares: [],
 });
@@ -429,9 +466,9 @@ const { execute: batchProcess } = loader().withOptions({
 // 각 API 호출은 독립적으로 retry되며, batch는 개별 실패를 retry하지 않음
 await batchProcess(async () => {
   return await Promise.allSettled([
-    apiCall(() => fetch('/api/users')),
-    apiCall(() => fetch('/api/posts')),
-    apiCall(() => fetch('/api/comments')),
+    apiCall(() => fetch("/api/users")),
+    apiCall(() => fetch("/api/posts")),
+    apiCall(() => fetch("/api/comments")),
   ]);
 });
 ```
@@ -441,13 +478,19 @@ await batchProcess(async () => {
 ```typescript
 // Fallback 계층을 가진 복합 작업
 const { execute: primaryOperation } = loader().withOptions({
-  input: { retry: { maxCount: 2, canRetryOnError: true }, timeout: { delay: 1000 } },
+  input: {
+    retry: { maxCount: 2, canRetryOnError: true },
+    timeout: { delay: 1000 },
+  },
   propagateRetry: true, // 실패를 상위로 전파
   middlewares: [],
 });
 
 const { execute: operationWithFallback } = loader().withOptions({
-  input: { retry: { maxCount: 1, canRetryOnError: true }, timeout: { delay: 5000 } },
+  input: {
+    retry: { maxCount: 1, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
   propagateRetry: false, // 이 수준에서 모든 retry 처리
   middlewares: [],
 });
@@ -467,13 +510,16 @@ await operationWithFallback(async () => {
 
 ```typescript
 const { execute } = loader().withOptions({
-  input: { retry: { maxCount: 3, canRetryOnError: true }, timeout: { delay: 2000 } },
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 2000 },
+  },
   propagateRetry: false,
   middlewares: [],
-  
+
   onHandleError: async (error) => {
     // 커스텀 로직: 특정 유형의 error만 전파
-    if (error.type === 'SYSTEM_ERROR') {
+    if (error.type === "SYSTEM_ERROR") {
       throw error; // 시스템 error 전파
     }
     // Application error는 로컬에서 처리
@@ -565,8 +611,15 @@ TypeScript 컴파일러는 type 호환성을 강제합니다:
 
 ```typescript
 // 컴파일 error 예시
-interface UserData { id: number; name: string; }
-interface ProductData { id: string; title: string; price: number; }
+interface UserData {
+  id: number;
+  name: string;
+}
+interface ProductData {
+  id: string;
+  title: string;
+  price: number;
+}
 
 const userMiddleware = middleware<UserData>().withOptions({
   name: "user-logging",
@@ -574,7 +627,10 @@ const userMiddleware = middleware<UserData>().withOptions({
 });
 
 const { execute } = loader<ProductData>().withOptions({
-  input: { retry: { maxCount: 1, canRetryOnError: false }, timeout: { delay: 1000 } },
+  input: {
+    retry: { maxCount: 1, canRetryOnError: false },
+    timeout: { delay: 1000 },
+  },
   propagateRetry: false,
   middlewares: [userMiddleware], // ❌ Compiler Error:
   // Type 'LoaderMiddleware<UserData, {}, "user-logging">' is not assignable to
@@ -606,7 +662,9 @@ const { execute } = loader<MyApiResult>().withOptions({
 
 ```typescript
 // Base interface를 확장하는 모든 type에 대해 재사용 가능한 middleware 생성
-interface BaseResponse { status: number; }
+interface BaseResponse {
+  status: number;
+}
 
 function createStatusMiddleware<T extends BaseResponse>() {
   return middleware<T>().withOptions({
@@ -622,7 +680,7 @@ function createStatusMiddleware<T extends BaseResponse>() {
 type ApiResult = BaseResponse & { data: string };
 const statusMiddleware = createStatusMiddleware<ApiResult>();
 const { execute } = loader<ApiResult>().withOptions({
-  middlewares: [statusMiddleware] // Type이 완벽하게 일치
+  middlewares: [statusMiddleware], // Type이 완벽하게 일치
 });
 ```
 
@@ -717,16 +775,17 @@ interface LoaderReturn<Result> {
 import { loader } from "@h1y/loader-core";
 
 // 커스텀 옵션으로 생성
-const { execute, retry, loaderOptions, middlewareOptions } = loader<MyResult>().withOptions({
-  input: {
-    retry: { maxCount: 3, canRetryOnError: true },
-    timeout: { delay: 5000 },
-  },
-  propagateRetry: false,
-  middlewares: [loggingMiddleware],
-  onDetermineError: async (errors) => errors[0],
-  onHandleError: async (error) => defaultResult,
-});
+const { execute, retry, loaderOptions, middlewareOptions } =
+  loader<MyResult>().withOptions({
+    input: {
+      retry: { maxCount: 3, canRetryOnError: true },
+      timeout: { delay: 5000 },
+    },
+    propagateRetry: false,
+    middlewares: [loggingMiddleware],
+    onDetermineError: async (errors) => errors[0],
+    onHandleError: async (error) => defaultResult,
+  });
 
 // 또는 기본 옵션으로 생성
 const defaultLoader = loader<MyResult>().withDefaultOptions();
@@ -794,19 +853,19 @@ interface MiddlewareProps<Result, Context, Name extends string> {
 import { middleware } from "@h1y/loader-core";
 
 const loggingMiddleware = middleware<MyResult>().withOptions({
-  name: 'logging',
+  name: "logging",
   contextGenerator: () => ({ startTime: 0 }),
   before: async (context) => {
     context.startTime = Date.now();
-    console.log('Loader 실행 시작.');
+    console.log("Loader 실행 시작.");
   },
   complete: async (context, result) => {
     const duration = Date.now() - context.startTime;
     console.log(`Loader 실행이 ${duration}ms에 완료되었습니다. 결과:`, result);
   },
   failure: async (context, error) => {
-    console.error('Loader 실행 실패:', error);
-  }
+    console.error("Loader 실행 실패:", error);
+  },
 });
 ```
 
@@ -912,10 +971,11 @@ const result = await execute(async () => {
 **중요한 구분**: `canRetryOnError` 옵션은 **오직** **target 함수**에서 발생한 error만 평가합니다. Middleware advice 함수(`before`, `complete`, `failure`, `cleanup`)에서 발생한 error에는 **적용되지 않습니다**.
 
 **`canRetryOnError`가 평가하는 대상:**
+
 - ✅ Target 함수에서 직접 발생한 error
 - ✅ Target 함수를 통해 중첩 호출에서 전파된 error
 - ❌ **아님** middleware의 `before` advice에서 발생한 error
-- ❌ **아님** middleware의 `complete` advice에서 발생한 error  
+- ❌ **아님** middleware의 `complete` advice에서 발생한 error
 - ❌ **아님** middleware의 `failure` advice에서 발생한 error
 - ❌ **아님** middleware의 `cleanup` advice에서 발생한 error
 
@@ -953,7 +1013,7 @@ afterThrowing: createAdvice({
     retry.count += 1;
     throw new RetrySignal();
   },
-})
+});
 ```
 
 **예시: Middleware Error는 Retry되지 않음**
@@ -972,12 +1032,12 @@ const validationMiddleware = middleware().withOptions({
 
 const { execute } = loader().withOptions({
   input: {
-    retry: { 
-      maxCount: 3, 
+    retry: {
+      maxCount: 3,
       canRetryOnError: (error) => {
         console.log("Retry를 위한 error 평가:", error.message);
         return true; // 이 함수는 middleware error에 대해서는 절대 호출되지 않습니다
-      }
+      },
     },
     timeout: { delay: 5000 },
   },
@@ -1102,9 +1162,7 @@ const { execute: parentExecute } = loader().withOptions({
 
 const results = await parentExecute(async () => {
   const ids = await fetchIds();
-  return Promise.all(
-    ids.map((id) => childExecute(() => fetchDataById(id)))
-  );
+  return Promise.all(ids.map((id) => childExecute(() => fetchDataById(id))));
 });
 ```
 

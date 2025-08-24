@@ -1,5 +1,7 @@
 # @h1y/loader-core
 
+**Latest version: v1.1.0**
+
 A robust, Promise AOP-based loader library with built-in retry, timeout, and backoff strategies. Built on top of [@h1y/promise-aop](https://github.com/h1ylabs/next-loader/tree/main/packages/promise-aop), this core library provides the foundation for creating resilient async operations with middleware support.
 
 ## Installation
@@ -89,12 +91,8 @@ const { execute } = loader().withOptions({
 });
 
 // Reuse for different API endpoints
-const users = await execute(() =>
-  fetch("/api/users").then((r) => r.json()),
-);
-const posts = await execute(() =>
-  fetch("/api/posts").then((r) => r.json()),
-);
+const users = await execute(() => fetch("/api/users").then((r) => r.json()));
+const posts = await execute(() => fetch("/api/posts").then((r) => r.json()));
 const comments = await execute(() =>
   fetch("/api/comments").then((r) => r.json()),
 );
@@ -125,9 +123,7 @@ const { execute: robustExecute } = loader().withOptions({
 
 // Use appropriate loader based on operation criticality
 const quickData = await fastExecute(() => getCacheableData());
-const criticalData = await robustExecute(() =>
-  getBusinessCriticalData(),
-);
+const criticalData = await robustExecute(() => getBusinessCriticalData());
 ```
 
 #### Efficient Batch Operations
@@ -161,15 +157,16 @@ The following priorities are used internally (higher values = higher priority):
 ```typescript
 // Signal priorities (binary representation for clarity)
 const MIDDLEWARE_INVALID_SIGNAL_PRIORITY = 0b1000_0000_0000_0000; // 32768
-const TIMEOUT_SIGNAL_PRIORITY =            0b0100_0000_0000_0000; // 16384  
-const RETRY_EXCEEDED_SIGNAL_PRIORITY =     0b0010_0000_0000_0000; // 8192
-const RETRY_SIGNAL_PRIORITY =              0b0001_0000_0000_0000; // 4096
-const ERROR_PRIORITY =                     0b0000_0000_0000_0000; // 0
+const TIMEOUT_SIGNAL_PRIORITY = 0b0100_0000_0000_0000; // 16384
+const RETRY_EXCEEDED_SIGNAL_PRIORITY = 0b0010_0000_0000_0000; // 8192
+const RETRY_SIGNAL_PRIORITY = 0b0001_0000_0000_0000; // 4096
+const ERROR_PRIORITY = 0b0000_0000_0000_0000; // 0
 ```
 
 **Priority Order (highest to lowest):**
+
 1. **`MiddlewareInvalidContextSignal`** - Critical system error, middleware context corruption
-2. **`TimeoutSignal`** - Operation timeout, time-sensitive failure  
+2. **`TimeoutSignal`** - Operation timeout, time-sensitive failure
 3. **`RetryExceededSignal`** - All retry attempts exhausted
 4. **`RetrySignal`** - Retry attempt request
 5. **Regular `Error`** - Application-level errors
@@ -187,7 +184,7 @@ async determineError({ errors }) {
 
   // Sort errors by priority (signals first, then by priority value)
   const prioritizedErrors = errors
-    .map((error) => 
+    .map((error) =>
       Signal.isSignal(error)
         ? [error.priority, error]  // Use signal's priority
         : [ERROR_PRIORITY, error]  // Regular errors get lowest priority
@@ -204,8 +201,8 @@ async determineError({ errors }) {
 
   // If no signals present, delegate to user-provided onDetermineError
   // or default to first error
-  return onDetermineError 
-    ? await onDetermineError(errors) 
+  return onDetermineError
+    ? await onDetermineError(errors)
     : highestPriorityError;
 }
 ```
@@ -215,6 +212,7 @@ async determineError({ errors }) {
 The system treats **Signals** and regular **Errors** differently:
 
 **Signals** (handled internally):
+
 - Have built-in priorities and special handling logic
 - `RetrySignal`: Triggers automatic retry mechanism
 - `TimeoutSignal`: Indicates timeout occurred
@@ -222,8 +220,9 @@ The system treats **Signals** and regular **Errors** differently:
 - `MiddlewareInvalidContextSignal`: Critical middleware state error
 
 **Regular Errors** (user-controlled):
+
 - Always have the lowest priority (0)
-- Subject to `canRetryOnError` evaluation  
+- Subject to `canRetryOnError` evaluation
 - Can be customized via `onDetermineError` and `onHandleError`
 
 #### Example: Multiple Concurrent Failures
@@ -238,13 +237,16 @@ const { execute } = loader().withOptions({
   },
   propagateRetry: false,
   middlewares: [],
-  
+
   onDetermineError: async (errors) => {
-    console.log("Multiple errors occurred:", errors.map(e => e.constructor.name));
+    console.log(
+      "Multiple errors occurred:",
+      errors.map((e) => e.constructor.name),
+    );
     // This function only gets called if NO signals are present
     return errors[0];
   },
-  
+
   onHandleError: async (error) => {
     console.log("Handling final error:", error.constructor.name);
     if (error instanceof TimeoutSignal) {
@@ -256,7 +258,7 @@ const { execute } = loader().withOptions({
 
 const result = await execute(async () => {
   // This will cause both a timeout AND throw an error
-  await new Promise(resolve => setTimeout(resolve, 200)); // Exceeds 100ms timeout
+  await new Promise((resolve) => setTimeout(resolve, 200)); // Exceeds 100ms timeout
   throw new Error("Business logic error");
 });
 
@@ -273,6 +275,7 @@ The `propagateRetry` option controls how `RetrySignal`s are handled when they bu
 ### Understanding Retry Propagation
 
 When a `RetrySignal` is thrown (either manually via `retry()` or automatically by the retry mechanism), the `propagateRetry` setting determines whether that signal should be:
+
 - **Handled locally** (converted to a retry attempt at the current level)
 - **Propagated upward** (passed to parent/calling context as-is)
 
@@ -284,13 +287,19 @@ All retry signals are handled locally and never propagated to parent contexts.
 
 ```typescript
 const { execute: childExecute } = loader().withOptions({
-  input: { retry: { maxCount: 2, canRetryOnError: true }, timeout: { delay: 1000 } },
+  input: {
+    retry: { maxCount: 2, canRetryOnError: true },
+    timeout: { delay: 1000 },
+  },
   propagateRetry: false, // Retry signals handled locally
   middlewares: [],
 });
 
 const { execute: parentExecute } = loader().withOptions({
-  input: { retry: { maxCount: 1, canRetryOnError: true }, timeout: { delay: 5000 } },
+  input: {
+    retry: { maxCount: 1, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
   propagateRetry: false,
   middlewares: [],
 });
@@ -309,13 +318,19 @@ All retry signals are propagated to parent contexts without local handling.
 
 ```typescript
 const { execute: childExecute } = loader().withOptions({
-  input: { retry: { maxCount: 2, canRetryOnError: true }, timeout: { delay: 1000 } },
+  input: {
+    retry: { maxCount: 2, canRetryOnError: true },
+    timeout: { delay: 1000 },
+  },
   propagateRetry: true, // All retry signals propagated upward
   middlewares: [],
 });
 
 const { execute: parentExecute } = loader().withOptions({
-  input: { retry: { maxCount: 3, canRetryOnError: true }, timeout: { delay: 5000 } },
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
   propagateRetry: false, // Handle propagated signals from children
   middlewares: [],
 });
@@ -335,13 +350,19 @@ Propagate retry signals only when there is an outer loader context.
 
 ```typescript
 const { execute: childExecute } = loader().withOptions({
-  input: { retry: { maxCount: 2, canRetryOnError: true }, timeout: { delay: 1000 } },
+  input: {
+    retry: { maxCount: 2, canRetryOnError: true },
+    timeout: { delay: 1000 },
+  },
   propagateRetry: "HAS_OUTER_CONTEXT", // Propagate only if parent loader exists
   middlewares: [],
 });
 
 const { execute: parentExecute } = loader().withOptions({
-  input: { retry: { maxCount: 3, canRetryOnError: true }, timeout: { delay: 5000 } },
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
   propagateRetry: false, // Handle propagated signals locally
   middlewares: [],
 });
@@ -366,28 +387,36 @@ Propagate retry signals only when the outer loader is the same instance (same `e
 ```typescript
 // Create a reusable loader instance
 const { execute: reusableExecute } = loader().withOptions({
-  input: { retry: { maxCount: 2, canRetryOnError: true }, timeout: { delay: 1000 } },
+  input: {
+    retry: { maxCount: 2, canRetryOnError: true },
+    timeout: { delay: 1000 },
+  },
   propagateRetry: "HAS_SAME_OUTER_CONTEXT", // Propagate only to same loader instance
   middlewares: [],
 });
 
 // Create a different loader instance
 const { execute: differentExecute } = loader().withOptions({
-  input: { retry: { maxCount: 3, canRetryOnError: true }, timeout: { delay: 2000 } },
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 2000 },
+  },
   propagateRetry: false,
   middlewares: [],
 });
 
 // Same loader instance - signals propagate
 await reusableExecute(async () => {
-  return await reusableExecute(async () => {  // Same execute function
+  return await reusableExecute(async () => {
+    // Same execute function
     throw new Error("Propagates to outer reusableExecute");
   });
 });
 
 // Different loader instance - signals handled locally
 await differentExecute(async () => {
-  return await reusableExecute(async () => {  // Different execute function
+  return await reusableExecute(async () => {
+    // Different execute function
     throw new Error("Handled locally, no propagation");
   });
 });
@@ -396,14 +425,16 @@ await differentExecute(async () => {
 async function processNestedData(data: any[], depth = 0): Promise<any[]> {
   return reusableExecute(async () => {
     if (depth > 5) throw new Error("Max depth reached");
-    
-    return Promise.all(data.map(async (item) => {
-      if (Array.isArray(item)) {
-        // Recursive call uses same loader - retries propagate up
-        return processNestedData(item, depth + 1);
-      }
-      return processItem(item);
-    }));
+
+    return Promise.all(
+      data.map(async (item) => {
+        if (Array.isArray(item)) {
+          // Recursive call uses same loader - retries propagate up
+          return processNestedData(item, depth + 1);
+        }
+        return processItem(item);
+      }),
+    );
   });
 }
 ```
@@ -415,13 +446,19 @@ async function processNestedData(data: any[], depth = 0): Promise<any[]> {
 ```typescript
 // API calls that should retry independently
 const { execute: apiCall } = loader().withOptions({
-  input: { retry: { maxCount: 3, canRetryOnError: (e) => e.status >= 500 }, timeout: { delay: 2000 } },
+  input: {
+    retry: { maxCount: 3, canRetryOnError: (e) => e.status >= 500 },
+    timeout: { delay: 2000 },
+  },
   propagateRetry: false, // Each API call retries independently
   middlewares: [],
 });
 
 const { execute: batchProcess } = loader().withOptions({
-  input: { retry: { maxCount: 1, canRetryOnError: true }, timeout: { delay: 30000 } },
+  input: {
+    retry: { maxCount: 1, canRetryOnError: true },
+    timeout: { delay: 30000 },
+  },
   propagateRetry: false,
   middlewares: [],
 });
@@ -429,9 +466,9 @@ const { execute: batchProcess } = loader().withOptions({
 // Each API call retries independently; batch doesn't retry individual failures
 await batchProcess(async () => {
   return await Promise.allSettled([
-    apiCall(() => fetch('/api/users')),
-    apiCall(() => fetch('/api/posts')),
-    apiCall(() => fetch('/api/comments')),
+    apiCall(() => fetch("/api/users")),
+    apiCall(() => fetch("/api/posts")),
+    apiCall(() => fetch("/api/comments")),
   ]);
 });
 ```
@@ -441,13 +478,19 @@ await batchProcess(async () => {
 ```typescript
 // Complex operation with fallback hierarchy
 const { execute: primaryOperation } = loader().withOptions({
-  input: { retry: { maxCount: 2, canRetryOnError: true }, timeout: { delay: 1000 } },
+  input: {
+    retry: { maxCount: 2, canRetryOnError: true },
+    timeout: { delay: 1000 },
+  },
   propagateRetry: true, // Propagate failures upward
   middlewares: [],
 });
 
 const { execute: operationWithFallback } = loader().withOptions({
-  input: { retry: { maxCount: 1, canRetryOnError: true }, timeout: { delay: 5000 } },
+  input: {
+    retry: { maxCount: 1, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
   propagateRetry: false, // Handle all retries at this level
   middlewares: [],
 });
@@ -467,13 +510,16 @@ await operationWithFallback(async () => {
 
 ```typescript
 const { execute } = loader().withOptions({
-  input: { retry: { maxCount: 3, canRetryOnError: true }, timeout: { delay: 2000 } },
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 2000 },
+  },
   propagateRetry: false,
   middlewares: [],
-  
+
   onHandleError: async (error) => {
     // Custom logic: only propagate certain types of errors
-    if (error.type === 'SYSTEM_ERROR') {
+    if (error.type === "SYSTEM_ERROR") {
       throw error; // Propagate system errors
     }
     // Handle application errors locally
@@ -565,8 +611,15 @@ The TypeScript compiler will enforce type compatibility:
 
 ```typescript
 // Compilation error example
-interface UserData { id: number; name: string; }
-interface ProductData { id: string; title: string; price: number; }
+interface UserData {
+  id: number;
+  name: string;
+}
+interface ProductData {
+  id: string;
+  title: string;
+  price: number;
+}
 
 const userMiddleware = middleware<UserData>().withOptions({
   name: "user-logging",
@@ -574,7 +627,10 @@ const userMiddleware = middleware<UserData>().withOptions({
 });
 
 const { execute } = loader<ProductData>().withOptions({
-  input: { retry: { maxCount: 1, canRetryOnError: false }, timeout: { delay: 1000 } },
+  input: {
+    retry: { maxCount: 1, canRetryOnError: false },
+    timeout: { delay: 1000 },
+  },
   propagateRetry: false,
   middlewares: [userMiddleware], // ❌ Compiler Error:
   // Type 'LoaderMiddleware<UserData, {}, "user-logging">' is not assignable to
@@ -606,7 +662,9 @@ const { execute } = loader<MyApiResult>().withOptions({
 
 ```typescript
 // Create reusable middleware for any type extending base interface
-interface BaseResponse { status: number; }
+interface BaseResponse {
+  status: number;
+}
 
 function createStatusMiddleware<T extends BaseResponse>() {
   return middleware<T>().withOptions({
@@ -622,7 +680,7 @@ function createStatusMiddleware<T extends BaseResponse>() {
 type ApiResult = BaseResponse & { data: string };
 const statusMiddleware = createStatusMiddleware<ApiResult>();
 const { execute } = loader<ApiResult>().withOptions({
-  middlewares: [statusMiddleware] // Types match perfectly
+  middlewares: [statusMiddleware], // Types match perfectly
 });
 ```
 
@@ -717,16 +775,17 @@ Creates a loader instance with default configuration settings (no retries, no ti
 import { loader } from "@h1y/loader-core";
 
 // Create with custom options
-const { execute, retry, loaderOptions, middlewareOptions } = loader<MyResult>().withOptions({
-  input: {
-    retry: { maxCount: 3, canRetryOnError: true },
-    timeout: { delay: 5000 },
-  },
-  propagateRetry: false,
-  middlewares: [loggingMiddleware],
-  onDetermineError: async (errors) => errors[0],
-  onHandleError: async (error) => defaultResult,
-});
+const { execute, retry, loaderOptions, middlewareOptions } =
+  loader<MyResult>().withOptions({
+    input: {
+      retry: { maxCount: 3, canRetryOnError: true },
+      timeout: { delay: 5000 },
+    },
+    propagateRetry: false,
+    middlewares: [loggingMiddleware],
+    onDetermineError: async (errors) => errors[0],
+    onHandleError: async (error) => defaultResult,
+  });
 
 // Or create with default options
 const defaultLoader = loader<MyResult>().withDefaultOptions();
@@ -794,19 +853,19 @@ interface MiddlewareProps<Result, Context, Name extends string> {
 import { middleware } from "@h1y/loader-core";
 
 const loggingMiddleware = middleware<MyResult>().withOptions({
-  name: 'logging',
+  name: "logging",
   contextGenerator: () => ({ startTime: 0 }),
   before: async (context) => {
     context.startTime = Date.now();
-    console.log('Loader execution started.');
+    console.log("Loader execution started.");
   },
   complete: async (context, result) => {
     const duration = Date.now() - context.startTime;
     console.log(`Loader execution finished in ${duration}ms. Result:`, result);
   },
   failure: async (context, error) => {
-    console.error('Loader execution failed:', error);
-  }
+    console.error("Loader execution failed:", error);
+  },
 });
 ```
 
@@ -912,10 +971,11 @@ const result = await execute(async () => {
 **Critical Distinction**: The `canRetryOnError` option **only** evaluates errors thrown from the **target function**. It does **not** apply to errors thrown from middleware advice functions (`before`, `complete`, `failure`, `cleanup`).
 
 **What `canRetryOnError` evaluates:**
+
 - ✅ Errors thrown directly by your target function
 - ✅ Errors propagated through your target function from nested calls
 - ❌ **NOT** errors thrown in middleware's `before` advice
-- ❌ **NOT** errors thrown in middleware's `complete` advice  
+- ❌ **NOT** errors thrown in middleware's `complete` advice
 - ❌ **NOT** errors thrown in middleware's `failure` advice
 - ❌ **NOT** errors thrown in middleware's `cleanup` advice
 
@@ -953,7 +1013,7 @@ afterThrowing: createAdvice({
     retry.count += 1;
     throw new RetrySignal();
   },
-})
+});
 ```
 
 **Example: Middleware Errors Are Not Retried**
@@ -972,12 +1032,12 @@ const validationMiddleware = middleware().withOptions({
 
 const { execute } = loader().withOptions({
   input: {
-    retry: { 
-      maxCount: 3, 
+    retry: {
+      maxCount: 3,
       canRetryOnError: (error) => {
         console.log("Evaluating error for retry:", error.message);
         return true; // This function will NEVER be called for middleware errors
-      }
+      },
     },
     timeout: { delay: 5000 },
   },
@@ -1102,9 +1162,7 @@ const { execute: parentExecute } = loader().withOptions({
 
 const results = await parentExecute(async () => {
   const ids = await fetchIds();
-  return Promise.all(
-    ids.map((id) => childExecute(() => fetchDataById(id)))
-  );
+  return Promise.all(ids.map((id) => childExecute(() => fetchDataById(id))));
 });
 ```
 
