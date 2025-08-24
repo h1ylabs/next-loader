@@ -1152,9 +1152,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@h1y/loader-config@workspace:*, @h1y/loader-config@workspace:packages/loader-config":
+"@h1y/loader-config@workspace:*, @h1y/loader-config@workspace:packages/config":
   version: 0.0.0-use.local
-  resolution: "@h1y/loader-config@workspace:packages/loader-config"
+  resolution: "@h1y/loader-config@workspace:packages/config"
   dependencies:
     "@eslint/compat": "npm:^1.2.9"
     "@eslint/js": "npm:^9.33.0"
@@ -1177,9 +1177,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@h1y/loader-core@workspace:*, @h1y/loader-core@workspace:packages/loader-core":
+"@h1y/loader-core@workspace:*, @h1y/loader-core@workspace:packages/core":
   version: 0.0.0-use.local
-  resolution: "@h1y/loader-core@workspace:packages/loader-core"
+  resolution: "@h1y/loader-core@workspace:packages/core"
   dependencies:
     "@h1y/loader-config": "workspace:*"
     "@h1y/promise-aop": "workspace:*"
@@ -1195,9 +1195,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@h1y/loader-tag@workspace:packages/loader-tag":
+"@h1y/loader-tag@workspace:packages/tag":
   version: 0.0.0-use.local
-  resolution: "@h1y/loader-tag@workspace:packages/loader-tag"
+  resolution: "@h1y/loader-tag@workspace:packages/tag"
   dependencies:
     "@h1y/loader-config": "workspace:*"
     "@types/jest": "catalog:"
