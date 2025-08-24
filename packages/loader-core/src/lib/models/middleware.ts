@@ -10,7 +10,7 @@ export type LoaderMiddleware<Result, Context, MiddlewareName extends string> = {
 export type MiddlewareOptions<
   Middlewares extends readonly LoaderMiddleware<any, unknown, string>[],
 > = {
-  [K in Middlewares[number] as K["name"]]: () => ReturnType<
+  readonly [K in Middlewares[number] as K["name"]]: () => ReturnType<
     K["contextGenerator"]
   >;
 };
@@ -18,7 +18,7 @@ export type MiddlewareOptions<
 export type MiddlewareContext<
   Middlewares extends readonly LoaderMiddleware<any, unknown, string>[],
 > = {
-  [K in Middlewares[number] as K["name"]]: K extends LoaderMiddleware<
+  readonly [K in Middlewares[number] as K["name"]]: K extends LoaderMiddleware<
     any,
     infer Context,
     any
