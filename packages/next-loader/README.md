@@ -1,6 +1,6 @@
 # @h1y/next-loader
 
-**Latest version: v3.0.0**
+**Latest version: v5.0.0**
 
 A powerful, type-safe resource loading library specifically designed for Next.js applications. Build efficient data fetching with built-in caching, revalidation, retry logic, and seamless integration with Next.js server components.
 

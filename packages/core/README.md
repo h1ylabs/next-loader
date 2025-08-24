@@ -1,6 +1,6 @@
 # @h1y/loader-core
 
-**Latest version: v3.0.0**
+**Latest version: v5.0.0**
 
 A robust, Promise AOP-based loader library with built-in retry, timeout, and backoff strategies. Built on top of [@h1y/promise-aop](https://github.com/h1ylabs/next-loader/tree/main/packages/promise-aop), this core library provides the foundation for creating resilient async operations with middleware support.
 
