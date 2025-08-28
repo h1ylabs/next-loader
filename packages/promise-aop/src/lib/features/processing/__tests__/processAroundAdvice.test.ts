@@ -38,8 +38,9 @@ describe("processAroundAdvice", () => {
       const resolver = await processAroundAdvice(props);
 
       const mockTarget = createMockTarget(42);
+      const resumer = (target: typeof mockTarget) => target;
       const nextChain = (target: typeof mockTarget) => target;
-      const wrappedTarget = resolver(mockTarget)(nextChain);
+      const wrappedTarget = resolver(mockTarget)(resumer, nextChain);
       const result = await wrappedTarget();
 
       expect(result).toBe(42);
@@ -65,8 +66,9 @@ describe("processAroundAdvice", () => {
       const resolver = await processAroundAdvice(props);
 
       const mockTarget = createMockTarget(10);
+      const resumer = (target: typeof mockTarget) => target;
       const nextChain = (target: typeof mockTarget) => target;
-      const wrappedTarget = resolver(mockTarget)(nextChain);
+      const wrappedTarget = resolver(mockTarget)(resumer, nextChain);
       const result = await wrappedTarget();
 
       expect(result).toBe(11);
@@ -90,8 +92,9 @@ describe("processAroundAdvice", () => {
       const resolver = await processAroundAdvice(props);
 
       const mockTarget = createMockTarget(10);
+      const resumer = (target: typeof mockTarget) => target;
       const nextChain = (target: typeof mockTarget) => target;
-      const wrappedTarget = resolver(mockTarget)(nextChain);
+      const wrappedTarget = resolver(mockTarget)(resumer, nextChain);
       const result = await wrappedTarget();
 
       expect(result).toBe(11);
@@ -123,8 +126,9 @@ describe("processAroundAdvice", () => {
       const resolver = await processAroundAdvice(props);
 
       const mockTarget = createMockTarget(5);
+      const resumer = (target: typeof mockTarget) => target;
       const nextChain = (target: typeof mockTarget) => target;
-      const wrappedTarget = resolver(mockTarget)(nextChain);
+      const wrappedTarget = resolver(mockTarget)(resumer, nextChain);
       const result = await wrappedTarget();
 
       // Execution order: multiplyByTwo(addOne(target))
@@ -162,8 +166,9 @@ describe("processAroundAdvice", () => {
       const resolver = await processAroundAdvice(props);
 
       const mockTarget = createMockTarget(2);
+      const resumer = (target: typeof mockTarget) => target;
       const nextChain = (target: typeof mockTarget) => target;
-      const wrappedTarget = resolver(mockTarget)(nextChain);
+      const wrappedTarget = resolver(mockTarget)(resumer, nextChain);
       const result = await wrappedTarget();
 
       // Execution order: addTen(multiplyByTwo(addOne(target)))
@@ -195,8 +200,9 @@ describe("processAroundAdvice", () => {
       const resolver = await processAroundAdvice(props);
 
       const mockTarget = createMockTarget(3);
+      const resumer = (target: typeof mockTarget) => target;
       const nextChain = (target: typeof mockTarget) => target;
-      const wrappedTarget = resolver(mockTarget)(nextChain);
+      const wrappedTarget = resolver(mockTarget)(resumer, nextChain);
       const result = await wrappedTarget();
 
       // Execution order: targetWrapper(nextChain(resultWrapper(target)))
@@ -226,8 +232,9 @@ describe("processAroundAdvice", () => {
       const resolver = await processAroundAdvice(props);
 
       const mockTarget = createMockTarget(50);
+      const resumer = (target: typeof mockTarget) => target;
       const nextChain = (target: typeof mockTarget) => target;
-      const wrappedTarget = resolver(mockTarget)(nextChain);
+      const wrappedTarget = resolver(mockTarget)(resumer, nextChain);
       const result = await wrappedTarget();
 
       expect(result).toBe(150);
@@ -257,8 +264,9 @@ describe("processAroundAdvice", () => {
       const resolver = await processAroundAdvice(props);
 
       const mockTarget = createMockTarget(5);
+      const resumer = (target: typeof mockTarget) => target;
       const nextChain = (target: typeof mockTarget) => target;
-      const wrappedTarget = resolver(mockTarget)(nextChain);
+      const wrappedTarget = resolver(mockTarget)(resumer, nextChain);
       const result = await wrappedTarget();
 
       expect(capturedContext).toEqual({ value: 10, flag: true });
@@ -284,8 +292,9 @@ describe("processAroundAdvice", () => {
       const resolver = await processAroundAdvice(props);
 
       const mockTarget = createMockTarget(10);
+      const resumer = (target: typeof mockTarget) => target;
       const nextChain = (target: typeof mockTarget) => target;
-      const wrappedTarget = resolver(mockTarget)(nextChain);
+      const wrappedTarget = resolver(mockTarget)(resumer, nextChain);
 
       await expect(wrappedTarget()).rejects.toThrow("Wrapper error");
     });
@@ -309,8 +318,9 @@ describe("processAroundAdvice", () => {
       const resolver = await processAroundAdvice(props);
 
       const mockTarget = createMockTarget(10);
+      const resumer = (target: typeof mockTarget) => target;
       const nextChain = (target: typeof mockTarget) => target;
-      const wrappedTarget = resolver(mockTarget)(nextChain);
+      const wrappedTarget = resolver(mockTarget)(resumer, nextChain);
       const result = await wrappedTarget();
 
       expect(result).toBe(999);
@@ -338,8 +348,9 @@ describe("processAroundAdvice", () => {
       const resolver = await processAroundAdvice(props);
 
       const mockTarget = createMockTarget(5);
+      const resumer = (target: typeof mockTarget) => target;
       const nextChain = (target: typeof mockTarget) => target;
-      const wrappedTarget = resolver(mockTarget)(nextChain);
+      const wrappedTarget = resolver(mockTarget)(resumer, nextChain);
       const result = await wrappedTarget();
 
       expect(result).toBe(10);
@@ -365,8 +376,9 @@ describe("processAroundAdvice", () => {
       const resolver = await processAroundAdvice(props);
 
       const mockTarget = createMockTarget(5);
+      const resumer = (target: typeof mockTarget) => target;
       const nextChain = (target: typeof mockTarget) => target;
-      const wrappedTarget = resolver(mockTarget)(nextChain);
+      const wrappedTarget = resolver(mockTarget)(resumer, nextChain);
       const result = await wrappedTarget();
 
       expect(result).toBe(12); // (5 + 1) * 2
@@ -393,8 +405,9 @@ describe("processAroundAdvice", () => {
       const resolver = await processAroundAdvice(props);
 
       const mockTarget = createMockTarget(25);
+      const resumer = (target: typeof mockTarget) => target;
       const nextChain = (target: typeof mockTarget) => target;
-      const wrappedTarget = resolver(mockTarget)(nextChain);
+      const wrappedTarget = resolver(mockTarget)(resumer, nextChain);
       const result = await wrappedTarget();
 
       expect(result).toBe(125);
@@ -432,8 +445,9 @@ describe("processAroundAdvice", () => {
       const resolver = await processAroundAdvice(props);
 
       const mockTarget = createMockTarget(5);
+      const resumer = (target: typeof mockTarget) => target;
       const nextChain = (target: typeof mockTarget) => target;
-      const wrappedTarget = resolver(mockTarget)(nextChain);
+      const wrappedTarget = resolver(mockTarget)(resumer, nextChain);
       const result = await wrappedTarget();
 
       // This test documents the actual execution order

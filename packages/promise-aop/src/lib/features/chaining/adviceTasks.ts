@@ -10,7 +10,6 @@ export function beforeAdviceTask<Result, SharedContext>(
 ) {
   return async () => {
     const beforeAdvice = async () => chain().advices.before(chain().context());
-
     return Promise.resolve().then(beforeAdvice).catch(handleRejection(chain));
   };
 }
@@ -42,7 +41,7 @@ export function aroundAdviceTask<Result, SharedContext>(
   };
 }
 
-export function executeTargetTask<Result>(target: Target<Result>) {
+export async function executeTargetTask<Result>(target: Target<Result>) {
   return target();
 }
 

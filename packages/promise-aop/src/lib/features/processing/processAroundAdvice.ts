@@ -1,5 +1,3 @@
-import { AsyncLocalStorage } from "node:async_hooks";
-
 import type { AdviceFunctionWithContext } from "@/lib/models/advice";
 import type {
   AroundAdviceResolver,
@@ -40,10 +38,8 @@ export async function processAroundAdvice<Result, SharedContext>({
       (target) => target,
     );
 
-    return (target) => (nextChain) => {
-      const snapshot = AsyncLocalStorage.snapshot();
-
-      return resultAttacher(snapshot(() => nextChain(targetAttacher(target))));
+    return (target) => (propagateChain, nextChain) => {
+      return resultAttacher(propagateChain(nextChain(targetAttacher(target))));
     };
   });
 }
