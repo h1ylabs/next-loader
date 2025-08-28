@@ -4,6 +4,7 @@ import {
   createProcess,
   Process,
   runProcess,
+  runProcessWith,
   type Target,
   TargetWrapper,
 } from "@h1y/promise-aop";
@@ -32,36 +33,6 @@ import { RetrySignal } from "./lib/signals/RetrySignal";
 import { generateID } from "./lib/utils/generateID";
 import { Signal } from "./lib/utils/Signal";
 
-/**
- * Creates a loader factory that provides methods to create configured loader instances.
- * The loader enhances target functions with features like retries, timeouts, custom error handling,
- * and middleware support.
- *
- * The loader is built upon an Aspect-Oriented Programming (AOP) foundation,
- * allowing for modular and reusable cross-cutting concerns.
- *
- * @example
- * ```typescript
- * // Create with custom options
- * const { execute, retry, loaderOptions } = loader<MyResult>().withOptions({
- *   input: {
- *     retry: { maxCount: 3, canRetryOnError: true },
- *     timeout: { delay: 5000 },
- *   },
- *   propagateRetry: false,
- *   middlewares: [loggingMiddleware],
- *   onDetermineError: async (errors) => errors[0],
- *   onHandleError: async (error) => defaultResult,
- * });
- *
- * // Or create with default options
- * const defaultLoader = loader<MyResult>().withDefaultOptions();
- *
- * const result = await execute(myAsyncFunction);
- * ```
- * @template Result - The expected return type of the target functions to be executed.
- * @returns An object containing `withOptions` and `withDefaultOptions` methods for creating loader instances.
- */
 export function loader<const Result>() {
   const withOptions = <
     const Middlewares extends readonly LoaderMiddleware<
@@ -76,37 +47,10 @@ export function loader<const Result>() {
     onDetermineError,
     onHandleError,
   }: {
-    /**
-     * Initial configuration for the loader's features, such as retry and timeout settings.
-     */
     readonly input: LoaderCoreInput<Result>;
-
-    /**
-     * A custom function to determine which error to handle when multiple errors occur.
-     * If not provided, the loader will prioritize Signal errors, or default to the first error thrown.
-     * @param errors An array of errors caught during the process.
-     * @returns A promise that resolves to the selected error to be handled.
-     */
     readonly onDetermineError?: (errors: unknown[]) => Promise<unknown>;
-
-    /**
-     * A custom function to handle determined errors that are not Signals.
-     * If not provided, the error will be re-thrown.
-     * @param error The error to handle.
-     * @returns A promise that resolves to a fallback value of type Result.
-     */
     readonly onHandleError?: (error: unknown) => Promise<Result>;
-
-    /**
-     * Defines the retry behavior when multiple loaders are nested.
-     * It can be a boolean or an object specifying propagation for parent loaders.
-     */
     readonly propagateRetry: LoaderRetryPropagation;
-
-    /**
-     * An array of middlewares to be applied to the loader.
-     * Each middleware can inspect, modify, or augment the loading process.
-     */
     readonly middlewares: Middlewares;
   }) => {
     type LoaderContext = LoaderCoreContext<Result> &
@@ -115,9 +59,10 @@ export function loader<const Result>() {
     // 1. check for duplicate middleware names.
     const middlewareNames = new Set<string>([
       "__core__backoff",
+      "__core__metadata",
       "__core__retry",
       "__core__timeout",
-    ]);
+    ] satisfies (keyof LoaderCoreContext<Result>)[]);
 
     for (const { name } of middlewares) {
       if (middlewareNames.has(name)) {
@@ -129,22 +74,17 @@ export function loader<const Result>() {
 
     // 2. configure the data to be used in the loader context.
     const loaderID = generateID("loader");
-    const initialContext = createLoaderCoreContext(input);
-    const middlewareContext = Object.fromEntries(
-      middlewares.map(({ name, contextGenerator }) => [
-        name,
-        contextGenerator(),
-      ]) ?? [],
-    ) as MiddlewareContext<Middlewares>;
+    const createContext = () => ({
+      ...createLoaderCoreContext(input),
+      ...(Object.fromEntries(
+        middlewares.map(({ name, contextGenerator }) => [
+          name,
+          contextGenerator(),
+        ]) ?? [],
+      ) as MiddlewareContext<Middlewares>),
+    });
 
-    const sharedContext = {
-      ...initialContext,
-      ...middlewareContext,
-    };
-
-    const loaderContext = AsyncContext.create<LoaderContext>(
-      () => sharedContext,
-    );
+    const loaderContext = AsyncContext.create<LoaderContext>(createContext);
 
     // 3. configure the AOP process.
     const process: Process<Result, LoaderContext> = createProcess({
@@ -200,7 +140,7 @@ export function loader<const Result>() {
           return onDetermineError ? onDetermineError(errors) : error;
         },
 
-        async handleError({ exit, error, currentTarget }) {
+        async handleError({ exit, error, currentTarget, context }) {
           // non-signal errors are left for the user to handle.
           if (!Signal.isSignal(error)) {
             if (onHandleError) {
@@ -213,13 +153,16 @@ export function loader<const Result>() {
           // if it's a retry signal, attempt a retry.
           if (error instanceof RetrySignal) {
             if (canPropagateRetry(loaderID, propagateRetry)) {
-              throw error;
+              throw new RetrySignal({ ...error, propagated: true });
             }
 
+            const nextContext = context();
+
             return exit(async () => {
-              return runProcess({
+              return runProcessWith({
                 process,
                 context: loaderContext,
+                contextGenerator: () => nextContext,
                 target: currentTarget,
               });
             });
@@ -231,11 +174,6 @@ export function loader<const Result>() {
     });
 
     return {
-      /**
-       * Executes the target function with the loader's aspects and middlewares.
-       * @param target The function to be executed by the loader.
-       * @returns A promise that resolves with the result of the target function.
-       */
       execute: async <T extends Result>(target: Target<T>): Promise<T> => {
         const executorFunction = async () =>
           runProcess({ process, target, context: loaderContext });
@@ -243,11 +181,6 @@ export function loader<const Result>() {
         return withLoaderMetadata(loaderID, executorFunction)() as T;
       },
 
-      /**
-       * Retrieves the context and options for the configured middlewares.
-       * Can only be used from within the execution context of a target function.
-       * @returns An object containing middleware-specific contexts.
-       */
       middlewareOptions: (): MiddlewareOptions<Middlewares> => {
         return Object.fromEntries(
           middlewares.map(({ name }) => [
@@ -260,14 +193,12 @@ export function loader<const Result>() {
         ) as MiddlewareOptions<Middlewares>;
       },
 
-      /**
-       * Retrieves the current options and state of the loader.
-       * Can only be used from within the execution context of a target function.
-       * @returns An object containing loader-specific options and state.
-       */
-      loaderOptions: (): LoaderCoreOptions<Result> => {
-        const { __core__retry: retry, __core__timeout: timeout } =
-          loaderContext.context();
+      loaderOptions: (): LoaderCoreOptions => {
+        const {
+          __core__retry: retry,
+          __core__timeout: timeout,
+          __core__metadata: metadata,
+        } = loaderContext.context();
 
         return {
           retry: {
@@ -276,9 +207,9 @@ export function loader<const Result>() {
             resetRetryCount: () => {
               retry.count = 0;
             },
-            useFallbackOnNextRetry: (fallback) => {
-              retry.fallback = fallback;
-            },
+          },
+          metadata: {
+            ...metadata,
           },
           timeout: {
             delay: timeout.delay,
@@ -293,35 +224,29 @@ export function loader<const Result>() {
         };
       },
 
-      /**
-       * Manually triggers a retry of the target function.
-       * This function will throw a `RetrySignal` to be caught by the loader's retry mechanism.
-       * Can only be used from within the execution context of a target function.
-       * @param fallback An optional function to be used for the subsequent retry instead of the original target.
-       */
-      retry: (fallback?: TargetWrapper<Result>): never => {
+      retryImmediately: (fallback?: TargetWrapper<Result>): never => {
+        // 수동적으로 재시도를 수행하는 경우, 최우선으로 폴백이 적용됩니다.
         if (fallback) {
-          loaderContext.context().__core__retry.fallback = fallback;
+          loaderContext.context().__core__retry.fallback.immediate = fallback;
         }
 
         throw new RetrySignal();
       },
+
+      retryFallback: <T>(matcher: {
+        readonly when: (error: T) => boolean;
+        readonly fallback: (error: T) => TargetWrapper<Result>;
+      }) => {
+        loaderContext.context().__core__retry.fallback.matchers.push(
+          matcher as {
+            readonly when: (error: unknown) => boolean;
+            readonly fallback: (error: unknown) => TargetWrapper<Result>;
+          },
+        );
+      },
     } as const;
   };
 
-  /**
-   * Creates a loader instance with default configuration settings.
-   * This provides a minimal loader with no retries, no timeout limits, no middlewares,
-   * and no retry propagation - essentially a pass-through wrapper for the target function.
-   *
-   * Default settings:
-   * - Retry: disabled (maxCount: 0, canRetryOnError: false)
-   * - Timeout: unlimited (delay: Infinity)
-   * - Middlewares: none
-   * - Retry propagation: disabled
-   *
-   * @returns A basic loader instance with default configuration.
-   */
   const withDefaultOptions = () =>
     withOptions({
       input: {

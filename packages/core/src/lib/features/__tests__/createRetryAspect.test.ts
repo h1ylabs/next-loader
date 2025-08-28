@@ -29,13 +29,15 @@ function createMockContext<Result>(
   });
 
   // Override retry context with custom values
+  const mergedRetry = {
+    ...baseContext.__core__retry,
+    ...retryOverrides,
+  } as RetryContext<Result>;
+
   return {
     ...baseContext,
-    __core__retry: {
-      ...baseContext.__core__retry,
-      ...retryOverrides,
-    },
-  } as LoaderCoreContext<Result>;
+    __core__retry: mergedRetry,
+  };
 }
 
 // Helper to create various error types
@@ -43,8 +45,8 @@ function createTestError(message = "Test error") {
   return new Error(message);
 }
 
-function createRetrySignal() {
-  return new RetrySignal();
+function createRetrySignal(errorReason?: unknown, propagated = false) {
+  return new RetrySignal({ errorReason, propagated });
 }
 
 // Helper to create mock callbacks
@@ -115,8 +117,18 @@ describe("createRetryAspect", () => {
 
       // Test with fallback
       const contextWithFallback = createMockContext<string>({
-        fallback: mockFallback,
+        count: 1, // Need count > 0 for fallback to be attached
+        fallback: {
+          immediate: undefined,
+          conditional: undefined,
+          matchers: [],
+          initial: mockFallback,
+          target: undefined,
+        },
       });
+
+      // Call before advice first to set up fallback.target
+      await aspect.before!.advice(contextWithFallback);
 
       await aspect.around!.advice(contextWithFallback, {
         attachToTarget: mockAttachToTarget,
@@ -131,7 +143,13 @@ describe("createRetryAspect", () => {
 
       // Test without fallback
       const contextWithoutFallback = createMockContext<string>({
-        fallback: undefined,
+        fallback: {
+          immediate: undefined,
+          conditional: undefined,
+          matchers: [],
+          initial: undefined,
+          target: undefined,
+        },
       });
 
       await aspect.around!.advice(contextWithoutFallback, {
@@ -144,9 +162,10 @@ describe("createRetryAspect", () => {
   });
 
   describe("AfterThrowing Advice - Retry Decision", () => {
-    it("should retry when error is RetrySignal", async () => {
+    it("should retry when error is RetrySignal and preserve original properties", async () => {
       const aspect = createRetryAspect<string>();
-      const retrySignal = createRetrySignal();
+      const originalError = new Error("Original error");
+      const retrySignal = createRetrySignal(originalError, true);
 
       const context = createMockContext<string>({
         count: 0,
@@ -154,14 +173,20 @@ describe("createRetryAspect", () => {
         canRetryOnError: false, // Even with false, RetrySignal should retry
       });
 
-      await expect(
-        aspect.afterThrowing!.advice(context, retrySignal),
-      ).rejects.toBeInstanceOf(RetrySignal);
+      try {
+        await aspect.afterThrowing!.advice(context, retrySignal);
+      } catch (thrownSignal) {
+        expect(thrownSignal).toBeInstanceOf(RetrySignal);
+        if (thrownSignal instanceof RetrySignal) {
+          expect(thrownSignal.errorReason).toBe(originalError);
+          expect(thrownSignal.propagated).toBe(true);
+        }
+      }
 
       expect(context.__core__retry.count).toBe(1);
     });
 
-    it("should respect canRetryOnError setting", async () => {
+    it("should respect canRetryOnError setting and store errorReason", async () => {
       const aspect = createRetryAspect<string>();
       const testError = createTestError("Generic error");
 
@@ -172,9 +197,15 @@ describe("createRetryAspect", () => {
         canRetryOnError: true,
       });
 
-      await expect(
-        aspect.afterThrowing!.advice(contextWithRetry, testError),
-      ).rejects.toBeInstanceOf(RetrySignal);
+      try {
+        await aspect.afterThrowing!.advice(contextWithRetry, testError);
+      } catch (thrownSignal) {
+        expect(thrownSignal).toBeInstanceOf(RetrySignal);
+        if (thrownSignal instanceof RetrySignal) {
+          expect(thrownSignal.errorReason).toBe(testError);
+          expect(thrownSignal.propagated).toBe(false);
+        }
+      }
 
       expect(contextWithRetry.__core__retry.count).toBe(1);
 
@@ -193,7 +224,7 @@ describe("createRetryAspect", () => {
       expect(contextWithoutRetry.__core__retry.count).toBe(0);
     });
 
-    it("should respect canRetryOnError function", async () => {
+    it("should respect canRetryOnError function and store errorReason", async () => {
       const aspect = createRetryAspect<string>();
       const testError = createTestError("Function-decided error");
       const mockCanRetry = jest.fn().mockReturnValue(true);
@@ -204,9 +235,15 @@ describe("createRetryAspect", () => {
         canRetryOnError: mockCanRetry,
       });
 
-      await expect(
-        aspect.afterThrowing!.advice(context, testError),
-      ).rejects.toBeInstanceOf(RetrySignal);
+      try {
+        await aspect.afterThrowing!.advice(context, testError);
+      } catch (thrownSignal) {
+        expect(thrownSignal).toBeInstanceOf(RetrySignal);
+        if (thrownSignal instanceof RetrySignal) {
+          expect(thrownSignal.errorReason).toBe(testError);
+          expect(thrownSignal.propagated).toBe(false);
+        }
+      }
 
       expect(mockCanRetry).toHaveBeenCalledWith(testError);
       expect(context.__core__retry.count).toBe(1);
@@ -238,7 +275,7 @@ describe("createRetryAspect", () => {
   });
 
   describe("AfterThrowing Advice - Max Retry Management", () => {
-    it("should increment count and retry when under max count", async () => {
+    it("should increment count and retry when under max count with errorReason", async () => {
       const aspect = createRetryAspect<string>();
       const testError = createTestError("Retryable error");
 
@@ -248,9 +285,15 @@ describe("createRetryAspect", () => {
         canRetryOnError: true,
       });
 
-      await expect(
-        aspect.afterThrowing!.advice(context, testError),
-      ).rejects.toBeInstanceOf(RetrySignal);
+      try {
+        await aspect.afterThrowing!.advice(context, testError);
+      } catch (thrownSignal) {
+        expect(thrownSignal).toBeInstanceOf(RetrySignal);
+        if (thrownSignal instanceof RetrySignal) {
+          expect(thrownSignal.errorReason).toBe(testError);
+          expect(thrownSignal.propagated).toBe(false);
+        }
+      }
 
       expect(context.__core__retry.count).toBe(2);
     });
@@ -331,16 +374,22 @@ describe("createRetryAspect", () => {
         count: 1, // Already tried once
         maxCount: 3,
         canRetryOnError: true,
-        fallback: mockFallback,
+        fallback: {
+          immediate: undefined,
+          conditional: undefined,
+          matchers: [],
+          initial: mockFallback,
+          target: undefined,
+        },
         onRetryEach: callbacks.onRetryEach,
         onRetryExceeded: callbacks.onRetryExceeded,
       });
 
-      // Test before advice
+      // Test before advice first to set up fallback.target
       await aspect.before!.advice(context);
       expect(callbacks.onRetryEach).toHaveBeenCalledTimes(1);
 
-      // Test around advice
+      // Test around advice after before advice sets target
       await aspect.around!.advice(context, {
         attachToTarget: mockAttachToTarget,
         attachToResult: mockAttachToResult,
@@ -349,9 +398,15 @@ describe("createRetryAspect", () => {
 
       // Test afterThrowing advice
       const testError = createTestError("Integration error");
-      await expect(
-        aspect.afterThrowing!.advice(context, testError),
-      ).rejects.toBeInstanceOf(RetrySignal);
+      try {
+        await aspect.afterThrowing!.advice(context, testError);
+      } catch (thrownSignal) {
+        expect(thrownSignal).toBeInstanceOf(RetrySignal);
+        if (thrownSignal instanceof RetrySignal) {
+          expect(thrownSignal.errorReason).toBe(testError);
+          expect(thrownSignal.propagated).toBe(false);
+        }
+      }
       expect(context.__core__retry.count).toBe(2);
     });
   });

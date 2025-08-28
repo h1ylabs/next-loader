@@ -11,6 +11,7 @@ export { middleware } from "./middleware";
 // types
 export type { BackoffContextInput } from "@/lib/models/backoff";
 export type { LoaderCoreInput } from "@/lib/models/context";
+export type { LoaderContextID, MetadataContext } from "@/lib/models/metadata";
 export type {
   LoaderMiddleware,
   MiddlewareContext,

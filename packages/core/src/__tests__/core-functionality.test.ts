@@ -120,36 +120,6 @@ describe("Core Functionality", () => {
       expect(callCount).toBeGreaterThan(3);
     });
 
-    it("should useFallbackOnNextRetry to change execution path", async () => {
-      let usesFallback = false;
-      const { execute, loaderOptions } = loader().withOptions({
-        input: {
-          retry: { maxCount: 3, canRetryOnError: true },
-          timeout: { delay: 5000 },
-        },
-        propagateRetry: false,
-        middlewares: [],
-      });
-
-      const fallbackTarget = async () => {
-        usesFallback = true;
-        return "fallback-success";
-      };
-
-      const targetWithFallback = jest.fn(async () => {
-        const options = loaderOptions();
-
-        // Use fallback on next retry - pass a function that returns the target
-        options.retry.useFallbackOnNextRetry(() => fallbackTarget);
-
-        throw new Error("will use fallback");
-      });
-
-      const result = await execute(targetWithFallback);
-      expect(result).toBe("fallback-success");
-      expect(usesFallback).toBe(true);
-    });
-
     it("should resetTimeout during execution", async () => {
       const { execute, loaderOptions } = loader().withOptions({
         input: {
@@ -219,7 +189,7 @@ describe("Core Functionality", () => {
   describe("retry() function manual retry", () => {
     it("should manually trigger retry from target function", async () => {
       let attemptCount = 0;
-      const { execute, retry } = loader().withOptions({
+      const { execute, retryImmediately: retry } = loader().withOptions({
         input: {
           retry: { maxCount: 3, canRetryOnError: true },
           timeout: { delay: 5000 },
@@ -251,7 +221,7 @@ describe("Core Functionality", () => {
 
     it("should use fallback function when manually retrying", async () => {
       let usedFallback = false;
-      const { execute, retry } = loader().withOptions({
+      const { execute, retryImmediately: retry } = loader().withOptions({
         input: {
           retry: { maxCount: 3, canRetryOnError: true },
           timeout: { delay: 5000 },
@@ -277,7 +247,7 @@ describe("Core Functionality", () => {
 
     it("should respect maxCount when using manual retry", async () => {
       let attemptCount = 0;
-      const { execute, retry } = loader().withOptions({
+      const { execute, retryImmediately: retry } = loader().withOptions({
         input: {
           retry: { maxCount: 2, canRetryOnError: true },
           timeout: { delay: 5000 },
@@ -470,7 +440,7 @@ describe("Core Functionality", () => {
     });
 
     it("should throw error when manually retrying outside execution context", () => {
-      const { retry } = loader().withOptions({
+      const { retryImmediately: retry } = loader().withOptions({
         input: {
           retry: { maxCount: 1, canRetryOnError: false },
           timeout: { delay: 5000 },

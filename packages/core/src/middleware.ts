@@ -5,33 +5,6 @@ import { MiddlewareInvalidContextSignal } from "@/lib/signals/MiddlewareInvalidC
 
 import type { LoaderMiddleware } from "./lib/models/middleware";
 
-/**
- * Creates a middleware factory that provides methods to create configured middleware instances.
- * Middlewares are built on top of the promise-aop library and act as aspects
- * that can run code before, after, or on failure of the target function.
- *
- * @example
- * ```typescript
- * const loggingMiddleware = middleware<MyResult>().withOptions({
- *   name: 'logging',
- *   contextGenerator: () => ({ startTime: 0 }),
- *   before: async (context) => {
- *     context.startTime = Date.now();
- *     console.log('Loader execution started.');
- *   },
- *   complete: async (context, result) => {
- *     const duration = Date.now() - context.startTime;
- *     console.log(`Loader execution finished in ${duration}ms. Result:`, result);
- *   },
- *   failure: async (context, error) => {
- *     console.error('Loader execution failed:', error);
- *   }
- * });
- * ```
- *
- * @template Result - The expected return type of the target functions to be executed.
- * @returns An object containing `withOptions` method for creating middleware instances.
- */
 export function middleware<const Result>() {
   const withOptions = <Context, MiddlewareName extends string>({
     name,

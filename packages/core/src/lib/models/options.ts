@@ -1,7 +1,9 @@
+import { MetadataOptions } from "./metadata";
 import type { RetryContextOptions } from "./retry";
 import type { TimeoutContextOptions } from "./timeout";
 
-export interface LoaderCoreOptions<Result> {
+export interface LoaderCoreOptions {
   readonly timeout: TimeoutContextOptions;
-  readonly retry: RetryContextOptions<Result>;
+  readonly retry: RetryContextOptions;
+  readonly metadata: MetadataOptions;
 }

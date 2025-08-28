@@ -19,7 +19,9 @@ export class DynamicTimeout {
     this.totalDelay = initialDelay;
 
     // Initialize timeout with arrow function to preserve 'this' context
-    this.timeoutID = setTimeout(() => this.handleTimeout(), initialDelay);
+    this.timeoutID = setTimeout(() => {
+      this.handleTimeout();
+    }, initialDelay);
   }
 
   private handleTimeout(): void {
