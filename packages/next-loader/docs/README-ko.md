@@ -1005,7 +1005,3 @@ export default componentLoader(MyComponent).withBoundary(<LoadingFallback />);
 ## 📄 라이선스
 
 MIT © [h1ylabs](https://github.com/h1ylabs)
-
-```
-
-```
