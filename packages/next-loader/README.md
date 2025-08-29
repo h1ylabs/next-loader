@@ -1,6 +1,6 @@
 # @h1y/next-loader
 
-**Latest version: v5.0.0**
+**Latest version: v6.0.0**
 
 A powerful, type-safe resource loading library specifically designed for Next.js applications. Build efficient data fetching with built-in caching, revalidation, retry logic, and seamless integration with Next.js server components.
 
@@ -12,9 +12,11 @@ A powerful, type-safe resource loading library specifically designed for Next.js
 ## ✨ Key Features
 
 - **🎯 Next.js Native**: Built specifically for Next.js with first-class server component support
+- **⚡ Batch Loading**: Load multiple resources in parallel with full type safety
 - **🔄 Smart Caching**: Integrates seamlessly with Next.js cache system and revalidation
-- **⚡ Resource Builder Pattern**: Declarative resource definitions with dependency management
 - **🛡️ Type Safety**: Full TypeScript support with intelligent type inference
+- **🎭 Boundary Management**: Suspense and Error Boundary integration for component resilience
+- **💾 State Persistence**: `componentState` maintains state across retry cycles
 - **🔗 Hierarchical Tags**: Advanced cache invalidation with hierarchical tagging system
 - **⏱️ Retry & Timeout**: Built-in resilience with configurable retry and timeout strategies
 - **🎛️ Middleware Support**: Extensible middleware system for cross-cutting concerns
@@ -40,10 +42,22 @@ import { revalidateTag } from "next/cache";
 import { cache } from "react";
 import { createLoader, NextJSAdapter } from "@h1y/next-loader";
 
-// Create once at module level, reuse everywhere
-const { loader } = createLoader({
-  adapter: NextJSAdapter,
-  revalidate: revalidateTag,
+// Define data types
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface Post {
+  id: string;
+  title: string;
+  content: string;
+  authorId: string;
+}
+
+// Create once at module level and reuse everywhere
+const loader = createLoader({
   memo: cache, // Request deduplication
 });
 ```
@@ -54,12 +68,22 @@ const { loader } = createLoader({
 import { createResourceBuilder } from "@h1y/next-loader";
 
 const User = createResourceBuilder({
-  tags: (req: { id: string }) => ({ identifier: `user-${req.id}` }),
+  tags: (req: { id: string }) => ({ id: `user-${req.id}` }),
   options: { staleTime: 300000 }, // Cache for 5 minutes
-  use: [],
-  load: async ({ req, fetch }) => {
-    const response = await fetch(`/api/users/${req.id}`);
+  load: async ({ req, fetcher }): Promise<User> => {
+    const response = await fetcher(NextJSAdapter).load(`/api/users/${req.id}`);
     if (!response.ok) throw new Error(`Failed to fetch user`);
+    return response.json();
+  },
+});
+
+const UserPosts = createResourceBuilder({
+  tags: (req: { userId: string }) => ({ id: `user-${req.userId}-posts` }),
+  options: { staleTime: 180000 }, // Cache for 3 minutes
+  load: async ({ req, fetcher }): Promise<Post[]> => {
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/users/${req.userId}/posts`,
+    );
     return response.json();
   },
 });
@@ -67,16 +91,21 @@ const User = createResourceBuilder({
 
 ### 3. Use in your components
 
+**Single Resource:**
+
 ```typescript
 async function UserProfile({ params }: { params: { id: string } }) {
-  const [load, revalidate] = loader(User({ id: params.id }));
+  const [load, revalidation] = loader(User({ id: params.id }));
   const [user] = await load();
 
   return (
     <div>
       <h1>{user.name}</h1>
       <p>{user.email}</p>
-      <form action={revalidate}>
+      <form action={async () => {
+        "use server";
+        revalidation.forEach(revalidateTag);
+      }}>
         <button>Refresh</button>
       </form>
     </div>
@@ -84,7 +113,35 @@ async function UserProfile({ params }: { params: { id: string } }) {
 }
 ```
 
-That's it! Your data is now automatically cached, revalidated, and ready for production.
+**Batch Loading (Multiple Resources):**
+
+```typescript
+async function UserDashboard({ params }: { params: { id: string } }) {
+  // Load multiple resources in parallel with full type safety
+  const [load, revalidation] = loader(
+    User({ id: params.id }),
+    UserPosts({ userId: params.id })
+  );
+
+  // Results are type-safe: [User, Post[]]
+  const [user, posts] = await load();
+
+  return (
+    <div>
+      <h1>{user.name}'s Dashboard</h1>
+      <p>{posts.length} posts</p>
+      <form action={async () => {
+        "use server";
+        revalidation.forEach(revalidateTag);
+      }}>
+        <button>Refresh All</button>
+      </form>
+    </div>
+  );
+}
+```
+
+That's it! Your data is now automatically cached, batch-loaded, revalidated, and ready for production.
 
 ## 🧩 Core Concepts
 
@@ -96,19 +153,18 @@ Resources are declarative definitions that tell @h1y/next-loader how to fetch, c
 const BlogPost = createResourceBuilder({
   // Define cache tags
   tags: (req: { slug: string }) => ({
-    identifier: `post-${req.slug}`,
+    id: `post-${req.slug}`,
     effects: ["blog-content"], // Invalidate related caches
   }),
 
   // Configure caching
   options: { staleTime: 600000 }, // Cache for 10 minutes
 
-  // Declare dependencies
-  use: [], // No dependencies for this resource
-
   // Define how to load data
-  load: async ({ req, fetch, retry }) => {
-    const response = await fetch(`/api/posts/${req.slug}`);
+  load: async ({ req, fetcher, retry }) => {
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/posts/${req.slug}`,
+    );
     if (!response.ok) {
       if (response.status >= 500) retry(); // Retry on server errors
       throw new Error("Failed to load post");
@@ -125,33 +181,47 @@ const BlogPost = createResourceBuilder({
 - **Cacheable**: Automatic caching with fine-grained control
 - **Resilient**: Built-in retry and error handling
 
-### Two Ways to Handle Loading
+### Two Loading Approaches
 
 @h1y/next-loader provides two distinct approaches for different use cases:
 
-#### `createLoader()` - For Data Fetching
+#### `createLoader()` - For Data Fetching with Caching
 
-**When to use**: Loading data in server components (most common use case)
+**When to use**: Loading external data in server components (most common use case)
 
 ```typescript
-const { loader } = createLoader(dependencies);
+const loader = createLoader({ memo: cache });
 
 async function UserPage() {
+  // Single resource
   const [load] = loader(User({ id: '123' }));
   const [data] = await load();
-  return <div>{data.name}</div>;
+
+  // Batch loading (key feature!)
+  const [batchLoad] = loader(
+    User({ id: '123' }),
+    UserPosts({ userId: '123' }),
+    UserStats({ id: '123' })
+  );
+  const [user, posts, stats] = await batchLoad();
+
+  return <div>{user.name} has {posts.length} posts</div>;
 }
 ```
 
 **Characteristics:**
 
-- ✅ Perfect for data fetching with caching
-- ❌ Middleware context not accessible in components
+- ✅ **Batch loading** with full type safety
+- ✅ Next.js cache integration (ISR, revalidateTag)
+- ✅ Request deduplication via React's `cache()`
+- ✅ Resource dependency management
+- ❌ No middleware context access
+- ❌ No component-level retry/fallback
 - 🔧 Default: 60s timeout, no retries
 
 #### `createComponentLoader()` - For Component Resilience
 
-**When to use**: Adding retry/timeout behavior to components themselves
+**When to use**: Adding retry/timeout/state management to components themselves
 
 ```typescript
 const { componentLoader } = createComponentLoader({
@@ -159,19 +229,83 @@ const { componentLoader } = createComponentLoader({
   timeout: { delay: 5000 }
 });
 
-async function RiskyComponent() {
-  const data = await unreliableApiCall();
-  return <div>{data}</div>;
+async function UserProfile({ userId }: { userId: string }) {
+  const user = await fetchUserProfile(userId);
+  return <div>Hello, {user.name}!</div>;
 }
 
-export default componentLoader(RiskyComponent);
+// Loading fallback component (Client Component)
+function LoadingFallback() {
+  return <div>Loading...</div>;
+}
+
+// Error fallback component (Client Component)
+function ErrorFallback({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
+  return (
+    <div>
+      <p>Something went wrong: {error.message}</p>
+      <button onClick={resetErrorBoundary}>Retry</button>
+    </div>
+  );
+}
+
+// Three boundary options:
+export const NoWrapperComponent = componentLoader(UserProfile).withNoBoundary();
+export const SuspenseComponent = componentLoader(UserProfile).withBoundary(<LoadingFallback />);
+export const ErrorSafeComponent = componentLoader(UserProfile).withErrorBoundary({
+  errorFallback: ErrorFallback
+});
 ```
 
 **Characteristics:**
 
 - ✅ Component-level retry and timeout handling
-- ✅ Middleware context accessible via `{name}MiddlewareOptions()`
-- 🔧 Default: Infinite timeout, no retries
+- ✅ **State persistence** across retries (`componentState`)
+- ✅ **Boundary management** (Suspense + Error Boundary)
+- ✅ **Middleware context access** via `{name}MiddlewareOptions()` within components
+- ✅ **Integrates with `createLoader()`** - automatic retry signal propagation
+- ✅ **Best Practice**: Use `loader()` for data fetching within `componentLoader()` components
+- 🔧 Default: 60s timeout, no retries
+
+### Key Integration: loader + componentLoader
+
+**Important**: You can use `createLoader()` inside `createComponentLoader()` components, and retry signals automatically propagate:
+
+```typescript
+const loader = createLoader(dependencies, {
+  retry: { maxCount: 2, canRetryOnError: true }
+});
+
+const { componentLoader } = createComponentLoader({
+  retry: { maxCount: 3, canRetryOnError: (err) => err.status >= 500 }
+});
+
+async function IntegratedDashboard({ userId }: { userId: string }) {
+  // loader failures automatically trigger componentLoader retries
+  const [loadUser] = loader(User({ id: userId }));
+  const [loadPosts] = loader(UserPosts({ userId }));
+
+  const [user, posts] = await Promise.all([
+    loadUser(),
+    loadPosts()
+  ]);
+
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      <p>{posts.length} posts</p>
+    </div>
+  );
+}
+
+// Loading fallback component (Client Component)
+function DashboardLoadingFallback() {
+  return <div>Loading dashboard...</div>;
+}
+
+// Wrapped component gets both loader caching + component resilience
+export default componentLoader(IntegratedDashboard).withBoundary(<DashboardLoadingFallback />);
+```
 
 ### Smart Cache Invalidation with Hierarchical Tags
 
@@ -182,13 +316,7 @@ import { hierarchyTag } from "@h1y/next-loader";
 
 const UserComments = createResourceBuilder({
   tags: (req: { userId: string; postId: string }) => ({
-    identifier: hierarchyTag(
-      "user",
-      req.userId,
-      "posts",
-      req.postId,
-      "comments",
-    ),
+    id: hierarchyTag("user", req.userId, "posts", req.postId, "comments"),
   }),
   // ... other config
 });
@@ -211,6 +339,44 @@ revalidateTag("user/123/posts/456"); // Specific post
 
 ## 🎯 Advanced Examples
 
+### Batch Loading with Type Safety
+
+Load multiple resources simultaneously with full TypeScript support:
+
+```typescript
+async function ComprehensiveDashboard({ userId }: { userId: string }) {
+  // Load 5 different resources in parallel
+  const [load, revalidation] = loader(
+    User({ id: userId }),           // → User
+    UserPosts({ userId }),          // → Post[]
+    UserStats({ userId }),          // → UserStats
+    RecentActivity({ userId }),     // → Activity[]
+    NotificationSettings({ userId }) // → NotificationSettings
+  );
+
+  // TypeScript infers: [User, Post[], UserStats, Activity[], NotificationSettings]
+  const [user, posts, stats, activities, settings] = await load();
+
+  return (
+    <div>
+      <h1>Welcome, {user.name}!</h1>
+      <div>Posts: {stats.postCount} | Views: {stats.totalViews}</div>
+      <div>Latest post: {posts[0]?.title}</div>
+      <div>Recent activity: {activities.length} items</div>
+      <div>Email notifications: {settings.emailEnabled ? 'On' : 'Off'}</div>
+
+      {/* Revalidate all resources at once */}
+      <form action={async () => {
+        "use server";
+        revalidation.forEach(revalidateTag);
+      }}>
+        <button>Refresh Everything</button>
+      </form>
+    </div>
+  );
+}
+```
+
 ### Resource Dependencies
 
 Build complex data flows by composing resources:
@@ -218,11 +384,10 @@ Build complex data flows by composing resources:
 ```typescript
 // Base user resource
 const User = createResourceBuilder({
-  tags: (req: { id: string }) => ({ identifier: `user-${req.id}` }),
+  tags: (req: { id: string }) => ({ id: `user-${req.id}` }),
   options: { staleTime: 300000 },
-  use: [],
-  load: async ({ req, fetch }) => {
-    const response = await fetch(`/api/users/${req.id}`);
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(`/api/users/${req.id}`);
     return response.json();
   },
 });
@@ -230,12 +395,12 @@ const User = createResourceBuilder({
 // Posts that depend on user data
 const UserPosts = createResourceBuilder({
   tags: (req: { userId: string }) => ({
-    identifier: hierarchyTag('user', req.userId, 'posts'),
+    id: hierarchyTag('user', req.userId, 'posts'),
     effects: ['activity-feed'] // Invalidate activity feed when posts change
   }),
   options: { staleTime: 180000 },
-  use: [User({ id: req.userId })], // Declare dependency
-  load: async ({ req, fetch, use: [user] }) => {
+  use: (req) => [User({ id: req.userId })], // Declare dependency
+  load: async ({ req, fetcher, use: [user] }) => {
     const userData = await user;
 
     // Skip loading if user is inactive
@@ -243,7 +408,7 @@ const UserPosts = createResourceBuilder({
       return { posts: [], reason: 'User inactive' };
     }
 
-    const response = await fetch(`/api/users/${req.userId}/posts`);
+    const response = await fetcher(NextJSAdapter).load(`/api/users/${req.userId}/posts`);
     return {
       posts: await response.json(),
       author: userData.name,
@@ -251,9 +416,9 @@ const UserPosts = createResourceBuilder({
   },
 });
 
-// Use both resources
+// Use both resources with batch loading
 async function UserDashboard({ userId }: { userId: string }) {
-  const [load, revalidate] = loader(
+  const [load, revalidation] = loader(
     User({ id: userId }),
     UserPosts({ userId })
   );
@@ -263,8 +428,11 @@ async function UserDashboard({ userId }: { userId: string }) {
   return (
     <div>
       <h1>{user.name}'s Dashboard</h1>
-      <p>{posts.posts.length} posts</p>
-      <form action={revalidate}>
+      <p>{posts.posts.length} posts by {posts.author}</p>
+      <form action={async () => {
+        "use server";
+        revalidation.forEach(revalidateTag);
+      }}>
         <button>Refresh</button>
       </form>
     </div>
@@ -272,319 +440,412 @@ async function UserDashboard({ userId }: { userId: string }) {
 }
 ```
 
-### Error Handling and Resilience
+### Component State Management
+
+Use `componentState` to maintain state across retry cycles and integrate with `loader()` for data fetching. Unlike React useState, componentState persists across retries.
 
 ```typescript
-const { loader } = createLoader(dependencies, {
-  retry: {
-    maxCount: 3,
-    canRetryOnError: (error) => error.status >= 500, // Only retry server errors
-  },
-  timeout: { delay: 10000 },
+const loader = createLoader({ memo: cache });
+const { componentLoader, componentState, componentOptions } = createComponentLoader({
+  retry: { maxCount: 3, canRetryOnError: true }
 });
 
+// Define resources
+const UserProfile = createResourceBuilder({
+  tags: (req: { userId: string }) => ({ id: `user-profile-${req.userId}` }),
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(`/api/users/${req.userId}/profile`);
+    return response.json();
+  },
+});
+
+const UserSettings = createResourceBuilder({
+  tags: (req: { userId: string }) => ({ id: `user-settings-${req.userId}` }),
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(`/api/users/${req.userId}/settings`);
+    return response.json();
+  },
+});
+
+async function StatefulDashboard({ userId }: { userId: string }) {
+  // State persists across retries (unlike React useState)
+  const [retryCount, setRetryCount] = componentState(0);
+  const [lastLoadTime, setLastLoadTime] = componentState<Date | null>(null);
+
+  const options = componentOptions();
+
+  // Track successful retry attempts
+  if (options.retry.count > retryCount) {
+    setRetryCount(options.retry.count);
+    setLastLoadTime(new Date());
+  }
+
+  // Use loader for data fetching - errors will propagate and trigger componentLoader retries
+  const [loadProfile] = loader(UserProfile({ userId }));
+  const [loadSettings] = loader(UserSettings({ userId }));
+
+  const [profile, settings] = await Promise.all([
+    loadProfile(),
+    loadSettings()
+  ]);
+
+  return (
+    <div className={`theme-${settings.theme}`}>
+      <h1>Welcome back, {profile.name}!</h1>
+      <p>Language: {settings.language}</p>
+      {retryCount > 0 && (
+        <small>✅ Successfully loaded after {retryCount} retries</small>
+      )}
+      {lastLoadTime && (
+        <small>Last updated: {lastLoadTime.toLocaleTimeString()}</small>
+      )}
+    </div>
+  );
+}
+
+export default componentLoader(StatefulDashboard).withBoundary(<div>Loading...</div>);
+```
+
+### Advanced Retry Control
+
+Use advanced retry functions for fine-grained control over retry behavior and user feedback.
+
+#### `retryImmediately()` - Immediate Retry
+
+```typescript
+const { componentLoader, retryImmediately } = createComponentLoader({
+  retry: { maxCount: 3, canRetryOnError: true }
+});
+
+async function PaymentProcessor({ amount }: { amount: number }) {
+  const result = await processPayment(amount);
+
+  // If payment requires immediate retry (e.g., rate limited)
+  if (result.needsRetry) {
+    retryImmediately(<div>Payment rate limited, retrying immediately...</div>);
+  }
+
+  return <div>✅ Payment: ${result.amount}</div>;
+}
+
+export default componentLoader(PaymentProcessor).withBoundary(<div>Loading...</div>);
+```
+
+#### `retryFallback()` - Conditional Fallback
+
+Unlike `retryImmediately()`, `retryFallback()` doesn't trigger immediate retry. Instead, it registers conditional fallbacks that are shown when specific error conditions are met, then allows automatic retry to proceed.
+
+```typescript
+const { componentLoader, retryFallback } = createComponentLoader({
+  retry: { maxCount: 3, canRetryOnError: true }
+});
+
+async function CheckoutForm({ amount }: { amount: number }) {
+  // Show different fallbacks based on error conditions
+  retryFallback({
+    when: (err) => err.code === 'INSUFFICIENT_FUNDS',
+    fallback: <div>❌ Insufficient funds. Please add money to your account.</div>
+  });
+
+  retryFallback({
+    when: (err) => err.code === 'CARD_EXPIRED',
+    fallback: <div>❌ Card expired. Please update your payment method.</div>
+  });
+
+  // Let other errors propagate to trigger automatic retry
+  const result = await processPayment(amount);
+  return <div>✅ Payment: ${result.amount}</div>;
+}
+
+export default componentLoader(CheckoutForm).withBoundary(<div>Loading...</div>);
+```
+
+**Key Differences:**
+
+- `retryImmediately()`: Bypasses automatic retry, triggers immediate retry
+- `retryFallback()`: Registers conditional fallbacks, allows automatic retry to continue
+
+### Error Handling
+
+```typescript
 const Product = createResourceBuilder({
-  tags: (req: { id: string }) => ({ identifier: `product-${req.id}` }),
-  options: { staleTime: 120000 },
-  use: [],
-  load: async ({ req, fetch, retry, loaderOptions }) => {
-    try {
-      const response = await fetch(`/api/products/${req.id}`);
-      if (!response.ok) {
-        if (response.status >= 500) retry(); // Trigger retry for server errors
-        throw new Error(`Product not found: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      const options = loaderOptions();
-
-      // Return error state with retry info
-      return {
-        id: req.id,
-        error: true,
-        message: error.message,
-        retryCount: options.retry.count,
-      };
-    }
+  tags: (req: { id: string }) => ({ id: `product-${req.id}` }),
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(`/api/products/${req.id}`);
+    if (!response.ok) throw new Error(`Product not found`);
+    return response.json();
   },
 });
+
+// Errors propagate and trigger retries automatically
+async function ProductPage({ id }: { id: string }) {
+  const [load] = loader(Product({ id }));
+  const [product] = await load();
+  return <div>{product.name}: ${product.price}</div>;
+}
 ```
 
 ## 🎛️ Middleware System
 
-Add cross-cutting concerns like logging, metrics, and monitoring to your loaders with a powerful middleware system built on [@h1y/promise-aop](https://github.com/h1ylabs/next-loader/tree/main/packages/promise-aop).
-
-### Why Middleware?
-
-**Middleware** provides clean separation of concerns:
-
-- **Simplified API**: Easy-to-use interfaces for common patterns
-- **Type Safety**: Full TypeScript support with automatic context inference
-- **Integration**: Seamless integration with Next.js caching
-- **Isolation**: Each middleware has its own isolated context
-
-### Creating Custom Middleware
-
-#### For Data Loaders
-
 ```typescript
 import { createLoaderMiddleware } from "@h1y/next-loader";
 
-// Performance monitoring middleware
-const performanceMiddleware = createLoaderMiddleware({
-  name: "performance",
+// Logging middleware
+const loggingMiddleware = createLoaderMiddleware({
+  name: "logging",
   contextGenerator: () => ({ startTime: 0 }),
-
   before: async (context) => {
-    context.startTime = performance.now();
+    context.startTime = Date.now();
     console.log("🚀 Loading started");
   },
-
-  complete: async (context, result) => {
-    const duration = performance.now() - context.startTime;
-    console.log(`✅ Completed in ${duration.toFixed(2)}ms`);
-  },
-
-  failure: async (context, error) => {
-    const duration = performance.now() - context.startTime;
-    console.error(`❌ Failed after ${duration.toFixed(2)}ms:`, error.message);
+  complete: async (context) => {
+    const duration = Date.now() - context.startTime;
+    console.log(`✅ Loading completed in ${duration}ms`);
   },
 });
 
-// Apply to your loader
-const { loader } = createLoader(dependencies, loaderConfig, [
-  performanceMiddleware,
-]);
+const loader = createLoader({ memo: cache }, config, [loggingMiddleware]);
 ```
 
-#### For Component Loaders
+#### Component Middleware with Context Access
 
 ```typescript
 import { createComponentMiddleware } from "@h1y/next-loader";
 
-// Metrics collection middleware
-const metricsMiddleware = createComponentMiddleware({
-  name: "metrics",
-  contextGenerator: () => ({ renderStart: 0, componentName: "Unknown" }),
-
+// Performance monitoring for component rendering
+const performanceMiddleware = createComponentMiddleware({
+  name: "performance",
+  contextGenerator: () => ({ startTime: 0, componentName: '' }),
   before: async (context) => {
-    context.renderStart = Date.now();
+    context.startTime = Date.now();
   },
-
   complete: async (context) => {
-    const renderTime = Date.now() - context.renderStart;
-    analytics.track("component.render.success", {
-      component: context.componentName,
-      renderTimeMs: renderTime,
-    });
-  },
-
-  failure: async (context, error) => {
-    analytics.track("component.render.failure", {
-      component: context.componentName,
-      error: error.message,
-    });
+    const renderTime = Date.now() - context.startTime;
+    console.log(`Component ${context.componentName} render time: ${renderTime}ms`);
   },
 });
 
-// Apply to component loader
-const { componentLoader } = createComponentLoader(componentConfig, [
-  metricsMiddleware,
-]);
+const { componentLoader, performanceMiddlewareOptions } = createComponentLoader({
+  retry: { maxCount: 2, canRetryOnError: true }
+}, [performanceMiddleware]);
+
+async function MonitoredComponent({ userId }: { userId: string }) {
+  // Access middleware context directly in component
+  const perfContext = performanceMiddlewareOptions();
+  perfContext.componentName = 'MonitoredComponent';
+
+  const [load] = loader(User({ id: userId }));
+  const [user] = await load();
+
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      <p>Render started at: {new Date(perfContext.startTime).toISOString()}</p>
+    </div>
+  );
+}
+
+export default componentLoader(MonitoredComponent).withBoundary(<div>Loading...</div>);
 ```
 
-### Advanced Patterns
+## ⚠️ Best Practices & Important Guidelines
 
-#### Conditional Logic
+### Fallback Component Guidelines
+
+**Separate Module Creation**: Always create fallback components as separate modules rather than inline definitions for better maintainability and reusability.
+
+**Error Fallback Requirements**: Error fallback components **must** be Client Components since they handle interactive events like `onClick` for retry buttons.
+
+**Context Access Limitation**: Fallback components cannot access (Component)Loader Context. Keep fallback logic independent and stateless.
+
+**retryFallback Usage Pattern**: Like React Hooks, `retryFallback` functions must be called during every component render cycle, not conditionally.
 
 ```typescript
-const debugMiddleware = createLoaderMiddleware({
-  name: "debug",
-  contextGenerator: () => ({
-    shouldLog: process.env.NODE_ENV === "development",
-  }),
+// ❌ Wrong - Conditional fallback registration
+async function MyComponent() {
+  if (someCondition) {
+    retryFallback({ when: () => true, fallback: () => {} }); // Don't do this
+  }
+  return await loadData();
+}
 
-  before: async (context) => {
-    if (context.shouldLog) console.log("🔍 Starting loader");
-  },
+// ✅ Correct - Always register fallbacks
+async function MyComponent() {
+  // Always call retryFallback at component render
+  retryFallback({ when: () => true, fallback: () => {} });
 
-  complete: async (context, result) => {
-    if (context.shouldLog) console.log("✅ Result:", result);
-  },
-});
+  return await loadData();
+}
 ```
 
-#### Error Recovery
+**Fallback Component Examples**:
 
 ```typescript
-const recoveryMiddleware = createLoaderMiddleware({
-  name: "recovery",
-  contextGenerator: () => ({ attempts: 0 }),
+// ✅ Correct: Separate module for loading fallback
+export function UserProfileLoadingFallback() {
+  return (
+    <div className="animate-pulse">
+      <div className="h-8 bg-gray-200 rounded mb-2"></div>
+      <div className="h-4 bg-gray-200 rounded"></div>
+    </div>
+  );
+}
 
-  failure: async (context, error) => {
-    context.attempts++;
-    if (error.code === "NETWORK_ERROR") {
-      console.warn(`Network error (attempt ${context.attempts}), will retry`);
-    }
-  },
+// ✅ Correct: Separate Client Component module for error fallback
+"use client";
+export function UserProfileErrorFallback({
+  error,
+  resetErrorBoundary
+}: {
+  error: Error;
+  resetErrorBoundary: () => void;
+}) {
+  return (
+    <div className="p-4 border border-red-300 rounded">
+      <h3>Failed to load user profile</h3>
+      <p className="text-red-600">{error.message}</p>
+      <button
+        onClick={resetErrorBoundary}
+        className="mt-2 px-4 py-2 bg-red-600 text-white rounded"
+      >
+        Retry
+      </button>
+    </div>
+  );
+}
+
+// Usage in main component
+export const UserProfileComponent = componentLoader(UserProfile).withErrorBoundary({
+  errorFallback: UserProfileErrorFallback
 });
 ```
 
-### Key Features
+## ⚠️ Important Principles
 
-- **🔒 Isolated Contexts**: Each middleware has its own private context
-- **🔁 Lifecycle Hooks**: Hook into before, complete, failure, and cleanup phases
-- **🎯 Composable**: Stack multiple middleware for complex behaviors
-- **🛡️ Type Safe**: Full TypeScript support with automatic inference
+**next-loader is a library that supports Next.js and does not change its fundamental behavior strategies:**
 
-### Best Practices
+- **Don't suppress errors that cannot be resolved through retries** - Let them propagate naturally so Next.js can handle them appropriately
 
-- Keep middleware **focused** on a single concern
-- Use **descriptive names** for easier debugging
-- Keep context data **minimal** to reduce memory usage
-- **Test middleware independently** from business logic
+```typescript
+// ❌ Wrong - Don't do this
+async function MyComponent() {
+  try {
+    const data = await loadData();
+    return <div>{data.content}</div>;
+  } catch (error) {
+    // Don't suppress errors that cannot be resolved through retries
+    return <div>Something went wrong: {error.message}</div>;
+  }
+}
+
+// ✅ Correct - Let Next.js handle errors
+async function MyComponent() {
+  // Errors that cannot be resolved through retries will propagate naturally for Next.js to handle
+  const data = await loadData();
+  return <div>{data.content}</div>;
+}
+```
 
 ## 📖 API Reference
 
 ### `createLoader(dependencies, options?, middlewares?)`
 
-Creates a global data loader for fetching and caching resources.
-
-**Dependencies** (required):
-
 ```typescript
-{
-  adapter: NextJSAdapter,        // Data fetching integration
-  revalidate: revalidateTag,     // Cache invalidation (from 'next/cache')
-  memo?: cache                   // Request deduplication (from 'react')
-}
-```
-
-**Options** (optional):
-
-```typescript
-{
-  retry: {
-    maxCount: number;                              // Max retry attempts (default: 0)
-    canRetryOnError: boolean | ((error) => boolean); // When to retry (default: false)
-    onRetryEach?: () => void;                      // Called on each retry
-  };
-  timeout: {
-    delay: number;                                 // Timeout in ms (default: 60000)
-    onTimeout?: () => void;                        // Called on timeout
-  };
-  backoff?: {
-    strategy: Backoff;                             // Delay strategy between retries
-    initialDelay: number;                          // First retry delay in ms
-  };
-}
-```
-
-**Returns:** `{ loader }` - The loader function
-
-**Example:**
-
-```typescript
-const { loader } = createLoader(
-  { adapter: NextJSAdapter, revalidate: revalidateTag },
-  { retry: { maxCount: 3, canRetryOnError: (error) => error.status >= 500 } },
+const loader = createLoader(
+  {
+    memo: cache, // Request deduplication
+  },
+  {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 10000 },
+  },
 );
+
+// Usage with revalidation
+const [load, revalidation] = loader(SomeResource({ id: '123' }));
+
+// In your component
+<form action={async () => {
+  "use server";
+  revalidation.forEach(revalidateTag);
+}}>
+  <button>Refresh</button>
+</form>
 ```
 
 ### `createComponentLoader(options?, middlewares?)`
 
-Wraps server components with retry and timeout behavior.
-
-**Options** (optional):
-
 ```typescript
-{
-  retry: {
-    maxCount: number;                              // Max retries (default: 0)
-    canRetryOnError: boolean | ((error) => boolean); // Retry condition
-    fallback?: React.ReactElement;                 // Loading component
-  };
-  timeout: {
-    delay: number;                                 // Timeout in ms (default: Infinity)
-  };
-  backoff?: {
-    strategy: Backoff;                             // Delay strategy
-    initialDelay: number;                          // Initial delay
-  };
-}
-```
-
-**Returns:**
-
-- `componentLoader`: Function to wrap components
-- `retryComponent`: Trigger manual retry
-- `componentOptions`: Access current state
-
-```typescript
-// Create component loader globally
-const { componentLoader, retryComponent, componentOptions, componentState } = createComponentLoader({
-  retry: {
-    maxCount: 2,
-    canRetryOnError: true,
-    fallback: <div>Loading...</div>
-  },
-  timeout: { delay: 30000 }
+const { componentLoader } = createComponentLoader({
+  retry: { maxCount: 3, canRetryOnError: true }
 });
 
-// Define component separately
 async function UserProfile({ userId }: { userId: string }) {
-  const user = await fetchUser(userId);
+  const user = await fetchUserProfile(userId);
   return <div>Hello, {user.name}!</div>;
 }
 
-// Wrap and export
-export default componentLoader(UserProfile);
+// Three boundary management options:
+export const NoBoundary = componentLoader(UserProfile).withNoBoundary();
+export const WithSuspense = componentLoader(UserProfile).withBoundary(<LoadingFallback />);
+export const WithErrorHandling = componentLoader(UserProfile).withErrorBoundary({
+  errorFallback: ErrorFallback
+});
+```
+
+#### Boundary Management Methods
+
+**`withNoBoundary()`**: Returns the async component as-is with resilience logic applied but no additional boundary wrapping.
+
+**`withBoundary(fallback?)`**: Wraps the component with a Suspense boundary for independent code-splitting and loading states.
+
+**`withErrorBoundary(props)`**: Handles both errors and loading states with comprehensive boundary management.
+
+```typescript
+// Error boundary props
+type AsyncErrorBoundaryProps = {
+  pendingFallback?: React.ReactElement; // Loading state
+  errorFallback: (props: { error: unknown }) => React.ReactElement; // Error state
+};
+```
+
+#### Integration with createLoader
+
+```typescript
+const loader = createLoader({ memo: cache });
+const { componentLoader } = createComponentLoader({
+  retry: { maxCount: 2, canRetryOnError: true }
+});
+
+async function Dashboard({ userId }: { userId: string }) {
+  // Loader failures automatically trigger component retries
+  const [loadUser] = loader(User({ id: userId }));
+  const [loadPosts] = loader(UserPosts({ userId }));
+
+  const [user, posts] = await Promise.all([loadUser(), loadPosts()]);
+  return <div>{user.name}: {posts.length} posts</div>;
+}
+
+export default componentLoader(Dashboard).withBoundary(<div>Loading...</div>);
 ```
 
 ### `createResourceBuilder(config)`
 
-Defines how to fetch, cache, and manage data resources.
-
-**Configuration:**
-
-```typescript
-{
-  tags: (req) => ({                                 // Cache tag generation
-    identifier: string;                            // Primary cache tag
-    effects?: string[];                            // Additional tags to invalidate
-  });
-
-  options: {
-    staleTime: number;                             // Cache duration in ms
-    revalidate?: boolean | number;                 // Next.js ISR setting
-  };
-
-  use: ResourceBuilder[];                          // Resource dependencies
-
-  load: async ({ req, fetch, use, retry }) => {    // Data loading function
-    // req: Request parameters
-    // fetch: Next.js enhanced fetch
-    // use: Resolved dependencies
-    // retry: Manual retry trigger
-  };
-}
-```
-
-**Example:**
-
 ```typescript
 const UserPosts = createResourceBuilder({
   tags: (req: { userId: string }) => ({
-    identifier: hierarchyTag("user", req.userId, "posts"),
+    id: hierarchyTag("user", req.userId, "posts"),
+    effects: ["activity-feed"],
   }),
   options: { staleTime: 180000 },
-  use: [User({ id: req.userId })],
-  load: async ({ req, fetch, use: [user] }) => {
+  use: (req) => [User({ id: req.userId })], // Dependencies
+  load: async ({ req, fetcher, use: [user] }) => {
     const userData = await user;
     if (!userData.isActive) return { posts: [] };
 
-    const response = await fetch(`/api/users/${req.userId}/posts`);
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/users/${req.userId}/posts`,
+    );
     return { posts: await response.json() };
   },
 });
@@ -592,450 +853,112 @@ const UserPosts = createResourceBuilder({
 
 ### `hierarchyTag(...segments)`
 
-Builds hierarchical cache tags for precise invalidation control.
-
-**Usage:**
-
 ```typescript
 // Creates: ['user', 'user/123', 'user/123/posts']
 const tags = hierarchyTag("user", "123", "posts");
 
-// In resource builders:
-const UserProfile = createResourceBuilder({
+const UserPosts = createResourceBuilder({
   tags: (req: { userId: string }) => ({
-    identifier: hierarchyTag("user", req.userId, "profile"),
+    id: hierarchyTag("user", req.userId, "posts"),
     effects: hierarchyTag("user", req.userId), // Parent levels
   }),
 });
 ```
 
-**Invalidation:**
-
-```typescript
-revalidateTag("user"); // All user data
-revalidateTag("user/123"); // All data for user 123
-revalidateTag("user/123/profile"); // Only user 123's profile
-```
-
 ### Backoff Strategies
 
-Backoff strategies control the delay between retry attempts. All strategies are imported from `@h1y/loader-core`.
+Control retry timing with different backoff strategies:
 
 ```typescript
 import {
   FIXED_BACKOFF,
   LINEAR_BACKOFF,
   EXPONENTIAL_BACKOFF,
-} from "@h1y/next-loader"; // Re-exported from loader-core
-```
+} from "@h1y/next-loader";
 
-**Available Strategies:**
-
-| Strategy        | Function                          | Description                    | Example Delays         |
-| --------------- | --------------------------------- | ------------------------------ | ---------------------- |
-| **Fixed**       | `FIXED_BACKOFF`                   | Same delay between all retries | 1000ms, 1000ms, 1000ms |
-| **Linear**      | `LINEAR_BACKOFF(increment)`       | Delay increases linearly       | 1000ms, 2000ms, 3000ms |
-| **Exponential** | `EXPONENTIAL_BACKOFF(multiplier)` | Delay multiplies exponentially | 1000ms, 2000ms, 4000ms |
-
-**Usage Examples:**
-
-```typescript
 // Fixed delay: always wait 2 seconds between retries
-const { loader } = createLoader(dependencies, {
+const loader = createLoader(dependencies, {
   retry: { maxCount: 3, canRetryOnError: true },
   backoff: {
     strategy: FIXED_BACKOFF,
-    initialDelay: 2000 // 2 seconds
-  }
+    initialDelay: 2000, // 2 seconds
+  },
 });
 
 // Linear backoff: 1s, 3s, 5s delays
-const { loader } = createLoader(dependencies, {
+const loader = createLoader(dependencies, {
   retry: { maxCount: 3, canRetryOnError: true },
   backoff: {
     strategy: LINEAR_BACKOFF(2000), // Add 2 seconds each retry
-    initialDelay: 1000 // Start with 1 second
-  }
+    initialDelay: 1000, // Start with 1 second
+  },
 });
 
 // Exponential backoff: 500ms, 1s, 2s, 4s delays
-const { loader } = createLoader(dependencies, {
+const loader = createLoader(dependencies, {
   retry: { maxCount: 4, canRetryOnError: true },
   backoff: {
     strategy: EXPONENTIAL_BACKOFF(2), // Double delay each retry
-    initialDelay: 500 // Start with 500ms
-  }
-});
-
-// Component loader with exponential backoff
-const { componentLoader } = createComponentLoader({
-  retry: {
-    maxCount: 3,
-    canRetryOnError: true,
-    fallback: <div>Retrying...</div>
+    initialDelay: 500, // Start with 500ms
   },
-  backoff: {
-    strategy: EXPONENTIAL_BACKOFF(1.5), // Multiply by 1.5 each retry
-    initialDelay: 1000
-  }
 });
 ```
 
-**Backoff Best Practices:**
+### `createExternalResourceAdapter(adapter)`
 
-1. **API Calls**: Use exponential backoff to reduce server load during outages
-2. **Database Operations**: Use linear backoff for predictable retry intervals
-3. **Quick Operations**: Use fixed backoff for consistent user experience
-4. **Rate Limited APIs**: Use exponential backoff with longer initial delays
+⚠️ **API Change**: Previously named `createResourceAdapter`, now renamed to `createExternalResourceAdapter` for better clarity.
 
-### Middleware Creation Functions
-
-#### `createLoaderMiddleware(config)`
-
-Creates middleware for data loaders with lifecycle hooks around data fetching operations.
-
-**Parameters:**
-
-- `config`: **Required** middleware configuration object:
-  ```typescript
-  {
-    name: string;                                    // Unique middleware identifier
-    contextGenerator: () => Context;                 // Factory function for middleware context
-    before?: (context: Context) => Promise<void>;   // Called before loader execution
-    complete?: (context: Context, result: Result) => Promise<void>; // Called after successful execution
-    failure?: (context: Context, error: unknown) => Promise<void>;  // Called when loader fails
-    cleanup?: (context: Context) => Promise<void>;  // Always called for cleanup
-  }
-  ```
-
-**Returns:** Middleware instance for use with `createLoader`
-
-#### `createComponentMiddleware(config)`
-
-Creates middleware for component loaders with lifecycle hooks around component rendering.
-
-**Parameters:**
-
-- `config`: **Required** middleware configuration object:
-  ```typescript
-  {
-    name: string;                                    // Unique middleware identifier
-    contextGenerator: () => Context;                 // Factory function for middleware context
-    before?: (context: Context) => Promise<void>;   // Called before component rendering
-    complete?: (context: Context, result: React.ReactElement) => Promise<void>; // Called after successful render
-    failure?: (context: Context, error: unknown) => Promise<void>;              // Called when component fails
-    cleanup?: (context: Context) => Promise<void>;  // Always called for cleanup
-  }
-  ```
-
-**Returns:** Middleware instance for use with `createComponentLoader`
-
-**Middleware Lifecycle:**
-
-1. `contextGenerator()` - Creates isolated context for this middleware instance
-2. `before(context)` - Setup, validation, preparation
-3. **Target execution** (loader or component)
-4. `complete(context, result)` **OR** `failure(context, error)` - Result handling
-5. `cleanup(context)` - Always executed for resource cleanup
-
-## 🔄 Next.js Integration & Caching Behavior
-
-### Understanding ISR and Cache Behavior
-
-**Important**: The retry process might not be visible to users due to Next.js caching mechanisms.
-
-Next.js uses an ISR (Incremental Static Regeneration) approach similar to `stale-while-revalidate`:
-
-1. **No cache exists**: Request triggers rendering, then caches the result
-2. **Cache exists**: Returns cached content immediately
-3. **Revalidation triggered**:
-   - **Current request** gets the stale cached content
-   - **Background** performs new rendering
-   - **Next request** gets fresh content if rendering succeeded
-   - **Failed rendering** keeps stale cache and retries on next request
-
-This means users might not see retry processes because they're getting cached results.
-
-### When Will Users See Retries?
-
-Retries become visible in these scenarios:
-
-- **Dynamic rendering**: Using `force-dynamic` or functions like `headers()`, `cookies()`
-- **Fresh requests**: No cache exists yet
-- **Cache misses**: Cache expired and no stale content available
+Create custom adapters for external resources:
 
 ```typescript
-// Example: Dynamic rendering where retries are visible
-import { headers } from 'next/headers';
+import { createExternalResourceAdapter } from "@h1y/next-loader";
 
-// Global loader with retry configuration
-const { loader } = createLoader(dependencies, {
-  retry: { maxCount: 3, canRetryOnError: true }, // Users will see these retries
-  timeout: { delay: 5000 }
-});
-
-async function DynamicUserPage({ id }: { id: string }) {
-  const headersList = await headers();
-  const userAgent = headersList.get('user-agent'); // Forces dynamic rendering
-
-  const [load] = loader(User({ id }));
-  const [userData] = await load();
-
-  return <div>Hello {userData.name}! (UA: {userAgent})</div>;
-}
-```
-
-## 🎯 Advanced Examples
-
-### Complex Resource Dependencies
-
-```typescript
-// Global loader instance
-const { loader } = createLoader(dependencies);
-
-// User resource
-const User = createResourceBuilder({
-  tags: (req: { id: string }) => ({ identifier: `user-${req.id}` }),
-  options: { staleTime: 300000 },
-  use: [],
-  load: async ({ req, fetch }) => {
-    const response = await fetch(`/api/users/${req.id}`);
+// Custom adapter for external API
+const externalAdapter = createExternalResourceAdapter({
+  validate: (param) => {
+    if (!param.url) throw new Error("URL is required");
+  },
+  load: async (param) => {
+    const response = await fetch(param.url, param.options);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   },
 });
 
-// Posts with user dependency and hierarchical tags
-const UserPosts = createResourceBuilder({
-  tags: (req: { userId: string }) => ({
-    identifier: hierarchyTag('user', req.userId, 'posts'),
-    effects: ['activity-feed']
-  }),
-  options: { staleTime: 180000 },
-  use: [User({ id: req.userId })],
-  load: async ({ req, fetch, use: [user], retry }) => {
-    const userData = await user;
-
-    if (!userData.isActive) {
-      retry(); // Retry if user inactive
-    }
-
-    const response = await fetch(`/api/users/${req.userId}/posts`);
-    const posts = await response.json();
-
-    return {
-      posts,
-      author: userData.name,
-      totalPosts: posts.length
-    };
+const ExternalResource = createResourceBuilder({
+  tags: (req: { url: string }) => ({ id: `external-${req.url}` }),
+  load: async ({ req, fetcher }) => {
+    const { load } = fetcher(externalAdapter);
+    return load({ url: req.url, options: { method: "GET" } });
   },
 });
+```
 
-// Usage in server component
-async function UserDashboard({ userId }: { userId: string }) {
-  const [load, revalidate] = loader(
-    User({ id: userId }),
-    UserPosts({ userId })
-  );
+## 🔄 Next.js Integration
 
-  const [userData, postsData] = await load();
+**Important**: Retries might not be visible due to Next.js caching. Use dynamic rendering for visible retries:
+
+```typescript
+import { headers } from 'next/headers';
+
+async function DynamicPage({ id }: { id: string }) {
+  await headers(); // Forces dynamic rendering
+
+  const [load, revalidation] = loader(User({ id }));
+  const [user] = await load(); // Retries visible to users
 
   return (
     <div>
-      <h1>{userData.name}'s Dashboard</h1>
-      <p>{postsData.totalPosts} posts by {postsData.author}</p>
-      <form action={revalidate}>
+      <div>{user.name}</div>
+      <form action={async () => {
+        "use server";
+        revalidation.forEach(revalidateTag);
+      }}>
         <button>Refresh</button>
       </form>
     </div>
   );
 }
-```
-
-### Error Handling and Fallbacks
-
-```typescript
-// Global loader with smart error handling
-const { loader } = createLoader(dependencies, {
-  retry: {
-    maxCount: 3,
-    canRetryOnError: (error) => error.status >= 500
-  },
-  timeout: { delay: 10000 }
-});
-
-// Product resource with multiple fallback strategies
-const Product = createResourceBuilder({
-  tags: (req: { id: string }) => ({
-    identifier: `product-${req.id}`,
-    effects: ['inventory']
-  }),
-  options: { staleTime: 120000 },
-  use: [],
-  load: async ({ req, fetch, retry, loaderOptions }) => {
-    const options = loaderOptions();
-
-    try {
-      const response = await fetch(`/api/products/${req.id}`);
-      if (!response.ok) {
-        if (response.status >= 500) retry();
-        throw new Error(`API Error: ${response.status}`);
-      }
-
-      const product = await response.json();
-
-      // Try to get live inventory, fallback to cached
-      let stock;
-      try {
-        const invResponse = await fetch(`/api/inventory/${req.id}`);
-        stock = invResponse.ok ? await invResponse.json() : product.cachedStock;
-      } catch {
-        stock = product.cachedStock;
-      }
-
-      return {
-        ...product,
-        stock,
-        available: stock > 0,
-        retries: options.retry.count
-      };
-
-    } catch (error) {
-      // Return error state with retry info
-      return {
-        id: req.id,
-        error: true,
-        message: error.message,
-        retries: options.retry.count,
-        stock: 0,
-        available: false
-      };
-    }
-  },
-});
-
-// Usage with error handling
-async function ProductPage({ id }: { id: string }) {
-  const [load, revalidate] = loader(Product({ id }));
-  const [product] = await load();
-
-  if (product.error) {
-    return (
-      <div>
-        <h1>Product Unavailable</h1>
-        <p>{product.message}</p>
-        <p>Retried {product.retries} times</p>
-        <form action={revalidate}>
-          <button>Try Again</button>
-        </form>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <h1>{product.name}</h1>
-      <p>${product.price}</p>
-      <p>{product.available ? `${product.stock} in stock` : 'Out of stock'}</p>
-      {product.retries > 0 && <small>Loaded after {product.retries} retries</small>}
-    </div>
-  );
-}
-```
-
-### Component-Level Resilience
-
-```typescript
-import { createComponentLoader, middleware } from '@h1y/next-loader';
-
-// Performance monitoring middleware
-const perfMiddleware = middleware<React.ReactElement>().withOptions({
-  name: 'perf',
-  contextGenerator: () => ({ startTime: 0 }),
-  before: async (context) => {
-    context.startTime = Date.now();
-  },
-  complete: async (context) => {
-    console.log(`Rendered in ${Date.now() - context.startTime}ms`);
-  },
-});
-
-// Create component loader with middleware and fallback
-const { componentLoader, retryComponent, componentOptions } = createComponentLoader({
-  retry: {
-    maxCount: 3,
-    canRetryOnError: (error) => error.status >= 500,
-    fallback: <div>Loading dashboard...</div>
-  },
-  timeout: { delay: 10000 }
-}, [perfMiddleware]);
-
-// Dashboard component with manual retry logic
-async function UserDashboard({ userId }: { userId: string }) {
-  const options = componentOptions();
-
-  try {
-    const [profile, notifications] = await Promise.all([
-      fetch(`/api/users/${userId}/profile`).then(r => r.json()),
-      fetch(`/api/users/${userId}/notifications`).then(r => r.json())
-    ]);
-
-    // Trigger retry if data is stale
-    if (!profile.isActive && options.retry.count === 0) {
-      retryComponent();
-    }
-
-    return (
-      <div>
-        <h1>Welcome, {profile.name}!</h1>
-        <div>
-          <p>{notifications.length} notifications</p>
-          {options.retry.count > 0 && (
-            <small>Loaded after {options.retry.count} retries</small>
-          )}
-        </div>
-      </div>
-    );
-
-  } catch (error) {
-    return (
-      <div>
-        <h2>Dashboard Error</h2>
-        <p>{error.message}</p>
-        <p>Retried {options.retry.count} times</p>
-      </div>
-    );
-  }
-}
-
-// Export wrapped component
-export default componentLoader(UserDashboard);
-```
-
-## ⚠️ Important Considerations & Caveats
-
-### Middleware Context Access
-
-- **`createLoader()`**: Middleware context is **NOT accessible** from your server component
-- **`createComponentLoader()`**: Middleware context **IS accessible** from wrapped component using the `{name}MiddlewareOptions()` function returned from `createComponentLoader`
-
-### Context Propagation Limitations
-
-- **Fallback Elements**: Do not share context with the main component
-- **Children Components**: Context is not propagated to child components
-- **Isolated Execution**: Each retry creates a fresh execution context
-
-### Retry/Timeout Reset
-
-While you can reset retry and timeout programmatically, **it's not recommended** as it can lead to unpredictable behavior:
-
-```typescript
-// ❌ Not recommended
-const [load] = loader(SomeResource({ id: "123" }));
-await load();
-
-// Reset (not recommended)
-loaderOptions().retry.resetRetryCount();
-loaderOptions().timeout.resetTimeout();
 ```
 
 ## 🤔 FAQ
@@ -1044,7 +967,7 @@ loaderOptions().timeout.resetTimeout();
 
 **A:** This is due to Next.js caching behavior. When content is cached, users get the cached version immediately while revalidation happens in the background. Retries are only visible during:
 
-- Dynamic rendering (using `force-dynamic` or dynamic functions)
+- Dynamic rendering (using `force-dynamic` or dynamic functions like `headers()` and `cookies()`)
 - Fresh requests without cache
 - Cache misses or expired content
 
@@ -1055,91 +978,73 @@ loaderOptions().timeout.resetTimeout();
 ```typescript
 import { headers } from 'next/headers';
 
-// Global loader instance
-const { loader } = createLoader(dependencies, {
-  retry: { maxCount: 3, canRetryOnError: true }
-});
-
 async function DynamicComponent() {
   await headers(); // Forces dynamic rendering
 
-  const [load] = loader(SomeResource({ id: '123' }));
-  const [data] = await load();
-  // Now retries will be visible to users
+  const [load, revalidation] = loader(SomeResource({ id: '123' }));
+  const [data] = await load(); // Now retries will be visible to users
 
-  return <div>{data.content}</div>;
+  return (
+    <div>
+      <div>{data.content}</div>
+      <form action={async () => {
+        "use server";
+        revalidation.forEach(revalidateTag);
+      }}>
+        <button>Refresh</button>
+      </form>
+    </div>
+  );
 }
 ```
-
-Or use PPR to limit dynamic rendering to specific sections.
-
-### Q: What's the difference between `identifier` and `effects` in tags?
-
-**A:**
-
-- `identifier`: Primary cache tag for this specific resource
-- `effects`: Additional tags that should be invalidated when this resource changes
-
-```typescript
-tags: (req) => ({
-  identifier: `user-${req.id}`, // Specific to this user
-  effects: ["user-list", "activity-feed"], // Related caches to invalidate
-});
-```
-
-### Q: Can I use multiple resource builders with the same tags?
-
-**A:** Yes, but be careful about cache conflicts. Use hierarchical tags to organize related resources:
-
-```typescript
-const UserProfile = createResourceBuilder({
-  tags: (req: { id: string }) => ({
-    identifier: hierarchyTag("user", req.id, "profile"),
-  }),
-  options: { staleTime: 300000 },
-  use: [],
-  load: async ({ req, fetch }) => {
-    const response = await fetch(`/api/users/${req.id}/profile`);
-    return response.json();
-  },
-});
-
-const UserSettings = createResourceBuilder({
-  tags: (req: { id: string }) => ({
-    identifier: hierarchyTag("user", req.id, "settings"),
-  }),
-  options: { staleTime: 180000 },
-  use: [],
-  load: async ({ req, fetch }) => {
-    const response = await fetch(`/api/users/${req.id}/settings`);
-    return response.json();
-  },
-});
-```
-
-### Q: How do I optimize performance with many resources?
-
-**A:**
-
-1. **Use appropriate staleTime** values based on data freshness needs
-2. **Leverage hierarchical tags** for efficient invalidation
-3. **Batch related resources** in single loader calls
-4. **Consider PPR** to limit dynamic rendering scope
 
 ### Q: When should I use componentLoader vs loader?
 
 **A:**
 
-- **Use `createLoader()`** for data fetching with caching (most common use case). **Always create loader instances globally** and reuse them across components.
-- **Use `createComponentLoader()`** when you need component-level retry behavior or access to middleware context within the component
+- **Use `createLoader()`** for data fetching with caching and **batch loading** (most common use case)
+- **Use `createComponentLoader()`** when you need component-level retry/timeout behavior and state management
 
-## 🙏 Related Packages
+**Best Practice:** Use both together:
+
+```typescript
+const loader = createLoader({ memo: cache }); // Global data loading
+const { componentLoader } = createComponentLoader(config); // Component resilience
+
+async function MyComponent() {
+  const [load, revalidation] = loader(SomeResource({ id: '123' }));
+  const [data] = await load();
+  return (
+    <div>
+      <div>{data.name}</div>
+      <form action={async () => {
+        "use server";
+        revalidation.forEach(revalidateTag);
+      }}>
+        <button>Refresh</button>
+      </form>
+    </div>
+  );
+}
+
+export default componentLoader(MyComponent).withBoundary(<LoadingFallback />);
+```
+
+## 🛠️ Dependencies
 
 This library is built on top of other packages in the @h1y ecosystem:
 
-- [@h1y/loader-core](https://github.com/h1ylabs/next-loader/tree/main/packages/core) - Core loading functionality with retry/timeout
-- [@h1y/promise-aop](https://github.com/h1ylabs/next-loader/tree/main/packages/promise-aop) - Promise-based AOP framework
-- [@h1y/loader-tag](https://github.com/h1ylabs/next-loader/tree/main/packages/tag) - Type-safe tagging utilities
+- **[@h1y/loader-core v6.0.0](https://github.com/h1ylabs/next-loader/tree/main/packages/core)** - Core loading functionality with retry/timeout/backoff
+- **[@h1y/promise-aop v6.0.0](https://github.com/h1ylabs/next-loader/tree/main/packages/promise-aop)** - Promise-based AOP framework for middleware
+
+**Dependencies:**
+
+- `react-error-boundary ^6.0.0` - Error boundary utilities for componentLoader
+
+**Peer Dependencies:**
+
+- React ≥18.2.0
+- Next.js ≥14.0.0 (for `NextJSAdapter` and cache integration)
 
 ## 📄 License
 

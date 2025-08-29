@@ -1,6 +1,6 @@
 # @h1y/loader-core
 
-**Latest version: v5.0.0**
+**Latest version: v6.0.0**
 
 A robust, Promise AOP-based loader library with built-in retry, timeout, and backoff strategies. Built on top of [@h1y/promise-aop](https://github.com/h1ylabs/next-loader/tree/main/packages/promise-aop), this core library provides the foundation for creating resilient async operations with middleware support.
 
@@ -24,7 +24,7 @@ pnpm add @h1y/loader-core
 import { loader, EXPONENTIAL_BACKOFF } from "@h1y/loader-core";
 
 // Create a reusable loader configuration
-const { execute } = loader().withOptions({
+const { execute, retryImmediately, retryFallback } = loader().withOptions({
   input: {
     retry: { maxCount: 3, canRetryOnError: true },
     timeout: { delay: 5000 },
@@ -36,12 +36,41 @@ const { execute } = loader().withOptions({
 
 // Execute with target - loader can be reused with different targets
 const result = await execute(async () => {
-  const response = await fetch("/api/data");
-  return response.json();
+  // ⚠️ IMPORTANT: retryFallback must be called inside execute (like React Hooks)
+  // These are re-registered on every retry attempt
+  retryFallback({
+    when: (error) => error.status === 503,
+    fallback: (error) => () => async () => {
+      console.log("Service unavailable, using cached data");
+      return getCachedData();
+    },
+  });
+
+  try {
+    const response = await fetch("/api/data");
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  } catch (error) {
+    // retryImmediately can also only be used inside execute
+    if (error.message.includes("CRITICAL")) {
+      retryImmediately(() => async () => {
+        return await getBackupData();
+      });
+    }
+    throw error;
+  }
 });
 
 // Reuse the same loader with different targets
 const userData = await execute(async () => {
+  // Each execution can have its own fallback strategy
+  retryFallback({
+    when: (error) => error.status >= 500,
+    fallback: () => () => async () => {
+      return getDefaultUserData();
+    },
+  });
+
   const response = await fetch("/api/user");
   return response.json();
 });
@@ -55,6 +84,79 @@ Built on [@h1y/promise-aop](https://github.com/h1ylabs/next-loader/tree/main/pac
 - **Signal-based Error Handling**: `RetrySignal`, `TimeoutSignal` for precise control
 - **Middleware System**: Lifecycle hooks for observing, validating, and side effects
 - **Context Isolation**: Each execution maintains isolated contexts for safety
+
+## Context Requirements
+
+### Execution Context Limitations
+
+⚠️ **Critical Constraint**: The `retryImmediately` and `retryFallback` functions can **only** be called from within the `execute` callback function. They depend on the internal loader context and will not work if called outside the execution scope.
+
+```typescript
+const { execute, retryImmediately, retryFallback } = loader().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+// ❌ INCORRECT: Will not work
+retryFallback({
+  when: (error) => error.status === 500,
+  fallback: () => () => async () => "fallback",
+});
+
+const result = await execute(async () => {
+  // ✅ CORRECT: Inside execute callback
+  retryFallback({
+    when: (error) => error.status === 500,
+    fallback: () => () => async () => "fallback",
+  });
+
+  try {
+    return await apiCall();
+  } catch (error) {
+    // ✅ CORRECT: Inside execute callback
+    if (shouldRetry) retryImmediately();
+    throw error;
+  }
+});
+```
+
+### React Hooks-like Behavior
+
+`retryFallback` behaves similarly to React Hooks:
+
+- **Re-executed on every call**: Like `useEffect` or `useState`, `retryFallback` calls must be made on every execution/retry
+- **Call order matters**: Place `retryFallback` calls at the **top** of your execute callback
+- **Automatic cleanup**: Fallback matchers are cleared before each retry, ensuring fresh registration
+
+```typescript
+await execute(async () => {
+  // ✅ CORRECT: React Hooks pattern - always at the top
+  retryFallback({ when: (error) => error.type === "A", fallback: fallbackA });
+  retryFallback({ when: (error) => error.type === "B", fallback: fallbackB });
+
+  // Don't put these inside conditions
+  if (someCondition) {
+    // ❌ INCORRECT: Conditional fallback registration
+    retryFallback({ when: (error) => error.type === "C", fallback: fallbackC });
+  }
+
+  // Actual logic comes after fallback registration
+  return await performOperation();
+});
+```
+
+### Why This Design?
+
+This constraint ensures:
+
+1. **Context Safety**: Functions can only access valid loader context during execution
+2. **Predictable Behavior**: Fallbacks are re-registered consistently on each retry
+3. **Memory Safety**: Prevents memory leaks from lingering references outside execution scope
+4. **Clear Boundaries**: Maintains separation between loader configuration and execution logic
 
 ## Loader Reusability
 
@@ -268,6 +370,209 @@ const result = await execute(async () => {
 
 This priority system ensures that critical system-level issues (like timeouts) are handled before application-level errors, providing predictable and reliable error handling behavior.
 
+## Advanced Retry Strategies
+
+The loader provides a sophisticated three-tier fallback selection system that determines which fallback to use when retries occur. Understanding this priority system is crucial for implementing robust error handling and recovery strategies.
+
+### Fallback Priority System
+
+When a retry occurs, the system evaluates fallbacks in the following priority order:
+
+#### 1st Priority: Immediate Fallback
+
+- **Source**: Set via `retryImmediately(fallback)` within the target function
+- **Use case**: Dynamic, context-aware fallbacks determined at runtime
+- **Scope**: Single retry attempt only
+
+```typescript
+const { execute, retryImmediately } = loader().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  const isMaintenanceMode = await checkMaintenanceStatus();
+
+  if (isMaintenanceMode) {
+    // Highest priority: immediate fallback for this specific condition
+    retryImmediately(() => async () => {
+      console.log("Maintenance mode detected, using cached response");
+      return await getCachedResponse();
+    });
+  }
+
+  return await primaryApiCall();
+});
+```
+
+#### 2nd Priority: Conditional Fallback
+
+- **Source**: Registered via `retryFallback(matcher)` within execution
+- **Use case**: Error type-specific fallbacks with predefined conditions
+- **Scope**: Applies to current execution and all its retries
+
+```typescript
+const { execute, retryFallback } = loader().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  // ✅ CORRECT: Register fallbacks inside execute (re-executed on every retry)
+  retryFallback({
+    when: (error) => error.status === 503,
+    fallback: (error) => () => async () => {
+      console.log("Service unavailable, using read replica");
+      return await readReplicaCall();
+    },
+  });
+
+  retryFallback({
+    when: (error) => error.status >= 500,
+    fallback: (error) => () => async () => {
+      console.log("Server error, degraded service mode");
+      return await degradedServiceCall();
+    },
+  });
+
+  return await primaryApiCall(); // Conditional fallbacks apply automatically
+});
+```
+
+#### 3rd Priority: Initial Fallback
+
+- **Source**: Set in loader configuration during creation
+- **Use case**: Default fallback for all unmatched retry scenarios
+- **Scope**: Applies throughout the loader's lifetime
+
+```typescript
+const { execute } = loader().withOptions({
+  input: {
+    retry: {
+      maxCount: 3,
+      canRetryOnError: true,
+      // Lowest priority: initial fallback as last resort
+      fallback: () => async () => {
+        console.log("Using default fallback");
+        return getDefaultResponse();
+      },
+    },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  return await primaryApiCall();
+});
+```
+
+### Fallback Selection Logic
+
+The internal fallback selection follows this decision tree:
+
+```typescript
+// Simplified internal logic from createRetryAspect
+function selectFallback(retry) {
+  return (
+    retry.fallback.immediate || // 1st: retryImmediately() fallback
+    retry.fallback.conditional || // 2nd: retryFallback() matched fallback
+    retry.fallback.initial // 3rd: loader configuration fallback
+  );
+}
+```
+
+### Practical Usage Patterns
+
+#### Pattern 1: Hierarchical Fallback Strategy
+
+```typescript
+const { execute, retryImmediately, retryFallback } = loader().withOptions({
+  input: {
+    retry: {
+      maxCount: 3,
+      canRetryOnError: true,
+      fallback: () => async () => "ultimate-fallback", // 3rd priority
+    },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  // ✅ CORRECT: Register fallbacks inside execute
+  // 2nd priority: handle different error types
+  retryFallback({
+    when: (error) => error.type === "RATE_LIMITED",
+    fallback: () => () => async () => {
+      await waitForRateLimit();
+      return await primaryApiCall();
+    },
+  });
+
+  try {
+    return await primaryApiCall();
+  } catch (error) {
+    if (error.type === "CRITICAL_DATA_LOSS") {
+      // 1st priority: immediate critical error handling
+      retryImmediately(() => async () => {
+        await notifyOperations(error);
+        return await recoverFromBackup();
+      });
+    }
+    throw error;
+  }
+});
+```
+
+#### Pattern 2: Dynamic Fallback Selection
+
+```typescript
+const { execute, retryImmediately } = loader().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  try {
+    return await primaryApiCall();
+  } catch (error) {
+    // Choose fallback strategy based on current system state
+    const systemHealth = await checkSystemHealth();
+
+    if (systemHealth.cpuUsage > 0.9) {
+      retryImmediately(() => async () => {
+        // Use lightweight fallback under high load
+        return await lightweightApiCall();
+      });
+    } else if (systemHealth.networkLatency > 1000) {
+      retryImmediately(() => async () => {
+        // Use local cache under high latency
+        return await localCacheCall();
+      });
+    }
+
+    throw error; // Let other fallback strategies handle it
+  }
+});
+```
+
+This layered approach ensures that you always have appropriate fallback strategies available, from immediate context-aware decisions to broad default behaviors, providing maximum flexibility and reliability in error recovery scenarios.
+
 ## Retry Propagation Strategies
 
 The `propagateRetry` option controls how `RetrySignal`s are handled when they bubble up from nested operations. This is particularly important in scenarios with nested loader executions or when you want to control retry behavior across different layers of your application.
@@ -384,6 +689,8 @@ await childExecute(async () => {
 
 Propagate retry signals only when the outer loader is the same instance (same `execute` function).
 
+**Loader Instance Identification System**: Each loader instance is assigned a unique UUID-based identifier when created using `generateID("loader")`. This ID is used internally to track loader hierarchies and determine propagation behavior. The system maintains a hierarchy of loader IDs in the metadata context, enabling precise control over retry propagation in nested scenarios.
+
 ```typescript
 // Create a reusable loader instance
 const { execute: reusableExecute } = loader().withOptions({
@@ -438,6 +745,38 @@ async function processNestedData(data: any[], depth = 0): Promise<any[]> {
   });
 }
 ```
+
+**Internal Hierarchy Tracking**: The system internally tracks loader execution hierarchy like this:
+
+```typescript
+// Example of internal loader hierarchy tracking
+// (This is for understanding - not part of the public API)
+
+// First loader instance: id:loader:uuid-1
+const loaderA = loader().withOptions({...});
+
+// Second loader instance: id:loader:uuid-2
+const loaderB = loader().withOptions({...});
+
+// When executed:
+await loaderA.execute(async () => {
+  // Current hierarchy: ["id:loader:uuid-1"]
+
+  await loaderA.execute(async () => {
+    // Current hierarchy: ["id:loader:uuid-1", "id:loader:uuid-1"]
+    // Same outer context detected -> propagation allowed
+    throw new Error("Will propagate with HAS_SAME_OUTER_CONTEXT");
+  });
+
+  await loaderB.execute(async () => {
+    // Current hierarchy: ["id:loader:uuid-1", "id:loader:uuid-2"]
+    // Different outer context -> no propagation
+    throw new Error("Handled locally");
+  });
+});
+```
+
+This identification system enables sophisticated retry propagation strategies while maintaining clear boundaries between different loader instances, ensuring predictable behavior in complex nested scenarios.
 
 ### Use Cases and Best Practices
 
@@ -759,7 +1098,11 @@ interface LoaderCoreInput<Result> {
 ```typescript
 interface LoaderReturn<Result> {
   execute: (target: Target<Result>) => Promise<Result>; // Execute with target
-  retry: (fallback?: TargetWrapper<Result>) => never; // Manual retry (target context only)
+  retryImmediately: (fallback?: TargetWrapper<Result>) => never; // Manual retry (target context only)
+  retryFallback: <T>(matcher: {
+    readonly when: (error: T) => boolean;
+    readonly fallback: (error: T) => TargetWrapper<Result>;
+  }) => void; // Register conditional fallback
   loaderOptions: () => LoaderCoreOptions<Result>; // Current state access
   middlewareOptions: () => MiddlewareOptions<Middlewares>; // Middleware contexts access
 }
@@ -775,17 +1118,22 @@ Creates a loader instance with default configuration settings (no retries, no ti
 import { loader } from "@h1y/loader-core";
 
 // Create with custom options
-const { execute, retry, loaderOptions, middlewareOptions } =
-  loader<MyResult>().withOptions({
-    input: {
-      retry: { maxCount: 3, canRetryOnError: true },
-      timeout: { delay: 5000 },
-    },
-    propagateRetry: false,
-    middlewares: [loggingMiddleware],
-    onDetermineError: async (errors) => errors[0],
-    onHandleError: async (error) => defaultResult,
-  });
+const {
+  execute,
+  retryImmediately,
+  retryFallback,
+  loaderOptions,
+  middlewareOptions,
+} = loader<MyResult>().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [loggingMiddleware],
+  onDetermineError: async (errors) => errors[0],
+  onHandleError: async (error) => defaultResult,
+});
 
 // Or create with default options
 const defaultLoader = loader<MyResult>().withDefaultOptions();
@@ -793,10 +1141,10 @@ const defaultLoader = loader<MyResult>().withDefaultOptions();
 const result = await execute(myAsyncFunction);
 ```
 
-**Important**: The `retry` function can only be called from within the `target` function context:
+**Important**: The `retryImmediately` function can only be called from within the `target` function context:
 
 ```typescript
-const { execute, retry } = loader().withOptions({
+const { execute, retryImmediately } = loader().withOptions({
   input: {
     retry: { maxCount: 3, canRetryOnError: true },
     timeout: { delay: 5000 },
@@ -810,16 +1158,103 @@ const result = await execute(async () => {
   try {
     return await apiCall();
   } catch (error) {
-    // ✅ Correct: retry within target context
+    // ✅ Correct: retryImmediately within target context
     if (shouldRetry(error)) {
-      retry();
+      retryImmediately();
     }
     throw error;
   }
 });
 
-// ❌ Incorrect: retry outside target context
-// retry(); // This will not work as expected
+// ❌ Incorrect: retryImmediately outside target context
+// retryImmediately(); // This will not work as expected
+```
+
+##### retryImmediately(fallback?: TargetWrapper\<Result\>)
+
+Manually triggers an immediate retry from within the target function context. This has the highest priority among all fallback strategies.
+
+**⚠️ Context Requirement**: This function can **only** be called from within the `execute` callback function. Calling it outside the execution context will not work.
+
+**Parameters:**
+
+- `fallback` (optional): A fallback function to execute on the retry. If provided, this becomes the immediate fallback with highest priority.
+
+**Example:**
+
+```typescript
+const { execute, retryImmediately } = loader().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  try {
+    return await riskyApiCall();
+  } catch (error) {
+    if (error.code === "TEMPORARY_ERROR") {
+      // Retry immediately with a fallback
+      retryImmediately(() => async () => {
+        console.log("Using fallback after temporary error");
+        return await safeApiCall();
+      });
+    }
+    throw error;
+  }
+});
+```
+
+##### retryFallback\<T\>(matcher)
+
+Registers a conditional fallback that will be used when the specified error condition is met. This has medium priority in the fallback selection process.
+
+**⚠️ Context Requirement**: This function can **only** be called from within the `execute` callback function. It cannot be called outside the execution context.
+
+**⚠️ Re-execution Behavior**: Like React Hooks, `retryFallback` calls are **re-executed on every retry attempt**. The fallback matchers are cleared before each retry, so you must call `retryFallback` on every execution. Place these calls at the **top** of your execute callback.
+
+**Parameters:**
+
+- `matcher.when: (error: T) => boolean` - Predicate function to determine if this fallback applies
+- `matcher.fallback: (error: T) => TargetWrapper<Result>` - Fallback factory function that receives the error
+
+**Example:**
+
+```typescript
+const { execute, retryFallback } = loader().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  // ✅ CORRECT: Register fallbacks inside execute (like React Hooks)
+  // These must be called on every execution/retry
+  retryFallback({
+    when: (error) => error.status === 503,
+    fallback: (error) => () => async () => {
+      console.log("Service unavailable, using cached data");
+      return getCachedData();
+    },
+  });
+
+  retryFallback({
+    when: (error) => error.status >= 500,
+    fallback: (error) => () => async () => {
+      console.log("Server error, trying alternative endpoint");
+      return await alternativeApiCall();
+    },
+  });
+
+  // Actual operation after registering fallbacks
+  return await apiCall();
+});
 ```
 
 ### middleware\<Result\>()
@@ -1165,6 +1600,239 @@ const results = await parentExecute(async () => {
   return Promise.all(ids.map((id) => childExecute(() => fetchDataById(id))));
 });
 ```
+
+### Multi-Service API Integration with Conditional Fallbacks
+
+```typescript
+// Different error handling strategies for different services
+const { execute: userServiceLoader, retryFallback: userFallback } =
+  loader().withOptions({
+    input: {
+      retry: { maxCount: 3, canRetryOnError: (error) => error.status >= 500 },
+      timeout: { delay: 5000 },
+    },
+    propagateRetry: false,
+    middlewares: [],
+  });
+
+const { execute: paymentServiceLoader, retryFallback: paymentFallback } =
+  loader().withOptions({
+    input: {
+      retry: { maxCount: 5, canRetryOnError: true },
+      timeout: { delay: 2000 },
+    },
+    propagateRetry: false,
+    middlewares: [],
+  });
+
+// Orchestrate multiple services with different error handling
+async function processUserCheckout(userId: string, paymentInfo: any) {
+  const [userData, paymentResult] = await Promise.allSettled([
+    userServiceLoader(() => {
+      // ✅ CORRECT: Configure service-specific fallback strategies inside execute
+      userFallback({
+        when: (error) => error.status === 503,
+        fallback: () => () => async () => {
+          console.log("User service degraded, using cached profile");
+          return await getCachedUserProfile();
+        },
+      });
+
+      return fetchUser(userId);
+    }),
+
+    paymentServiceLoader(() => {
+      // ✅ CORRECT: Configure service-specific fallback strategies inside execute
+      paymentFallback({
+        when: (error) => error.message.includes("RATE_LIMIT"),
+        fallback: () => () => async () => {
+          console.log("Payment service rate limited, queuing for later");
+          return await queuePaymentForLater();
+        },
+      });
+
+      return processPayment(paymentInfo);
+    }),
+  ]);
+
+  return {
+    user: userData.status === "fulfilled" ? userData.value : null,
+    payment: paymentResult.status === "fulfilled" ? paymentResult.value : null,
+  };
+}
+```
+
+### Circuit Breaker Pattern with Dynamic Fallbacks
+
+```typescript
+class ServiceHealthMonitor {
+  private failureCount = 0;
+  private lastFailure = 0;
+  private readonly threshold = 5;
+  private readonly cooldownMs = 30000;
+
+  isHealthy(): boolean {
+    if (this.failureCount < this.threshold) return true;
+    return Date.now() - this.lastFailure > this.cooldownMs;
+  }
+
+  recordFailure() {
+    this.failureCount++;
+    this.lastFailure = Date.now();
+  }
+
+  recordSuccess() {
+    this.failureCount = 0;
+  }
+}
+
+const healthMonitor = new ServiceHealthMonitor();
+const { execute, retryImmediately, retryFallback } = loader().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  // ✅ CORRECT: Configure circuit breaker fallback inside execute
+  retryFallback({
+    when: (error) => !healthMonitor.isHealthy(),
+    fallback: () => () => async () => {
+      console.log("Circuit breaker open, using fallback service");
+      return await fallbackServiceCall();
+    },
+  });
+
+  try {
+    if (!healthMonitor.isHealthy()) {
+      // Circuit breaker is open, trigger fallback immediately
+      retryImmediately(() => async () => {
+        return await fallbackServiceCall();
+      });
+    }
+
+    const result = await primaryServiceCall();
+    healthMonitor.recordSuccess();
+    return result;
+  } catch (error) {
+    healthMonitor.recordFailure();
+    throw error;
+  }
+});
+```
+
+### Database Connection with Cache Fallback
+
+```typescript
+const { execute: dbLoader, retryFallback: dbFallback } = loader().withOptions({
+  input: {
+    retry: {
+      maxCount: 2,
+      canRetryOnError: (error) => error.code !== "PERMISSION_DENIED",
+    },
+    timeout: { delay: 3000 },
+    backoff: { strategy: EXPONENTIAL_BACKOFF(2), initialDelay: 500 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+async function getUserData(userId: string) {
+  return dbLoader(async () => {
+    // ✅ CORRECT: Configure fallback strategies inside execute
+    dbFallback({
+      when: (error) => error.code === "CONNECTION_TIMEOUT",
+      fallback: () => () => async () => {
+        console.log("Database timeout, using read replica");
+        return await queryReadReplica();
+      },
+    });
+
+    dbFallback({
+      when: (error) => error.code === "MAX_CONNECTIONS",
+      fallback: () => () => async () => {
+        console.log("Database overloaded, using cache");
+        return await getCachedData();
+      },
+    });
+
+    try {
+      // Try primary database
+      const result = await db.query("SELECT * FROM users WHERE id = ?", [
+        userId,
+      ]);
+
+      if (!result.length) {
+        // No data found, but connection is healthy
+        throw new Error("USER_NOT_FOUND");
+      }
+
+      return result[0];
+    } catch (error) {
+      // Log for monitoring
+      console.error("Database query failed:", error);
+      throw error;
+    }
+  });
+}
+```
+
+### Real-Time Data Processing with Graceful Degradation
+
+```typescript
+const {
+  execute: realtimeLoader,
+  retryImmediately,
+  retryFallback,
+} = loader().withOptions({
+  input: {
+    retry: { maxCount: 2, canRetryOnError: true },
+    timeout: { delay: 1000 }, // Short timeout for real-time
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+async function getRealtimeData(dataId: string) {
+  return realtimeLoader(async () => {
+    // ✅ CORRECT: Configure degradation strategies inside execute
+    retryFallback({
+      when: (error) => error.type === "WEBSOCKET_DISCONNECTED",
+      fallback: () => () => async () => {
+        console.log("WebSocket down, polling REST API");
+        return await pollRestApi();
+      },
+    });
+
+    retryFallback({
+      when: (error) => error.type === "RATE_LIMITED",
+      fallback: () => () => async () => {
+        console.log("Rate limited, using cached data");
+        return await getLastKnownData();
+      },
+    });
+
+    // Check system load first
+    const systemLoad = await getSystemLoad();
+
+    if (systemLoad > 0.8) {
+      // System overloaded, use cached data immediately
+      retryImmediately(() => async () => {
+        console.log("System overloaded, serving cached data");
+        return await getCachedRealtimeData(dataId);
+      });
+    }
+
+    // Try real-time data source
+    return await fetchRealtimeData(dataId);
+  });
+}
+```
+
+These patterns demonstrate how the advanced retry and fallback features can be used to build resilient systems that gracefully handle various failure scenarios while maintaining optimal performance and user experience.
 
 ## Related Packages
 

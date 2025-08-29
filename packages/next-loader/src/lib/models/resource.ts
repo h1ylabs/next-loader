@@ -1,14 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { LoaderCoreOptions } from "@h1y/loader-core";
+import type { LoaderContextID, LoaderCoreOptions } from "@h1y/loader-core";
 
-import { ResourceAdapter } from "./resourceAdapter";
+import { MemoFunction } from "../utils/memoFn";
 import type { Dependencies, ResourceTag } from "./resourceTag";
 
-// this is an internally used property.
-export const __RESOURCE_ID = Symbol("RESOURCE_ID");
-
 export type Resource<
-  Response = unknown,
+  Response,
   Tag extends ResourceTag = ResourceTag,
   Deps extends readonly string[] = readonly string[],
 > = {
@@ -19,13 +16,12 @@ export type Resource<
     dependencies: Deps;
   };
   options: { staleTime?: number };
-  load: <LoaderParam>(
-    adapter: ResourceAdapter<LoaderParam, Response>,
-    loaderOptions: () => LoaderCoreOptions<Response>,
+  load: (
+    loaderOptions: () => LoaderCoreOptions,
     retry: () => never,
+    contextID: LoaderContextID,
+    memo: MemoFunction,
   ) => Promise<Response>;
-
-  [__RESOURCE_ID]: string;
 };
 
 export type ResourcesUsed = readonly Resource<any, any, any>[];

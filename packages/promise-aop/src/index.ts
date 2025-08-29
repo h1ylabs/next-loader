@@ -4,7 +4,7 @@ export { AsyncContext } from "@/lib/utils/AsyncContext";
 // AOP Functions
 export { createAspect } from "./createAspect";
 export { createProcess } from "./createProcess";
-export { runProcess } from "./runProcess";
+export { runProcess, runProcessWith } from "./runProcess";
 
 // Errors
 export {

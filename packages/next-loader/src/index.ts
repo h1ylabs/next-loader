@@ -1,8 +1,8 @@
-// loader
+// loader functions
 export { createComponentLoader } from "./createComponentLoader";
 export { createLoader } from "./createLoader";
 
-// middleware
+// middleware functions
 export { createComponentMiddleware } from "./createComponentMiddleware";
 export { createLoaderMiddleware } from "./createLoaderMiddleware";
 
@@ -10,8 +10,8 @@ export { createLoaderMiddleware } from "./createLoaderMiddleware";
 export { createResourceBuilder } from "./createResourceBuilder";
 export { hierarchyTag } from "./lib/features/hierarchyTag";
 
-// adapter
-export { createResourceAdapter } from "./lib/features/createResourceAdapter";
+// adapters
+export { createExternalResourceAdapter } from "./lib/features/createResourceAdapter";
 export { NextJSAdapter } from "./lib/integrations/next/adapter";
 
 // backoff

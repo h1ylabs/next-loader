@@ -1,6 +1,6 @@
 # @h1y/loader-core
 
-**최신 버전: v5.0.0**
+**최신 버전: v6.0.0**
 
 내장된 retry, timeout, backoff 전략을 갖춘 견고한 Promise AOP 기반 loader 라이브러리입니다. [@h1y/promise-aop](https://github.com/h1ylabs/next-loader/tree/main/packages/promise-aop) 위에 구축된 이 core 라이브러리는 middleware 지원과 함께 탄력적인 비동기 작업을 생성하기 위한 기반을 제공합니다.
 
@@ -24,7 +24,7 @@ pnpm add @h1y/loader-core
 import { loader, EXPONENTIAL_BACKOFF } from "@h1y/loader-core";
 
 // 재사용 가능한 loader 설정 생성
-const { execute } = loader().withOptions({
+const { execute, retryImmediately, retryFallback } = loader().withOptions({
   input: {
     retry: { maxCount: 3, canRetryOnError: true },
     timeout: { delay: 5000 },
@@ -36,12 +36,41 @@ const { execute } = loader().withOptions({
 
 // Target과 함께 실행 - loader는 다른 target과 함께 재사용될 수 있습니다
 const result = await execute(async () => {
-  const response = await fetch("/api/data");
-  return response.json();
+  // ⚠️ 중요: retryFallback은 execute 내부에서 호출해야 합니다 (React Hooks처럼)
+  // 매 재시도마다 다시 등록됩니다
+  retryFallback({
+    when: (error) => error.status === 503,
+    fallback: (error) => () => async () => {
+      console.log("서비스 불가, 캐시된 데이터 사용");
+      return getCachedData();
+    },
+  });
+
+  try {
+    const response = await fetch("/api/data");
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  } catch (error) {
+    // retryImmediately도 execute 내부에서만 사용 가능
+    if (error.message.includes("CRITICAL")) {
+      retryImmediately(() => async () => {
+        return await getBackupData();
+      });
+    }
+    throw error;
+  }
 });
 
 // 다른 target과 함께 동일한 loader 재사용
 const userData = await execute(async () => {
+  // 각 실행마다 고유한 fallback 전략을 가질 수 있습니다
+  retryFallback({
+    when: (error) => error.status >= 500,
+    fallback: () => () => async () => {
+      return getDefaultUserData();
+    },
+  });
+
   const response = await fetch("/api/user");
   return response.json();
 });
@@ -55,6 +84,79 @@ const userData = await execute(async () => {
 - **Signal 기반 Error 처리**: `RetrySignal`, `TimeoutSignal`을 통한 정밀한 제어
 - **Middleware 시스템**: 관찰, 검증 및 부수 효과를 위한 lifecycle hook
 - **Context 격리**: 각 실행은 안전을 위해 격리된 context를 유지합니다
+
+## Context 요구사항
+
+### 실행 Context 제한사항
+
+⚠️ **중요한 제약사항**: `retryImmediately`와 `retryFallback` 함수는 **`execute` 콜백 함수 내부에서만** 호출할 수 있습니다. 이들은 내부 loader context에 의존하며 실행 범위 밖에서 호출하면 작동하지 않습니다.
+
+```typescript
+const { execute, retryImmediately, retryFallback } = loader().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+// ❌ 잘못된 사용: 작동하지 않습니다
+retryFallback({
+  when: (error) => error.status === 500,
+  fallback: () => () => async () => "fallback",
+});
+
+const result = await execute(async () => {
+  // ✅ 올바른 사용: execute 콜백 내부
+  retryFallback({
+    when: (error) => error.status === 500,
+    fallback: () => () => async () => "fallback",
+  });
+
+  try {
+    return await apiCall();
+  } catch (error) {
+    // ✅ 올바른 사용: execute 콜백 내부
+    if (shouldRetry) retryImmediately();
+    throw error;
+  }
+});
+```
+
+### React Hooks와 같은 동작
+
+`retryFallback`은 React Hooks와 유사하게 동작합니다:
+
+- **매번 재실행**: `useEffect`나 `useState`처럼 `retryFallback` 호출은 매번 실행/재시도마다 이루어져야 합니다
+- **호출 순서 중요**: `retryFallback` 호출을 execute 콜백의 **맨 위에** 배치하세요
+- **자동 정리**: fallback matcher들이 각 재시도 전에 정리되어 새로운 등록이 보장됩니다
+
+```typescript
+await execute(async () => {
+  // ✅ 올바른 사용: React Hooks 패턴 - 항상 맨 위에
+  retryFallback({ when: (error) => error.type === "A", fallback: fallbackA });
+  retryFallback({ when: (error) => error.type === "B", fallback: fallbackB });
+
+  // 조건문 안에 넣지 마세요
+  if (someCondition) {
+    // ❌ 잘못된 사용: 조건부 fallback 등록
+    retryFallback({ when: (error) => error.type === "C", fallback: fallbackC });
+  }
+
+  // 실제 로직은 fallback 등록 후에
+  return await performOperation();
+});
+```
+
+### 왜 이런 설계인가요?
+
+이 제약사항은 다음을 보장합니다:
+
+1. **Context 안전성**: 함수들이 실행 중에만 유효한 loader context에 접근할 수 있습니다
+2. **예측 가능한 동작**: fallback이 각 재시도마다 일관되게 재등록됩니다
+3. **메모리 안전성**: 실행 범위 밖의 참조로 인한 메모리 누수를 방지합니다
+4. **명확한 경계**: loader 설정과 실행 로직 간의 분리를 유지합니다
 
 ## Loader 재사용성
 
@@ -143,6 +245,209 @@ const results = await Promise.all(
   largeDataArray.map((item) => execute(() => processItem(item))),
 );
 ```
+
+## 고급 재시도 전략
+
+Loader는 재시도가 발생할 때 사용할 fallback을 결정하는 정교한 3단계 fallback 선택 시스템을 제공합니다. 이 우선순위 시스템을 이해하는 것은 견고한 오류 처리 및 복구 전략을 구현하는 데 중요합니다.
+
+### Fallback 우선순위 시스템
+
+재시도가 발생할 때, 시스템은 다음 우선순위 순서로 fallback을 평가합니다:
+
+#### 1순위: 즉시 Fallback
+
+- **출처**: target 함수 내에서 `retryImmediately(fallback)` 호출로 설정
+- **사용 사례**: 런타임에 결정되는 동적이고 context를 인식하는 fallback
+- **범위**: 단일 재시도 시도에만 해당
+
+```typescript
+const { execute, retryImmediately } = loader().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  const isMaintenanceMode = await checkMaintenanceStatus();
+
+  if (isMaintenanceMode) {
+    // 최고 우선순위: 이 특정 조건에 대한 즉시 fallback
+    retryImmediately(() => async () => {
+      console.log("유지보수 모드 감지, 캐시된 응답 사용");
+      return await getCachedResponse();
+    });
+  }
+
+  return await primaryApiCall();
+});
+```
+
+#### 2순위: 조건부 Fallback
+
+- **출처**: 실행 내에서 `retryFallback(matcher)` 등록으로 설정
+- **사용 사례**: 미리 정의된 조건을 가진 오류 유형별 fallback
+- **범위**: 현재 실행과 모든 재시도에 적용
+
+```typescript
+const { execute, retryFallback } = loader().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  // ✅ 올바름: execute 내부에서 fallback 등록 (매번 재시도마다 재실행됨)
+  retryFallback({
+    when: (error) => error.status === 503,
+    fallback: (error) => () => async () => {
+      console.log("서비스 불가, 읽기 전용 복제본 사용");
+      return await readReplicaCall();
+    },
+  });
+
+  retryFallback({
+    when: (error) => error.status >= 500,
+    fallback: (error) => () => async () => {
+      console.log("서버 오류, 기능 저하 서비스 모드");
+      return await degradedServiceCall();
+    },
+  });
+
+  return await primaryApiCall(); // 조건부 fallback이 자동으로 적용됩니다
+});
+```
+
+#### 3순위: 초기 Fallback
+
+- **출처**: loader 생성 중 설정에서 설정
+- **사용 사례**: 일치하지 않는 모든 재시도 시나리오에 대한 기본 fallback
+- **범위**: loader의 수명 전체에 적용
+
+```typescript
+const { execute } = loader().withOptions({
+  input: {
+    retry: {
+      maxCount: 3,
+      canRetryOnError: true,
+      // 최저 우선순위: 마지막 수단으로서의 초기 fallback
+      fallback: () => async () => {
+        console.log("기본 fallback 사용");
+        return getDefaultResponse();
+      },
+    },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  return await primaryApiCall();
+});
+```
+
+### Fallback 선택 로직
+
+내부 fallback 선택은 이 결정 트리를 따릅니다:
+
+```typescript
+// createRetryAspect에서의 간소화된 내부 로직
+function selectFallback(retry) {
+  return (
+    retry.fallback.immediate || // 1순위: retryImmediately() fallback
+    retry.fallback.conditional || // 2순위: retryFallback() 매치된 fallback
+    retry.fallback.initial // 3순위: loader 설정 fallback
+  );
+}
+```
+
+### 실용적인 사용 패턴
+
+#### 패턴 1: 계층적 Fallback 전략
+
+```typescript
+const { execute, retryImmediately, retryFallback } = loader().withOptions({
+  input: {
+    retry: {
+      maxCount: 3,
+      canRetryOnError: true,
+      fallback: () => async () => "ultimate-fallback", // 3순위
+    },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  // ✅ 올바름: execute 내부에서 fallback 등록
+  // 2순위: 다른 오류 유형 처리
+  retryFallback({
+    when: (error) => error.type === "RATE_LIMITED",
+    fallback: () => () => async () => {
+      await waitForRateLimit();
+      return await primaryApiCall();
+    },
+  });
+
+  try {
+    return await primaryApiCall();
+  } catch (error) {
+    if (error.type === "CRITICAL_DATA_LOSS") {
+      // 1순위: 즉시 중요 오류 처리
+      retryImmediately(() => async () => {
+        await notifyOperations(error);
+        return await recoverFromBackup();
+      });
+    }
+    throw error;
+  }
+});
+```
+
+#### 패턴 2: 동적 Fallback 선택
+
+```typescript
+const { execute, retryImmediately } = loader().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  try {
+    return await primaryApiCall();
+  } catch (error) {
+    // 현재 시스템 상태에 따라 fallback 전략 선택
+    const systemHealth = await checkSystemHealth();
+
+    if (systemHealth.cpuUsage > 0.9) {
+      retryImmediately(() => async () => {
+        // 높은 부하 하에서 가벼운 fallback 사용
+        return await lightweightApiCall();
+      });
+    } else if (systemHealth.networkLatency > 1000) {
+      retryImmediately(() => async () => {
+        // 높은 지연시간 하에서 로컬 캐시 사용
+        return await localCacheCall();
+      });
+    }
+
+    throw error; // 다른 fallback 전략이 처리하도록 함
+  }
+});
+```
+
+이 계층화된 접근 방식은 즉시 context를 인식하는 결정부터 광범위한 기본 동작까지 항상 적절한 fallback 전략을 사용할 수 있도록 보장하여 오류 복구 시나리오에서 최대한의 유연성과 안정성을 제공합니다.
 
 ## Error 처리 내부 구조
 
@@ -759,7 +1064,11 @@ interface LoaderCoreInput<Result> {
 ```typescript
 interface LoaderReturn<Result> {
   execute: (target: Target<Result>) => Promise<Result>; // Target과 함께 실행
-  retry: (fallback?: TargetWrapper<Result>) => never; // 수동 retry (target context 내에서만)
+  retryImmediately: (fallback?: TargetWrapper<Result>) => never; // 수동 retry (target context 내에서만)
+  retryFallback: <T>(matcher: {
+    readonly when: (error: T) => boolean;
+    readonly fallback: (error: T) => TargetWrapper<Result>;
+  }) => void; // 조건부 fallback 등록
   loaderOptions: () => LoaderCoreOptions<Result>; // 현재 상태 접근
   middlewareOptions: () => MiddlewareOptions<Middlewares>; // Middleware context 접근
 }
@@ -775,17 +1084,22 @@ interface LoaderReturn<Result> {
 import { loader } from "@h1y/loader-core";
 
 // 커스텀 옵션으로 생성
-const { execute, retry, loaderOptions, middlewareOptions } =
-  loader<MyResult>().withOptions({
-    input: {
-      retry: { maxCount: 3, canRetryOnError: true },
-      timeout: { delay: 5000 },
-    },
-    propagateRetry: false,
-    middlewares: [loggingMiddleware],
-    onDetermineError: async (errors) => errors[0],
-    onHandleError: async (error) => defaultResult,
-  });
+const {
+  execute,
+  retryImmediately,
+  retryFallback,
+  loaderOptions,
+  middlewareOptions,
+} = loader<MyResult>().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [loggingMiddleware],
+  onDetermineError: async (errors) => errors[0],
+  onHandleError: async (error) => defaultResult,
+});
 
 // 또는 기본 옵션으로 생성
 const defaultLoader = loader<MyResult>().withDefaultOptions();
@@ -793,10 +1107,10 @@ const defaultLoader = loader<MyResult>().withDefaultOptions();
 const result = await execute(myAsyncFunction);
 ```
 
-**중요**: `retry` 함수는 `target` 함수 context 내에서만 호출할 수 있습니다:
+**중요**: `retryImmediately` 함수는 `target` 함수 context 내에서만 호출할 수 있습니다:
 
 ```typescript
-const { execute, retry } = loader().withOptions({
+const { execute, retryImmediately } = loader().withOptions({
   input: {
     retry: { maxCount: 3, canRetryOnError: true },
     timeout: { delay: 5000 },
@@ -805,21 +1119,108 @@ const { execute, retry } = loader().withOptions({
   middlewares: [],
 });
 
-// Target과 함께 실행 - retry는 target 내에서 호출될 수 있습니다
+// Target과 함께 실행 - retryImmediately는 target 내에서 호출될 수 있습니다
 const result = await execute(async () => {
   try {
     return await apiCall();
   } catch (error) {
-    // ✅ 올바름: target context 내에서 retry 호출
+    // ✅ 올바름: target context 내에서 retryImmediately 호출
     if (shouldRetry(error)) {
-      retry();
+      retryImmediately();
     }
     throw error;
   }
 });
 
-// ❌ 잘못됨: target context 외부에서 retry 호출
-// retry(); // 이것은 예상대로 작동하지 않습니다
+// ❌ 잘못됨: target context 외부에서 retryImmediately 호출
+// retryImmediately(); // 이것은 예상대로 작동하지 않습니다
+```
+
+##### retryImmediately(fallback?: TargetWrapper\<Result\>)
+
+target 함수 context 내에서 즉시 재시도를 수동으로 트리거합니다. 모든 fallback 전략 중에서 최고 우선순위를 가집니다.
+
+**⚠️ Context 요구사항**: 이 함수는 **`execute` 콜백 함수 내부에서만** 호출할 수 있습니다. 실행 context 외부에서 호출하면 작동하지 않습니다.
+
+**매개변수:**
+
+- `fallback` (선택사항): 재시도 시 실행할 fallback 함수. 제공되면 최고 우선순위의 즉시 fallback이 됩니다.
+
+**예시:**
+
+```typescript
+const { execute, retryImmediately } = loader().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  try {
+    return await riskyApiCall();
+  } catch (error) {
+    if (error.code === "TEMPORARY_ERROR") {
+      // 임시 오류 후 fallback과 함께 즉시 재시도
+      retryImmediately(() => async () => {
+        console.log("임시 오류 후 fallback 사용");
+        return await safeApiCall();
+      });
+    }
+    throw error;
+  }
+});
+```
+
+##### retryFallback\<T\>(matcher)
+
+지정된 오류 조건이 충족될 때 사용될 조건부 fallback을 등록합니다. fallback 선택 프로세스에서 중간 우선순위를 가집니다.
+
+**⚠️ Context 요구사항**: 이 함수는 **`execute` 콜백 함수 내부에서만** 호출할 수 있습니다. 실행 context 외부에서 호출할 수 없습니다.
+
+**⚠️ 재실행 동작**: React Hooks처럼 `retryFallback` 호출은 **모든 재시도 시도마다 재실행됩니다**. fallback matcher들이 각 재시도 전에 정리되므로 모든 실행에서 `retryFallback`을 호출해야 합니다. 이러한 호출들을 execute 콜백의 **맨 위에** 배치하세요.
+
+**매개변수:**
+
+- `matcher.when: (error: T) => boolean` - 이 fallback이 적용될지 판단하는 조건 함수
+- `matcher.fallback: (error: T) => TargetWrapper<Result>` - 오류를 받는 fallback factory 함수
+
+**예시:**
+
+```typescript
+const { execute, retryFallback } = loader().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  // ✅ 올바름: execute 내부에서 fallback 등록 (React Hooks처럼)
+  // 모든 실행/재시도마다 호출되어야 합니다
+  retryFallback({
+    when: (error) => error.status === 503,
+    fallback: (error) => () => async () => {
+      console.log("서비스 불가, 캐시된 데이터 사용");
+      return getCachedData();
+    },
+  });
+
+  retryFallback({
+    when: (error) => error.status >= 500,
+    fallback: (error) => () => async () => {
+      console.log("서버 오류, 대체 엔드포인트 시도");
+      return await alternativeApiCall();
+    },
+  });
+
+  // fallback 등록 후 실제 작업
+  return await apiCall();
+});
 ```
 
 ### middleware\<Result\>()
@@ -1165,6 +1566,239 @@ const results = await parentExecute(async () => {
   return Promise.all(ids.map((id) => childExecute(() => fetchDataById(id))));
 });
 ```
+
+### 조건부 Fallback을 활용한 멀티 서비스 API 통합
+
+```typescript
+// 서로 다른 서비스에 대한 다양한 오류 처리 전략
+const { execute: userServiceLoader, retryFallback: userFallback } =
+  loader().withOptions({
+    input: {
+      retry: { maxCount: 3, canRetryOnError: (error) => error.status >= 500 },
+      timeout: { delay: 5000 },
+    },
+    propagateRetry: false,
+    middlewares: [],
+  });
+
+const { execute: paymentServiceLoader, retryFallback: paymentFallback } =
+  loader().withOptions({
+    input: {
+      retry: { maxCount: 5, canRetryOnError: true },
+      timeout: { delay: 2000 },
+    },
+    propagateRetry: false,
+    middlewares: [],
+  });
+
+// 서로 다른 오류 처리가 있는 여러 서비스 오케스트레이션
+async function processUserCheckout(userId: string, paymentInfo: any) {
+  const [userData, paymentResult] = await Promise.allSettled([
+    userServiceLoader(() => {
+      // ✅ 올바름: execute 내부에서 서비스별 fallback 전략 구성
+      userFallback({
+        when: (error) => error.status === 503,
+        fallback: () => () => async () => {
+          console.log("사용자 서비스 성능 저하, 캐시된 프로필 사용");
+          return await getCachedUserProfile();
+        },
+      });
+
+      return fetchUser(userId);
+    }),
+
+    paymentServiceLoader(() => {
+      // ✅ 올바름: execute 내부에서 서비스별 fallback 전략 구성
+      paymentFallback({
+        when: (error) => error.message.includes("RATE_LIMIT"),
+        fallback: () => () => async () => {
+          console.log("결제 서비스 속도 제한, 나중에 대기열에 추가");
+          return await queuePaymentForLater();
+        },
+      });
+
+      return processPayment(paymentInfo);
+    }),
+  ]);
+
+  return {
+    user: userData.status === "fulfilled" ? userData.value : null,
+    payment: paymentResult.status === "fulfilled" ? paymentResult.value : null,
+  };
+}
+```
+
+### 동적 Fallback을 활용한 Circuit Breaker 패턴
+
+```typescript
+class ServiceHealthMonitor {
+  private failureCount = 0;
+  private lastFailure = 0;
+  private readonly threshold = 5;
+  private readonly cooldownMs = 30000;
+
+  isHealthy(): boolean {
+    if (this.failureCount < this.threshold) return true;
+    return Date.now() - this.lastFailure > this.cooldownMs;
+  }
+
+  recordFailure() {
+    this.failureCount++;
+    this.lastFailure = Date.now();
+  }
+
+  recordSuccess() {
+    this.failureCount = 0;
+  }
+}
+
+const healthMonitor = new ServiceHealthMonitor();
+const { execute, retryImmediately, retryFallback } = loader().withOptions({
+  input: {
+    retry: { maxCount: 3, canRetryOnError: true },
+    timeout: { delay: 5000 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+const result = await execute(async () => {
+  // ✅ 올바름: execute 내부에서 circuit breaker fallback 구성
+  retryFallback({
+    when: (error) => !healthMonitor.isHealthy(),
+    fallback: () => () => async () => {
+      console.log("Circuit breaker 열림, fallback 서비스 사용");
+      return await fallbackServiceCall();
+    },
+  });
+
+  try {
+    if (!healthMonitor.isHealthy()) {
+      // Circuit breaker가 열려있으면 즉시 fallback 트리거
+      retryImmediately(() => async () => {
+        return await fallbackServiceCall();
+      });
+    }
+
+    const result = await primaryServiceCall();
+    healthMonitor.recordSuccess();
+    return result;
+  } catch (error) {
+    healthMonitor.recordFailure();
+    throw error;
+  }
+});
+```
+
+### 캐시 Fallback을 활용한 데이터베이스 연결
+
+```typescript
+const { execute: dbLoader, retryFallback: dbFallback } = loader().withOptions({
+  input: {
+    retry: {
+      maxCount: 2,
+      canRetryOnError: (error) => error.code !== "PERMISSION_DENIED",
+    },
+    timeout: { delay: 3000 },
+    backoff: { strategy: EXPONENTIAL_BACKOFF(2), initialDelay: 500 },
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+async function getUserData(userId: string) {
+  return dbLoader(async () => {
+    // ✅ 올바름: execute 내부에서 fallback 전략 구성
+    dbFallback({
+      when: (error) => error.code === "CONNECTION_TIMEOUT",
+      fallback: () => () => async () => {
+        console.log("데이터베이스 타임아웃, 읽기 복제본 사용");
+        return await queryReadReplica();
+      },
+    });
+
+    dbFallback({
+      when: (error) => error.code === "MAX_CONNECTIONS",
+      fallback: () => () => async () => {
+        console.log("데이터베이스 과부하, 캐시 사용");
+        return await getCachedData();
+      },
+    });
+
+    try {
+      // 기본 데이터베이스 시도
+      const result = await db.query("SELECT * FROM users WHERE id = ?", [
+        userId,
+      ]);
+
+      if (!result.length) {
+        // 데이터 없음, 하지만 연결은 정상
+        throw new Error("USER_NOT_FOUND");
+      }
+
+      return result[0];
+    } catch (error) {
+      // 모니터링을 위한 로깅
+      console.error("데이터베이스 쿼리 실패:", error);
+      throw error;
+    }
+  });
+}
+```
+
+### Graceful Degradation을 활용한 실시간 데이터 처리
+
+```typescript
+const {
+  execute: realtimeLoader,
+  retryImmediately,
+  retryFallback,
+} = loader().withOptions({
+  input: {
+    retry: { maxCount: 2, canRetryOnError: true },
+    timeout: { delay: 1000 }, // 실시간용 짧은 타임아웃
+  },
+  propagateRetry: false,
+  middlewares: [],
+});
+
+async function getRealtimeData(dataId: string) {
+  return realtimeLoader(async () => {
+    // ✅ 올바름: execute 내부에서 성능 저하 전략 구성
+    retryFallback({
+      when: (error) => error.type === "WEBSOCKET_DISCONNECTED",
+      fallback: () => () => async () => {
+        console.log("WebSocket 연결 끊김, REST API 폴링");
+        return await pollRestApi();
+      },
+    });
+
+    retryFallback({
+      when: (error) => error.type === "RATE_LIMITED",
+      fallback: () => () => async () => {
+        console.log("속도 제한, 캐시된 데이터 사용");
+        return await getLastKnownData();
+      },
+    });
+
+    // 먼저 시스템 로드 확인
+    const systemLoad = await getSystemLoad();
+
+    if (systemLoad > 0.8) {
+      // 시스템 과부하, 즉시 캐시된 데이터 사용
+      retryImmediately(() => async () => {
+        console.log("시스템 과부하, 캐시된 데이터 제공");
+        return await getCachedRealtimeData(dataId);
+      });
+    }
+
+    // 실시간 데이터 소스 시도
+    return await fetchRealtimeData(dataId);
+  });
+}
+```
+
+이러한 패턴들은 고급 재시도 및 fallback 기능을 사용하여 다양한 실패 시나리오를 우아하게 처리하면서 최적의 성능과 사용자 경험을 유지하는 탄력적인 시스템을 구축하는 방법을 보여줍니다.
 
 ## 관련 패키지
 

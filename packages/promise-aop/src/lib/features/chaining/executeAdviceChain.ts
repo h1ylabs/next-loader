@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import type { AspectOrganization } from "@/lib/models/aspect";
 import type { RequiredBuildOptions } from "@/lib/models/buildOptions";
 import type { RequiredProcessOptions } from "@/lib/models/processOptions";
@@ -32,13 +34,22 @@ export async function executeAdviceChain<Result, SharedContext>(
     }),
   );
 
-  return AsyncContext.execute(AdviceChainContext, async (chain) => {
+  return AsyncContext.execute(AdviceChainContext, async (chain, exit) => {
+    const snapshot = AsyncLocalStorage.snapshot();
+    const propagateChain = <T>(func: Target<T>) => {
+      return async () =>
+        exit(() =>
+          AsyncContext.execute(AdviceChainContext, async () => snapshot(func)),
+        );
+    };
+
     return (
       Promise.resolve()
         .then(beforeAdviceTask(chain))
         .then(aroundAdviceTask(chain))
         .then((resolve) =>
           resolve(
+            propagateChain,
             (target) => async () =>
               target()
                 .then(afterReturningAdviceTask(chain))

@@ -15,7 +15,7 @@ export function normalizeOptions<T, U extends NormalizableOptions<T>>(
   if (isNullish(target)) {
     return source;
   }
-  if (isDifferentType(source, target)) {
+  if (source !== undefined && isDifferentType(source, target)) {
     throw new Error(MSG_ERR_NORMALIZE_OPTIONS_TYPE_MISMATCH);
   }
   if (!isObject(source) || !isObject(target)) {
@@ -23,13 +23,6 @@ export function normalizeOptions<T, U extends NormalizableOptions<T>>(
   }
   if (isArray(source) || isFunction(source)) {
     return target as T;
-  }
-
-  // validate that target only contains properties that exist in source
-  for (const key in target) {
-    if (!Object.hasOwn(source as object, key)) {
-      throw new Error(MSG_ERR_NORMALIZE_OPTIONS_UNKNOWN_PROPERTY(key));
-    }
   }
 
   const result = { ...source };

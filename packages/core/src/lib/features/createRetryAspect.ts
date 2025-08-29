@@ -13,9 +13,21 @@ export const createRetryAspect = <Result>() =>
     before: createAdvice({
       use: ["__core__retry"],
       async advice({ __core__retry: retry }) {
+        // execute retry event handler
         if (retry.count > 0) {
           retry.onRetryEach?.();
         }
+
+        // determine the fallback to execute next
+        retry.fallback.target =
+          /* 1st priority */ retry.fallback.immediate ??
+          /* 2nd priority */ retry.fallback.conditional ??
+          /* 3rd priority */ retry.fallback.initial;
+
+        // clean up fallback information from previous context (excluding initial settings)
+        retry.fallback.matchers = [];
+        retry.fallback.immediate = undefined;
+        retry.fallback.conditional = undefined;
       },
     }),
 
@@ -23,8 +35,8 @@ export const createRetryAspect = <Result>() =>
       use: ["__core__retry"],
       dependsOn: [LOADER_TIMEOUT_ASPECT],
       async advice({ __core__retry: retry }, { attachToResult }) {
-        if (retry.fallback) {
-          attachToResult(retry.fallback);
+        if (retry.count > 0 && retry.fallback.target) {
+          attachToResult(retry.fallback.target);
         }
       },
     }),
@@ -58,8 +70,23 @@ export const createRetryAspect = <Result>() =>
           throw new RetryExceededSignal({ maxRetry: retry.maxCount });
         }
 
+        // increment retry count by 1
         retry.count += 1;
-        throw new RetrySignal();
+
+        // select fallback registered in retryFallback
+        const errorTarget =
+          error instanceof RetrySignal ? error.errorReason : error;
+
+        retry.fallback.conditional = retry.fallback.matchers
+          .find(({ when }) => when(errorTarget))
+          ?.fallback(errorTarget);
+
+        // propagate retry signal
+        if (error instanceof RetrySignal) {
+          throw new RetrySignal({ ...error });
+        }
+
+        throw new RetrySignal({ errorReason: error });
       },
     }),
   }));

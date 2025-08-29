@@ -15,17 +15,36 @@ export type RetryContext<Result> = {
 
   count: number;
   resetRequested: boolean;
-  fallback?: TargetWrapper<Result>;
+
+  // retry fallback with priority
+  readonly fallback: {
+    // 1st priority: directly specified fallback
+    immediate?: TargetWrapper<Result>;
+
+    // 2nd priority: conditional fallback
+    conditional?: TargetWrapper<Result>;
+
+    // condition match information defined within the component
+    matchers: {
+      readonly when: (error: unknown) => boolean;
+      readonly fallback: (error: unknown) => TargetWrapper<Result>;
+    }[];
+
+    // 3rd priority: fallback specified in initial settings
+    readonly initial?: TargetWrapper<Result>;
+
+    // internally determined fallback
+    target?: TargetWrapper<Result>;
+  };
 
   readonly onRetryEach?: () => void;
   readonly onRetryExceeded?: () => void;
 };
 
-export type RetryContextOptions<Result> = {
+export type RetryContextOptions = {
   readonly count: number;
   readonly maxCount: number;
   readonly resetRetryCount: () => void;
-  readonly useFallbackOnNextRetry: (fallback: TargetWrapper<Result>) => void;
 };
 
 export function createRetryContext<Result>(
@@ -46,7 +65,10 @@ export function createRetryContext<Result>(
     count: 0,
     resetRequested: false,
 
-    fallback: retry.fallback,
+    fallback: {
+      initial: retry.fallback,
+      matchers: [],
+    },
 
     onRetryEach: retry.onRetryEach,
     onRetryExceeded: retry.onRetryExceeded,

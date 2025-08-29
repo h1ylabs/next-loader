@@ -1,25 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { nanoid } from "nanoid";
+import type { LoaderContextID } from "@h1y/loader-core";
 
-import { createResourceBuilder } from "@/lib/loaders/createResourceBuilder";
-import { __RESOURCE_ID } from "@/lib/models/resource";
-import type { ResourceAdapter } from "@/lib/models/resourceAdapter";
-import type { ResourceTag } from "@/lib/models/resourceTag";
-
-import {
-  createMockAdapter,
-  type MockLoaderParam,
-} from "../../../__tests__/__helpers__/mockResourceBuilder";
+import { createMockAdapter } from "@/__tests__/__helpers__/mockResourceBuilder";
 import {
   createDependentResourceBuilder,
   createHierarchicalResourceBuilder,
   createTestResourceBuilder,
   expectResourceStructure,
   expectResourceTag,
-} from "../../../__tests__/__helpers__/testUtils";
-
-jest.mock("nanoid");
-const mockNanoid = nanoid as jest.MockedFunction<typeof nanoid>;
+} from "@/__tests__/__helpers__/testUtils";
+import { createResourceBuilder } from "@/lib/loaders/createResourceBuilder";
+import type { ResourceTag } from "@/lib/models/resourceTag";
 
 // Helper function to create mock loader options
 const createMockLoaderOptions = () => ({
@@ -27,14 +18,20 @@ const createMockLoaderOptions = () => ({
     count: 0,
     maxCount: 0,
     resetRetryCount: () => {},
-    useFallbackOnNextRetry: () => {},
   },
   timeout: {
     delay: 1000,
     elapsedTime: 0,
     resetTimeout: () => {},
   },
+  metadata: {
+    contextID: { __loaderContextID: Symbol() as any } as LoaderContextID,
+  },
 });
+
+// Helper function to create a proper contextID for tests
+const createMockContextID = () =>
+  ({ __loaderContextID: Symbol() as any }) as LoaderContextID;
 
 const createMockRetry = (): never => {
   throw new Error("retry");
@@ -43,7 +40,6 @@ const createMockRetry = (): never => {
 describe("createResourceBuilder", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockNanoid.mockImplementation(() => `mock-id-${Date.now()}`);
   });
 
   describe("Basic Resource Creation", () => {
@@ -52,24 +48,9 @@ describe("createResourceBuilder", () => {
       const resource = factory({ id: "test-1" });
 
       expectResourceStructure(resource);
-      expect(resource.tag.resource.identifier).toBe("test-resource-test-1");
+      expect(resource.tag.resource.id).toBe("test-resource-test-1");
       expect(resource.options).toEqual({});
       expect(typeof resource.load).toBe("function");
-      expect(resource[__RESOURCE_ID]).toBeDefined();
-    });
-
-    it("should generate unique resource IDs using nanoid", () => {
-      mockNanoid
-        .mockReturnValueOnce("unique-id-1")
-        .mockReturnValueOnce("unique-id-2");
-
-      const factory = createTestResourceBuilder();
-      const resource1 = factory({ id: "test-1" });
-      const resource2 = factory({ id: "test-2" });
-
-      expect(resource1[__RESOURCE_ID]).toBe("unique-id-1");
-      expect(resource2[__RESOURCE_ID]).toBe("unique-id-2");
-      expect(mockNanoid).toHaveBeenCalledTimes(2);
     });
 
     it("should apply resource options correctly", () => {
@@ -81,32 +62,29 @@ describe("createResourceBuilder", () => {
   });
 
   describe("Tag System", () => {
-    it("should create simple identifier tags", () => {
+    it("should create simple id tags", () => {
       const factory = createResourceBuilder({
         tags: (req: { id: string }) => ({
-          identifier: `simple-${req.id}`,
+          id: `simple-${req.id}`,
         }),
-        options: {},
-        use: [],
-        load: async ({ fetch, req }) => fetch({ data: req } as any),
+        load: async ({ fetcher, req }) => {
+          const { load } = fetcher(createMockAdapter());
+          return load({ data: req } as any);
+        },
       });
 
       const resource = factory({ id: "simple-test" });
       expectResourceTag(resource.tag.resource);
-      expect(resource.tag.resource.identifier).toBe("simple-simple-test");
+      expect(resource.tag.resource.id).toBe("simple-simple-test");
       expect((resource.tag.resource as any).effects).toBeUndefined();
     });
 
-    it("should create hierarchical identifier tags", () => {
+    it("should create hierarchical id tags", () => {
       const factory = createHierarchicalResourceBuilder();
       const resource = factory({ path: ["acme", "engineering", "john"] });
 
       expectResourceTag(resource.tag.resource);
-      expect(resource.tag.resource.identifier).toEqual([
-        "acme",
-        "engineering",
-        "john",
-      ]);
+      expect(resource.tag.resource.id).toEqual(["acme", "engineering", "john"]);
       expect(resource.tag.resource.effects).toEqual([
         "acme-engineering-john-cache",
       ]);
@@ -126,10 +104,11 @@ describe("createResourceBuilder", () => {
 
     it("should throw error for empty hierarchical tags", () => {
       const factory = createResourceBuilder({
-        tags: () => ({ identifier: [] }),
-        options: {},
-        use: [],
-        load: async ({ fetch }) => fetch({} as any),
+        tags: () => ({ id: [] }),
+        load: async ({ fetcher }) => {
+          const { load } = fetcher(createMockAdapter());
+          return load({} as any);
+        },
       });
 
       expect(() => {
@@ -155,7 +134,7 @@ describe("createResourceBuilder", () => {
       const childBuilder = createDependentResourceBuilder([parentResource]);
       const childResource = childBuilder({ id: "child" });
 
-      // Should include parent's identifier tag and effects
+      // Should include parent's id tag and effects
       expect(childResource.tag.dependencies).toContain("test-resource-parent");
       expect(childResource.tag.dependencies).toContain("parent-effect");
     });
@@ -190,7 +169,7 @@ describe("createResourceBuilder", () => {
       ]);
       const childResource = childBuilder({ id: "hierarchical-child" });
 
-      // Should include last element of hierarchical identifier and effects
+      // Should include last element of hierarchical id and effects
       expect(childResource.tag.dependencies).toContain("engineering"); // last element of hierarchy
       expect(childResource.tag.dependencies).toContain(
         "acme-engineering-cache",
@@ -255,13 +234,12 @@ describe("createResourceBuilder", () => {
 
   describe("Load Function", () => {
     it("should execute load function with correct parameters", async () => {
-      const adapter = createMockAdapter();
       const factory = createResourceBuilder({
-        tags: (req: { id: string }) => ({ identifier: `load-test-${req.id}` }),
+        tags: (req: { id: string }) => ({ id: `load-test-${req.id}` }),
         options: { staleTime: 2000 },
-        use: [],
-        load: async ({ req, fetch }) => {
-          return fetch({
+        load: async ({ req, fetcher }) => {
+          const { load } = fetcher(createMockAdapter());
+          return load({
             url: `/api/load/${req.id}`,
             data: { id: req.id, processed: true },
           } as any);
@@ -270,9 +248,10 @@ describe("createResourceBuilder", () => {
 
       const resource = factory({ id: "load-test" });
       const result = await resource.load(
-        adapter,
         () => createMockLoaderOptions(),
         createMockRetry,
+        createMockContextID(),
+        (fn) => fn,
       );
 
       expect(result).toMatchObject({
@@ -286,13 +265,10 @@ describe("createResourceBuilder", () => {
       const parentBuilder = createTestResourceBuilder();
       const parentResource = parentBuilder({ id: "parent-for-load" });
 
-      const adapter = createMockAdapter();
-
       const childBuilder = createResourceBuilder({
-        tags: (req: { id: string }) => ({ identifier: `child-${req.id}` }),
-        options: {},
-        use: [parentResource],
-        load: async ({ req, use, fetch }) => {
+        tags: (req: { id: string }) => ({ id: `child-${req.id}` }),
+        use: () => [parentResource],
+        load: async ({ req, use, fetcher }) => {
           expect(use).toHaveLength(1);
           if (use.length > 0) {
             expect((use as any)[0]).toBeInstanceOf(Promise);
@@ -302,7 +278,8 @@ describe("createResourceBuilder", () => {
           const parentData =
             parentResults.length > 0 ? parentResults[0] : undefined;
 
-          return fetch({
+          const { load } = fetcher(createMockAdapter());
+          return load({
             url: `/api/child/${req.id}`,
             data: {
               id: req.id,
@@ -315,9 +292,10 @@ describe("createResourceBuilder", () => {
 
       const childResource = childBuilder({ id: "child-load-test" });
       const result = await childResource.load(
-        adapter,
         () => createMockLoaderOptions(),
         createMockRetry,
+        createMockContextID(),
+        (fn) => fn,
       );
 
       expect((result as any).data).toMatchObject({
@@ -336,26 +314,30 @@ describe("createResourceBuilder", () => {
 
       const childBuilder = createResourceBuilder({
         tags: (req: { id: string }) => ({
-          identifier: `child-${req.id}`,
+          id: `child-${req.id}`,
           effects: ["child-effect"],
         }),
         options: { staleTime: 1000 },
-        use: [parentResource],
-        load: async ({ fetch }) => fetch({ data: "test" } as any),
+        use: () => [parentResource],
+        load: async ({ fetcher }) => {
+          const { load } = fetcher(adapter);
+          return load({ data: "test" } as any);
+        },
       });
 
       const childResource = childBuilder({ id: "revalidation-test" });
       await childResource.load(
-        adapter,
         () => createMockLoaderOptions(),
         createMockRetry,
+        createMockContextID(),
+        (fn) => fn,
       );
 
       expect(adapter).toHaveBeenCalledWith({
         tags: expect.arrayContaining([
-          "child-revalidation-test", // own identifier
+          "child-revalidation-test", // own id
           "child-effect", // own effects
-          "test-resource-revalidation-parent", // parent identifier
+          "test-resource-revalidation-parent", // parent id
           "parent-cache", // parent effects
         ]),
         options: { staleTime: 1000 },
@@ -365,14 +347,11 @@ describe("createResourceBuilder", () => {
 
   describe("Error Cases", () => {
     it("should propagate errors from load function", async () => {
-      const adapter = createMockAdapter();
-
       const factory = createResourceBuilder({
-        tags: () => ({ identifier: "error-test" }),
-        options: {},
-        use: [],
-        load: async ({ fetch }) => {
-          return fetch({
+        tags: () => ({ id: "error-test" }),
+        load: async ({ fetcher }) => {
+          const { load } = fetcher(createMockAdapter());
+          return load({
             shouldError: true,
             errorMessage: "Test load error",
           } as any);
@@ -383,20 +362,20 @@ describe("createResourceBuilder", () => {
 
       await expect(
         resource.load(
-          adapter,
           () => createMockLoaderOptions(),
           createMockRetry,
+          createMockContextID(),
+          (fn) => fn,
         ),
       ).rejects.toThrow("Test load error");
     });
 
     it("should handle dependency resolution errors", async () => {
       const failingParentBuilder = createResourceBuilder({
-        tags: () => ({ identifier: "failing-parent" }),
-        options: {},
-        use: [],
-        load: async ({ fetch }) => {
-          return fetch({
+        tags: () => ({ id: "failing-parent" }),
+        load: async ({ fetcher }) => {
+          const { load } = fetcher(createMockAdapter());
+          return load({
             shouldError: true,
             errorMessage: "Parent failed",
           } as any);
@@ -404,16 +383,15 @@ describe("createResourceBuilder", () => {
       });
 
       const parentResource = failingParentBuilder({ id: "failing" });
-      const adapter = createMockAdapter();
 
       const childBuilder = createResourceBuilder({
-        tags: () => ({ identifier: "dependent-child" }),
-        options: {},
-        use: [parentResource],
-        load: async ({ use, fetch }) => {
+        tags: () => ({ id: "dependent-child" }),
+        use: () => [parentResource],
+        load: async ({ use, fetcher }) => {
           // This should fail when trying to resolve parent
           await Promise.all(use);
-          return fetch({ data: "should not reach here" } as any);
+          const { load } = fetcher(createMockAdapter());
+          return load({ data: "should not reach here" } as any);
         },
       });
 
@@ -421,9 +399,10 @@ describe("createResourceBuilder", () => {
 
       await expect(
         childResource.load(
-          adapter,
           () => createMockLoaderOptions(),
           createMockRetry,
+          createMockContextID(),
+          (fn) => fn,
         ),
       ).rejects.toThrow("Parent failed");
     });
@@ -447,9 +426,8 @@ describe("createResourceBuilder", () => {
         ResourceTag,
         readonly []
       >({
-        tags: (req) => ({ identifier: `user-${req.userId}` }),
+        tags: (req) => ({ id: `user-${req.userId}` }),
         options: { staleTime: 5000 },
-        use: [],
         load: async ({ req }) => {
           return {
             user: { id: req.userId, name: "Test User" },
@@ -461,17 +439,11 @@ describe("createResourceBuilder", () => {
       });
 
       const resource = typedBuilder({ userId: 123, includeMetadata: true });
-      const adapter: ResourceAdapter<MockLoaderParam, TypedResponse> =
-        () => async () => {
-          return {
-            user: { id: 123, name: "Test User" },
-            metadata: { lastLogin: new Date().toISOString() },
-          };
-        };
       const result = await resource.load(
-        adapter,
         () => createMockLoaderOptions(),
         createMockRetry,
+        createMockContextID(),
+        (fn) => fn,
       );
 
       expect(result.user.id).toBe(123);
@@ -481,17 +453,14 @@ describe("createResourceBuilder", () => {
 
   describe("LoaderOptions and Retry Integration", () => {
     it("should provide access to loaderOptions() within load function", async () => {
-      const adapter = createMockAdapter();
-
       const factory = createResourceBuilder({
-        tags: () => ({ identifier: "loader-options-test" }),
-        options: {},
-        use: [],
-        load: async ({ req, fetch, loaderOptions }) => {
+        tags: () => ({ id: "loader-options-test" }),
+        load: async ({ req, fetcher, loaderOptions }) => {
           // Access loader configuration during resource loading
           const config = loaderOptions();
 
-          const response = await fetch({
+          const { load } = fetcher(createMockAdapter());
+          const response = await load({
             url: `/api/test/${(req as any).id}`,
             data: { id: (req as any).id },
           } as any);
@@ -515,12 +484,14 @@ describe("createResourceBuilder", () => {
           count: 0,
           maxCount: 3,
           resetRetryCount: () => {},
-          useFallbackOnNextRetry: () => {},
         },
         timeout: {
           delay: 5000,
           elapsedTime: 0,
           resetTimeout: () => {},
+        },
+        metadata: {
+          contextID: createMockContextID(),
         },
       });
 
@@ -528,14 +499,18 @@ describe("createResourceBuilder", () => {
         throw new Error("Retry called");
       };
 
-      const result = await resource.load(adapter, mockLoaderOptions, mockRetry);
+      const result = await resource.load(
+        mockLoaderOptions,
+        mockRetry,
+        createMockContextID(),
+        (fn) => fn,
+      );
 
       expect((result as any).capturedLoaderConfig).toEqual({
         retry: {
           count: 0,
           maxCount: 3,
           resetRetryCount: expect.any(Function),
-          useFallbackOnNextRetry: expect.any(Function),
         },
         timeout: {
           delay: 5000,
@@ -546,14 +521,11 @@ describe("createResourceBuilder", () => {
     });
 
     it("should provide access to retry() function within load function", async () => {
-      const adapter = createMockAdapter();
       let retryCallCount = 0;
 
       const factory = createResourceBuilder({
-        tags: () => ({ identifier: "retry-test" }),
-        options: {},
-        use: [],
-        load: async ({ req, fetch, retry }) => {
+        tags: () => ({ id: "retry-test" }),
+        load: async ({ req, fetcher, retry }) => {
           retryCallCount++;
 
           // Simulate a condition where retry is needed
@@ -567,7 +539,8 @@ describe("createResourceBuilder", () => {
             }
           }
 
-          const response = await fetch({
+          const { load } = fetcher(createMockAdapter());
+          const response = await load({
             url: `/api/test/${(req as any).id}`,
             data: { id: (req as any).id, attempt: retryCallCount },
           } as any);
@@ -586,12 +559,14 @@ describe("createResourceBuilder", () => {
           count: 0,
           maxCount: 2,
           resetRetryCount: () => {},
-          useFallbackOnNextRetry: () => {},
         },
         timeout: {
           delay: 5000,
           elapsedTime: 0,
           resetTimeout: () => {},
+        },
+        metadata: {
+          contextID: createMockContextID(),
         },
       });
 
@@ -601,7 +576,12 @@ describe("createResourceBuilder", () => {
 
       // First call should trigger retry
       try {
-        await resource.load(adapter, mockLoaderOptions, mockRetry);
+        await resource.load(
+          mockLoaderOptions,
+          mockRetry,
+          createMockContextID(),
+          (fn) => fn,
+        );
       } catch (error) {
         expect((error as any).message).toBe("Retry signal");
       }
@@ -610,18 +590,16 @@ describe("createResourceBuilder", () => {
     });
 
     it("should pass loaderOptions and retry to dependent resources", async () => {
-      const adapter = createMockAdapter();
       let capturedOptions: any = null;
 
       // Create parent resource that captures loader options
       const parentBuilder = createResourceBuilder({
-        tags: () => ({ identifier: "parent-with-options" }),
-        options: {},
-        use: [],
-        load: async ({ req, fetch, loaderOptions }) => {
+        tags: () => ({ id: "parent-with-options" }),
+        load: async ({ req, fetcher, loaderOptions }) => {
           capturedOptions = loaderOptions();
 
-          const response = await fetch({
+          const { load } = fetcher(createMockAdapter());
+          const response = await load({
             url: `/api/parent/${(req as any).id}`,
             data: { id: (req as any).id },
           } as any);
@@ -634,16 +612,16 @@ describe("createResourceBuilder", () => {
 
       // Create child resource that depends on parent
       const childBuilder = createResourceBuilder({
-        tags: () => ({ identifier: "child-with-options" }),
-        options: {},
-        use: [parentResource],
-        load: async ({ req, use, fetch, loaderOptions }) => {
+        tags: () => ({ id: "child-with-options" }),
+        use: () => [parentResource],
+        load: async ({ req, use, fetcher, loaderOptions }) => {
           // This should receive the same loaderOptions and retry as parent
           const config = loaderOptions();
           const parentResults = await Promise.all(use);
           const firstParent = (parentResults as any[])[0];
 
-          const response = await fetch({
+          const { load } = fetcher(createMockAdapter());
+          const response = await load({
             url: `/api/child/${(req as any).id}`,
             data: { id: (req as any).id, parent: firstParent },
           } as any);
@@ -667,12 +645,14 @@ describe("createResourceBuilder", () => {
           count: 0,
           maxCount: 2,
           resetRetryCount: () => {},
-          useFallbackOnNextRetry: () => {},
         },
         timeout: {
           delay: 3000,
           elapsedTime: 0,
           resetTimeout: () => {},
+        },
+        metadata: {
+          contextID: createMockContextID(),
         },
       });
 
@@ -681,32 +661,31 @@ describe("createResourceBuilder", () => {
       };
 
       const result = await childResource.load(
-        adapter,
         mockLoaderOptions,
         mockRetry,
+        createMockContextID(),
+        (fn) => fn,
       );
 
-      // Verify both parent and child received the same loader options
-      expect(capturedOptions).toEqual({
-        retry: {
-          count: 0,
-          maxCount: 2,
-          resetRetryCount: expect.any(Function),
-          useFallbackOnNextRetry: expect.any(Function),
-        },
-        timeout: {
-          delay: 3000,
-          elapsedTime: 0,
-          resetTimeout: expect.any(Function),
-        },
+      // Verify both parent and child received the same loader options structure
+      expect(capturedOptions.retry).toEqual({
+        count: 0,
+        maxCount: 2,
+        resetRetryCount: expect.any(Function),
       });
+      expect(capturedOptions.timeout).toEqual({
+        delay: 3000,
+        elapsedTime: 0,
+        resetTimeout: expect.any(Function),
+      });
+      expect(capturedOptions.metadata).toHaveProperty("contextID");
+      expect(typeof capturedOptions.metadata.contextID).toBe("object");
 
       expect((result as any).childLoaderConfig).toEqual({
         retry: {
           count: 0,
           maxCount: 2,
           resetRetryCount: expect.any(Function),
-          useFallbackOnNextRetry: expect.any(Function),
         },
         timeout: {
           delay: 3000,
@@ -720,17 +699,14 @@ describe("createResourceBuilder", () => {
     });
 
     it("should handle loaderOptions gracefully when not provided", async () => {
-      const adapter = createMockAdapter();
-
       const factory = createResourceBuilder({
-        tags: () => ({ identifier: "no-options-test" }),
-        options: {},
-        use: [],
-        load: async ({ req, fetch, loaderOptions }) => {
+        tags: () => ({ id: "no-options-test" }),
+        load: async ({ req, fetcher, loaderOptions }) => {
           // loaderOptions might be undefined in some contexts
           const config = loaderOptions ? loaderOptions() : null;
 
-          const response = await fetch({
+          const { load } = fetcher(createMockAdapter());
+          const response = await load({
             url: `/api/test/${(req as any).id}`,
             data: { id: (req as any).id },
           } as any);
@@ -747,11 +723,12 @@ describe("createResourceBuilder", () => {
 
       // Call without loaderOptions (passing undefined)
       const result = await resource.load(
-        adapter,
         undefined as any,
         (): never => {
           throw new Error("retry");
         },
+        createMockContextID(),
+        (fn) => fn,
       );
 
       expect((result as any).hasLoaderOptions).toBe(false);
