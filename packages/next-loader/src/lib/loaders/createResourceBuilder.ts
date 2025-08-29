@@ -1,110 +1,72 @@
-import { LoaderCoreOptions } from "@h1y/loader-core";
-import { nanoid } from "nanoid";
+import { LoaderContextID, LoaderCoreOptions } from "@h1y/loader-core";
 
 import {
-  __RESOURCE_ID,
   type PrefetchedResources,
   type ResourceDeps,
   type ResourceFactory,
   type ResourcesUsed,
 } from "../models/resource";
-import type { ResourceOptions } from "../models/resourceAdapter";
+import type {
+  ExternalResourceAdapter,
+  ExternalResourceOptions,
+} from "../models/resourceAdapter";
 import {
   dependencyRevalidationTags,
+  idTag,
   type ResourceTag,
   validateTag,
 } from "../models/resourceTag";
 
-/**
- * Creates a resource builder factory that defines how to fetch, cache, and manage data.
- * Supports dependency resolution, cache tagging, and hierarchical relationships between resources.
- *
- * @param props - Configuration object for the resource
- * @param props.tags - Function that generates cache tags based on the request
- * @param props.options - Resource options including staleTime for cache invalidation
- * @param props.use - Array of dependent resources that this resource requires
- * @param props.load - Function that defines how to fetch and process the data
- * @returns A resource factory function that can be called with request parameters
- *
- * @example
- * ```typescript
- * // Simple resource without dependencies
- * const User = createResourceBuilder({
- *   tags: (req: { id: string }) => ({ identifier: `user-${req.id}` }),
- *   options: { staleTime: 300000 }, // 5 minutes
- *   use: [], // no dependencies
- *   load: async ({ req, fetch }) => {
- *     const response = await fetch(`/api/users/${req.id}`);
- *     return response.json();
- *   }
- * });
- *
- * // Resource with dependencies and hierarchical tags
- * const UserPosts = createResourceBuilder({
- *   tags: (req: { userId: string }) => ({
- *     identifier: hierarchyTag('user', req.userId, 'posts'), // hierarchical tag
- *     effects: ['user-activity'] // side effect tag
- *   }),
- *   options: { staleTime: 60000 }, // 1 minute
- *   use: [User({ id: req.userId })], // depends on User resource
- *   load: async ({ req, use, fetch, retry }) => {
- *     const [userData] = await Promise.all(use);
- *
- *     if (!userData.isActive) {
- *       retry(); // Retry if user is not active
- *     }
- *
- *     const response = await fetch(`/api/users/${req.userId}/posts`);
- *     return response.json();
- *   }
- * });
- *
- * // Usage in server component
- * const userResource = User({ id: '123' });
- * const postsResource = UserPosts({ userId: '123' });
- * ```
- */
 export function createResourceBuilder<
   const Request,
   const Response,
-  Tag extends ResourceTag,
-  Resources extends ResourcesUsed,
+  const Tag extends ResourceTag,
+  const Resources extends ResourcesUsed,
 >(props: {
   // cache tags that represent this resource.
   tags: (req: Request) => Tag;
 
   // extra resource options.
-  options: { staleTime?: number };
+  options?: { staleTime?: number };
 
   // resources that will be used.
-  use: Resources;
+  use?: (req: Request) => Resources;
 
   // load function that fetches and refines the data.
-  load: <LoaderParam>(props: {
+  load: (props: {
     // resources that have been prefetched.
     readonly use: PrefetchedResources<Resources>;
 
-    // fetcher function that defaults to Next.js fetch() function.
-    readonly fetch: (param: LoaderParam) => Promise<Response>;
+    // fetcher function.
+    readonly fetcher: <const ExternalResourceParam, const ExternalResource>(
+      adapter: ExternalResourceAdapter<ExternalResourceParam, ExternalResource>,
+    ) => { load: (param: ExternalResourceParam) => Promise<ExternalResource> };
 
     // request parameter.
     readonly req: Request;
 
     // access to loader options.
-    readonly loaderOptions: () => LoaderCoreOptions<Response>;
+    readonly loaderOptions: () => LoaderCoreOptions;
 
     // retry loading this resource.
     readonly retry: () => never;
   }) => Promise<Response>;
-}): ResourceFactory<Request, Response, Tag, ResourceDeps<Resources>> {
+}): ResourceFactory<Request, Response, ResourceTag, ResourceDeps<Resources>> {
+  // memoized functions
+  const memoizations = new WeakMap<
+    LoaderContextID,
+    Map<string, () => unknown>
+  >();
+
   return (req) => {
     // generate tags based on the request.
     const resourceTag = validateTag(props.tags(req));
-    // unique ID required internally to identify the resource.
-    const resourceID = nanoid();
+
+    // dependency resources
+    const resources = props.use?.(req) ?? [];
 
     // revalidation tags for dependent resources.
-    const dependencyTags = props.use
+    const dependencyTags = resources
       .map(({ tag }) => [
         ...dependencyRevalidationTags(tag.resource),
         ...tag.dependencies,
@@ -119,11 +81,11 @@ export function createResourceBuilder<
 
     // use the minimum staleTime from all related resources.
     const staleTimeOption = [
-      props.options.staleTime,
-      ...props.use.map((res) => res.options.staleTime),
+      props.options?.staleTime,
+      ...resources.map((res) => res.options.staleTime),
     ].filter((staleTime) => staleTime !== undefined);
 
-    const options: ResourceOptions = {
+    const options: ExternalResourceOptions = {
       ...props.options,
       staleTime:
         staleTimeOption.length > 0 ? Math.min(...staleTimeOption) : undefined,
@@ -136,28 +98,56 @@ export function createResourceBuilder<
         dependencies: dependencyTags,
       },
 
-      load: async (adapter, loaderOptions, retry) => {
-        return props.load({
-          // request parameter.
-          req,
+      load: async (
+        loaderOptions,
+        retry,
+        contextID,
+        memo,
+      ): Promise<Response> => {
+        let resourceContext = memoizations.get(contextID);
 
-          // resources used as dependencies.
-          use: props.use.map(({ load }) =>
-            load(adapter, loaderOptions, retry),
-          ) as PrefetchedResources<Resources>,
+        if (!resourceContext) {
+          memoizations.set(contextID, (resourceContext = new Map()));
+        }
 
-          // fetcher function.
-          fetch: adapter({
-            tags: revalidationTags,
-            options: props.options,
-          }),
+        const resourceID = idTag(resourceTag);
+        let memoizedLoadFn = resourceContext.get(
+          resourceID,
+        ) as () => ReturnType<typeof props.load>;
 
-          loaderOptions,
-          retry,
-        });
+        if (!resourceContext.has(resourceID)) {
+          memoizedLoadFn = async () =>
+            props.load({
+              // request parameter.
+              req,
+
+              use: resources.map(({ load }) =>
+                load(loaderOptions, retry, contextID, memo),
+              ) as PrefetchedResources<Resources>,
+
+              // fetcher function.
+              fetcher: (adapter) => {
+                const { load, validate } = adapter({
+                  tags: revalidationTags,
+                  options: props.options ?? {},
+                });
+
+                return {
+                  load: async (param) => {
+                    validate?.(param);
+                    return load(param);
+                  },
+                };
+              },
+
+              loaderOptions,
+              retry,
+            });
+          resourceContext.set(resourceID, memoizedLoadFn);
+        }
+
+        return memoizedLoadFn();
       },
-
-      [__RESOURCE_ID]: resourceID,
     };
   };
 }

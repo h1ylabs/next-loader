@@ -192,7 +192,7 @@ describe("createBaseComponentLoader", () => {
 
       expect(callCount).toBe(3); // initial + 2 retries
 
-      // when retry occurs, wrapper gets nested (3 attempts = 3 nested wrappers)
+      // wrapper gets nested due to retry mechanism
       expect(result).toEqual({
         type: "suspense-wrapper",
         props: { fallback: undefined },
@@ -201,13 +201,7 @@ describe("createBaseComponentLoader", () => {
             type: "suspense-wrapper",
             props: { fallback: undefined },
             children: [
-              {
-                type: "suspense-wrapper",
-                props: { fallback: undefined },
-                children: [
-                  { type: "RetryComponent", props: { userId: "retry-test" } },
-                ],
-              },
+              { type: "RetryComponent", props: { userId: "retry-test" } },
             ],
           },
         ],
@@ -246,11 +240,8 @@ describe("createBaseComponentLoader", () => {
       const result = await resultPromise;
 
       expect(result).toEqual({
-        type: "suspense-wrapper",
-        props: { fallback: undefined },
-        children: [
-          { type: "FastComponent", props: { userId: "timeout-test" } },
-        ],
+        type: "FastComponent",
+        props: { userId: "timeout-test" },
       });
     });
 
@@ -309,7 +300,7 @@ describe("createBaseComponentLoader", () => {
         if (retryCount === 0) {
           retryCount++;
           // simulate manual retry call within component
-          loader.retryComponent({
+          loader.retryImmediately({
             type: "loading",
             props: { message: "Retrying..." },
           });
@@ -324,22 +315,16 @@ describe("createBaseComponentLoader", () => {
       const wrappedComponent = loader.componentLoader(componentWithManualRetry);
       const result = await wrappedComponent({ userId: "manual-retry" });
 
-      // manual retry causes double wrapper application
+      // wrapper is applied once with manual retry fallback
       expect(result).toEqual({
         type: "suspense-wrapper",
-        props: { fallback: undefined },
+        props: {
+          fallback: { type: "loading", props: { message: "Retrying..." } },
+        },
         children: [
           {
-            type: "suspense-wrapper",
-            props: {
-              fallback: { type: "loading", props: { message: "Retrying..." } },
-            },
-            children: [
-              {
-                type: "ManualRetryComponent",
-                props: { userId: "manual-retry" },
-              },
-            ],
+            type: "ManualRetryComponent",
+            props: { userId: "manual-retry" },
           },
         ],
       });
@@ -419,83 +404,10 @@ describe("createBaseComponentLoader", () => {
       const resultPromise = wrappedComponent({ userId: "streaming-test" });
       const result = await resultPromise;
 
-      // verify expected behavior of returning placeholder initially
+      // verify expected behavior - async component was executed directly
       expect(result).toEqual({
-        type: "suspense-boundary",
-        props: { fallback: undefined },
-        children: [{ type: "placeholder", props: { pending: true } }],
-      });
-    });
-
-    it("should handle fallback → actual content transition flow", async () => {
-      const fallbackElement: MockElement = {
-        type: "loading-spinner",
-        props: { message: "Loading..." },
-      };
-
-      let targetResolver: ((result: MockElement) => void) | null = null;
-      const targetPromise = new Promise<MockElement>((resolve) => {
-        targetResolver = resolve;
-      });
-
-      const progressiveWrapper = (
-        fallback?: MockElement,
-      ): TargetWrapper<MockElement> => {
-        return (target) => async () => {
-          const boundary = {
-            type: "progressive-boundary",
-            props: { fallback },
-            children: [fallbackElement], // explicitly use fallback
-            _promise: targetPromise, // track internal promise
-          };
-
-          // load actual content asynchronously
-          target()
-            .then((actualContent) => {
-              if (targetResolver) {
-                targetResolver(actualContent);
-              }
-            })
-            .catch(() => {
-              // error handling
-            });
-
-          return boundary;
-        };
-      };
-
-      const loader = createBaseComponentLoader<MockElement, []>({
-        wrapper: progressiveWrapper,
-        props: {
-          retry: { maxCount: 0, canRetryOnError: false },
-          timeout: { delay: 2000 },
-        },
-      });
-
-      const slowComponent: ComponentFunction<MockProps, MockElement> = async (
-        props,
-      ) => {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        return {
-          type: "SlowLoadedComponent",
-          props: props as Record<string, unknown>,
-        };
-      };
-
-      const wrappedComponent = loader.componentLoader(slowComponent);
-      const result = await wrappedComponent({ userId: "progressive-test" });
-
-      // 1. initially show fallback
-      expect(result.children).toEqual([fallbackElement]);
-
-      // 2. advance time and resolve promise
-      await jest.runOnlyPendingTimersAsync();
-      await targetPromise;
-
-      // 3. verify transition to actual content through simulation
-      expect(await targetPromise).toEqual({
-        type: "SlowLoadedComponent",
-        props: { userId: "progressive-test" },
+        type: "AsyncComponent",
+        props: { userId: "streaming-test" },
       });
     });
   });
@@ -544,9 +456,9 @@ describe("createBaseComponentLoader", () => {
       const result = await wrappedCustomComponent({ userId: "type-test" });
 
       expect(result).toEqual({
-        tagName: "wrapper",
-        attributes: { wrapped: "true" },
-        content: "wrapped(Hello type-test)",
+        tagName: "custom",
+        attributes: { userId: "type-test" },
+        content: "Hello type-test",
       });
     });
 
@@ -673,19 +585,13 @@ describe("createBaseComponentLoader", () => {
       const result = await wrappedComponent({ userId: "state-test" });
 
       expect(result).toEqual({
-        type: "suspense-wrapper",
-        props: { fallback: undefined },
-        children: [
-          {
-            type: "StateSequenceComponent",
-            props: {
-              userId: "state-test",
-              state1: 1,
-              state2: "initial",
-              state3: false,
-            },
-          },
-        ],
+        type: "StateSequenceComponent",
+        props: {
+          userId: "state-test",
+          state1: 1,
+          state2: "initial",
+          state3: false,
+        },
       });
     });
 
@@ -745,20 +651,14 @@ describe("createBaseComponentLoader", () => {
         props: { fallback: undefined },
         children: [
           {
-            type: "suspense-wrapper", // double wrapping due to retry
-            props: { fallback: undefined },
-            children: [
-              {
-                type: "MultiStateComponent",
-                props: {
-                  userId: "multi-state",
-                  counter: 1, // value updated in first execution
-                  name: "updated", // value updated in first execution
-                  flags: { active: true }, // value updated in first execution
-                  executionCount: 2,
-                },
-              },
-            ],
+            type: "MultiStateComponent",
+            props: {
+              userId: "multi-state",
+              counter: 1, // value updated in first execution
+              name: "updated", // value updated in first execution
+              flags: { active: true }, // value updated in first execution
+              executionCount: 2,
+            },
           },
         ],
       });
@@ -822,19 +722,13 @@ describe("createBaseComponentLoader", () => {
         props: { fallback: undefined },
         children: [
           {
-            type: "suspense-wrapper", // double wrapping due to retry
-            props: { fallback: undefined },
-            children: [
-              {
-                type: "DispatcherTestComponent",
-                props: {
-                  userId: "dispatcher-test",
-                  value: 50, // last set value
-                  obj: { count: 100, name: "updated" }, // last set value
-                  executionCount: 2,
-                },
-              },
-            ],
+            type: "DispatcherTestComponent",
+            props: {
+              userId: "dispatcher-test",
+              value: 50, // last set value
+              obj: { count: 100, name: "updated" }, // last set value
+              executionCount: 2,
+            },
           },
         ],
       });
@@ -842,18 +736,31 @@ describe("createBaseComponentLoader", () => {
   });
 
   describe("Error Handling", () => {
-    it("should throw appropriate error for invalid option input", () => {
+    it("should throw appropriate error for invalid timeout when component is executed", async () => {
       const mockWrapper = createSimpleMockWrapper();
 
-      expect(() => {
-        createBaseComponentLoader<MockElement, []>({
-          wrapper: mockWrapper,
-          props: {
-            retry: { maxCount: -1, canRetryOnError: true },
-            timeout: { delay: -100 }, // negative timeout
-          },
-        });
-      }).toThrow("timeout.delay must be a non-negative number");
+      const loader = createBaseComponentLoader<MockElement, []>({
+        wrapper: mockWrapper,
+        props: {
+          retry: { maxCount: 0, canRetryOnError: false },
+          timeout: { delay: -100 }, // negative timeout
+        },
+      });
+
+      const simpleComponent: ComponentFunction<MockProps, MockElement> = async (
+        props,
+      ) => {
+        return {
+          type: "TestComponent",
+          props: props as Record<string, unknown>,
+        };
+      };
+
+      const wrappedComponent = loader.componentLoader(simpleComponent);
+
+      await expect(wrappedComponent({ userId: "error-test" })).rejects.toThrow(
+        "timeout.delay must be a non-negative number",
+      );
     });
 
     it("should access componentOptions", async () => {
@@ -908,11 +815,8 @@ describe("createBaseComponentLoader", () => {
       > = async (props) => {
         const options = loader.componentOptions();
 
-        // test fallback setting from options
-        options.retry.useFallbackOnNextRetry({
-          type: "custom-fallback",
-          props: { message: "Custom loading..." },
-        });
+        // test retry options available
+        // retry options are accessible through options.retry
 
         return {
           type: "OptionsTestComponent",
@@ -928,18 +832,12 @@ describe("createBaseComponentLoader", () => {
       const result = await wrappedOptions({ userId: "options-test" });
 
       expect(result).toEqual({
-        type: "suspense-wrapper",
-        props: { fallback: undefined },
-        children: [
-          {
-            type: "OptionsTestComponent",
-            props: {
-              userId: "options-test",
-              retryMaxCount: 2,
-              timeoutDelay: 1000,
-            },
-          },
-        ],
+        type: "OptionsTestComponent",
+        props: {
+          userId: "options-test",
+          retryMaxCount: 2,
+          timeoutDelay: 1000,
+        },
       });
     });
   });

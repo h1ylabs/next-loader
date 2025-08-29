@@ -13,15 +13,11 @@ import {
   type InitialValue,
 } from "../features/componentState";
 import type { ComponentFunction } from "../models/component";
+import { DEFAULT_COMPONENT_LOADER_PROPS } from "../models/loader";
 import {
   type NormalizableOptions,
   normalizeOptions,
 } from "../utils/normalizeOptions";
-
-export const DEFAULT_COMPONENT_LOADER_PROPS = {
-  retry: { maxCount: 0, canRetryOnError: false },
-  timeout: { delay: Infinity },
-} as const;
 
 export function createBaseComponentLoader<
   Element,
@@ -40,142 +36,64 @@ export function createBaseComponentLoader<
   readonly middlewares?: Middlewares;
 }) {
   const options = normalizeProps<Element>(props);
-  const { execute, retry, loaderOptions, middlewareOptions } =
-    loaderCore<Element>().withOptions({
-      input: {
-        retry: {
-          ...options.retry,
-          // The loader's fallback is different from Suspense's fallback.
-          fallback: wrapper(options.retry.fallback),
-        },
-        timeout: options.timeout,
-        backoff: options.backoff,
-      },
-      middlewares: [
-        ComponentStateMiddleware<Element>(),
-        ...(middlewares ?? []),
-      ],
+  const {
+    execute,
+    retryFallback,
+    retryImmediately,
+    loaderOptions,
+    middlewareOptions,
+  } = loaderCore<Element>().withOptions({
+    input: {
+      retry: {
+        ...options.retry,
+        onRetryEach() {
+          // from props
+          props?.retry?.onRetryEach?.();
 
-      // component loader does not propagate retry signals.
-      propagateRetry: false,
-    });
+          // determine retry fallback
+          // PRIORITY: initial < retryWhen < retryImmediately
+        },
+        // the loader's fallback is different from Suspense's fallback.
+        fallback: wrapper(options.retry.fallback),
+      },
+      timeout: options.timeout,
+      backoff: options.backoff,
+    },
+    middlewares: [ComponentStateMiddleware<Element>(), ...(middlewares ?? [])],
+
+    // component loader does not propagate retry signals.
+    propagateRetry: false,
+    // determineError, handleError
+  });
 
   return {
-    /**
-     * Higher-Order Component (HOC) that wraps a React Server Component with loader capabilities.
-     *
-     * @param component - The React Server Component to wrap with loader functionality
-     * @returns A wrapped component that automatically handles loading states, retries, and timeouts
-     *
-     * @example
-     * ```typescript
-     * // Define your server component
-     * async function MyServerComponent({ userId }: { userId: string }) {
-     *   const user = await fetchUser(userId);
-     *   return <div>Hello, {user.name}!</div>;
-     * }
-     *
-     * // Wrap it with loader capabilities and export
-     * const { componentLoader } = createComponentLoader();
-     * export default componentLoader(MyServerComponent);
-     * ```
-     */
-    componentLoader: <Props>(
+    componentLoader: <Props extends object>(
       component: ComponentFunction<Props, Element>,
     ): ComponentFunction<Props, Element> => {
       return async (props: Props) => execute(async () => component(props));
     },
 
-    /**
-     * Manually triggers a retry for the component with an optional fallback element.
-     *
-     * @important This function can only be used within a server component wrapped by `componentLoader()`.
-     * It has no effect on other components returned by the wrapped server component.
-     *
-     * @param fallback - Optional React element to display during the retry process
-     *
-     * @example
-     * ```typescript
-     * const { componentLoader, retryComponent } = createComponentLoader();
-     *
-     * async function MyServerComponent() {
-     *   // This works - inside wrapped component
-     *   retryComponent(<div>Retrying...</div>);
-     *
-     *   return <div>Content</div>;
-     * }
-     *
-     * export default componentLoader(MyServerComponent);
-     * ```
-     */
-    retryComponent: (fallback?: Element) => {
-      retry(wrapper(fallback));
+    retryImmediately: (fallback?: Element) => {
+      retryImmediately(wrapper(fallback));
     },
 
-    /**
-     * Returns the current component loader configuration options.
-     *
-     * @important This function can only be used within a server component wrapped by `componentLoader()`.
-     * It has no effect on other components returned by the wrapped server component.
-     *
-     * @returns Configuration object containing retry and timeout settings
-     *
-     * @example
-     * ```typescript
-     * const { componentLoader, componentOptions } = createComponentLoader();
-     *
-     * async function MyServerComponent() {
-     *   const { retry, timeout } = componentOptions();
-     *
-     *   // Configure fallback for next retry
-     *   retry.useFallbackOnNextRetry(<LoadingSpinner />);
-     *
-     *   return <div>Content</div>;
-     * }
-     *
-     * export default componentLoader(MyServerComponent);
-     * ```
-     */
-    componentOptions: () => {
-      const { useFallbackOnNextRetry, ...retryOptions } = loaderOptions().retry;
+    retryFallback: <T>({
+      when,
+      fallback,
+    }: {
+      readonly when: (error: T) => boolean;
+      readonly fallback: (error: T) => Element;
+    }) => {
+      retryFallback<T>({ when, fallback: (error) => wrapper(fallback(error)) });
+    },
 
+    componentOptions: () => {
       return {
-        retry: {
-          ...retryOptions,
-          useFallbackOnNextRetry: (fallback: Element) => {
-            useFallbackOnNextRetry(wrapper(fallback));
-          },
-        },
+        retry: { ...loaderOptions().retry },
         timeout: { ...loaderOptions().timeout },
       };
     },
 
-    /**
-     * Creates and manages component state that persists across retry cycles.
-     *
-     * @important This function can only be used within a server component wrapped by `componentLoader()`.
-     * It has no effect on other components returned by the wrapped server component.
-     *
-     * @param initialValue - Optional initial value for the state (can be a value or factory function)
-     * @returns A tuple containing [state, setState] similar to React's useState hook
-     *
-     * @example
-     * ```typescript
-     * const { componentLoader, componentState } = createComponentLoader();
-     *
-     * async function MyServerComponent() {
-     *   // Create state within the wrapped component (useState-like pattern)
-     *   const [count, setCount] = componentState(0);
-     *   const [userData, setUserData] = componentState(() => ({ name: '', email: '' }));
-     *
-     *   setCount(count + 1);
-     *
-     *   return <div>Count: {count}</div>;
-     * }
-     *
-     * export default componentLoader(MyServerComponent);
-     * ```
-     */
     componentState: <T>(initialValue?: InitialValue<T>) => {
       return createComponentState(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
