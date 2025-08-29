@@ -1,6 +1,6 @@
 # Promise-AOP
 
-**최신 버전: v4.1.0**
+**최신 버전: v6.0.0**
 
 깔끔하고 유지보수하기 쉬운 비동기 코드를 위한 TypeScript-first AOP(Aspect-Oriented Programming) 프레임워크입니다. 로깅, 캐싱, 에러 처리 등의 횡단 관심사를 구조화된 방식으로 관리하며, 타입 안전성과 명시적 컨텍스트 관리에 중점을 둡니다.
 
@@ -380,6 +380,80 @@ const result = await runProcess({
 });
 ```
 
+#### `runProcessWith<Result, Context>(props)`
+
+기존 AsyncContext 인스턴스와 별도의 컨텍스트 생성기로 process를 실행합니다. 이 함수는 컨텍스트 관리에 대한 더 정밀한 제어를 제공하며 더 나은 성능을 위해 AsyncContext 재사용을 가능하게 합니다.
+
+**매개변수:**
+
+```typescript
+type RunProcessWithProps<Result, Context> = {
+  readonly process: Process<Result, Context>;
+  readonly target: Target<Result>; // () => Promise<Result>
+  readonly context: AsyncContext<Context>; // 미리 생성된 AsyncContext 인스턴스
+  readonly contextGenerator: ContextGenerator<Context>; // () => Context
+};
+```
+
+**반환값:** `Promise<Result>`
+
+**`runProcess`와의 주요 차이점:**
+
+- **관심사 분리**: 미리 생성된 `AsyncContext` 인스턴스와 별도의 `contextGenerator`를 받음
+- **성능 최적화**: 여러 실행에서 AsyncContext 인스턴스 재사용 가능
+- **고급 제어**: 복잡한 컨텍스트 관리 시나리오 지원
+
+**사용 사례:**
+
+- **컨텍스트 재사용**: 여러 작업에서 동일한 AsyncContext를 재사용해야 할 때
+- **성능 중요**: AsyncContext 인스턴스를 미리 생성하고 재사용하여 오버헤드 감소
+- **복잡한 시나리오**: 고급 컨텍스트 전파 패턴
+
+**예시:**
+
+```typescript
+// 재사용을 위한 AsyncContext 미리 생성
+const sharedAsyncContext = AsyncContext.create();
+
+// 동일한 컨텍스트 인스턴스로 여러 작업 실행
+const results = await Promise.all([
+  runProcessWith({
+    process: userProcess,
+    target: async () => fetchUser("user1"),
+    context: sharedAsyncContext,
+    contextGenerator: () => ({ logger: console, db: userDb }),
+  }),
+
+  runProcessWith({
+    process: userProcess,
+    target: async () => fetchUser("user2"),
+    context: sharedAsyncContext, // 동일한 컨텍스트 인스턴스
+    contextGenerator: () => ({ logger: console, db: userDb }),
+  }),
+]);
+
+// 성능 최적화 패턴
+class ServiceManager {
+  private sharedContext = AsyncContext.create<ServiceContext>();
+
+  async executeOperation<T>(
+    operation: () => Promise<T>,
+    process: Process<T, ServiceContext>,
+  ): Promise<T> {
+    return runProcessWith({
+      process,
+      target: operation,
+      context: this.sharedContext, // 모든 작업에서 재사용
+      contextGenerator: () => this.createServiceContext(),
+    });
+  }
+
+  private createServiceContext(): ServiceContext {
+    return { logger: this.logger, metrics: this.metrics, db: this.db };
+  }
+}
+```
+
 ### 설정 옵션
 
 #### `BuildOptions`
@@ -554,7 +628,13 @@ const process = createProcess<string, AppContext>({
 
 ```typescript
 // 주요 내보내기
-export { createAspect, createProcess, runProcess, AsyncContext };
+export {
+  createAspect,
+  createProcess,
+  runProcess,
+  runProcessWith,
+  AsyncContext,
+};
 
 // 에러 타입
 export { Rejection, HaltRejection, ContinuousRejection };

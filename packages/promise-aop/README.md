@@ -1,6 +1,6 @@
 # Promise-AOP
 
-**Latest version: v4.1.0**
+**Latest version: v6.0.0**
 
 A TypeScript-first, zero-dependency AOP (Aspect-Oriented Programming) framework for robust and maintainable asynchronous code. It provides a structured way to manage cross-cutting concerns like logging, caching, and error handling with a strong emphasis on type safety and explicit context management.
 
@@ -380,6 +380,80 @@ const result = await runProcess({
 });
 ```
 
+#### `runProcessWith<Result, Context>(props)`
+
+Executes a process with an existing AsyncContext instance and a separate context generator. This function provides more precise control over context management and enables AsyncContext reuse for better performance.
+
+**Parameters:**
+
+```typescript
+type RunProcessWithProps<Result, Context> = {
+  readonly process: Process<Result, Context>;
+  readonly target: Target<Result>; // () => Promise<Result>
+  readonly context: AsyncContext<Context>; // Pre-created AsyncContext instance
+  readonly contextGenerator: ContextGenerator<Context>; // () => Context
+};
+```
+
+**Returns:** `Promise<Result>`
+
+**Key Differences from `runProcess`:**
+
+- **Separation of Concerns**: Takes a pre-created `AsyncContext` instance and a separate `contextGenerator`
+- **Performance Optimization**: Allows reuse of AsyncContext instances across multiple executions
+- **Advanced Control**: Enables complex context management scenarios
+
+**Use Cases:**
+
+- **Context Reuse**: When you need to reuse the same AsyncContext across multiple operations
+- **Performance Critical**: Reduce overhead by pre-creating and reusing AsyncContext instances
+- **Complex Scenarios**: Advanced context propagation patterns
+
+**Example:**
+
+```typescript
+// Pre-create AsyncContext for reuse
+const sharedAsyncContext = AsyncContext.create();
+
+// Execute multiple operations with the same context instance
+const results = await Promise.all([
+  runProcessWith({
+    process: userProcess,
+    target: async () => fetchUser("user1"),
+    context: sharedAsyncContext,
+    contextGenerator: () => ({ logger: console, db: userDb }),
+  }),
+
+  runProcessWith({
+    process: userProcess,
+    target: async () => fetchUser("user2"),
+    context: sharedAsyncContext, // Same context instance
+    contextGenerator: () => ({ logger: console, db: userDb }),
+  }),
+]);
+
+// Performance optimization pattern
+class ServiceManager {
+  private sharedContext = AsyncContext.create<ServiceContext>();
+
+  async executeOperation<T>(
+    operation: () => Promise<T>,
+    process: Process<T, ServiceContext>,
+  ): Promise<T> {
+    return runProcessWith({
+      process,
+      target: operation,
+      context: this.sharedContext, // Reused across all operations
+      contextGenerator: () => this.createServiceContext(),
+    });
+  }
+
+  private createServiceContext(): ServiceContext {
+    return { logger: this.logger, metrics: this.metrics, db: this.db };
+  }
+}
+```
+
 ### Configuration Options
 
 #### `BuildOptions`
@@ -554,7 +628,13 @@ const process = createProcess<string, AppContext>({
 
 ```typescript
 // Main exports
-export { createAspect, createProcess, runProcess, AsyncContext };
+export {
+  createAspect,
+  createProcess,
+  runProcess,
+  runProcessWith,
+  AsyncContext,
+};
 
 // Error types
 export { Rejection, HaltRejection, ContinuousRejection };
