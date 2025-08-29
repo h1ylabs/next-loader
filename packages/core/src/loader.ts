@@ -225,7 +225,7 @@ export function loader<const Result>() {
       },
 
       retryImmediately: (fallback?: TargetWrapper<Result>): never => {
-        // 수동적으로 재시도를 수행하는 경우, 최우선으로 폴백이 적용됩니다.
+        // when retrying manually, the provided fallback takes precedence.
         if (fallback) {
           loaderContext.context().__core__retry.fallback.immediate = fallback;
         }
