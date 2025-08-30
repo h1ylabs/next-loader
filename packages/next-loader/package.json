@@ -46,8 +46,7 @@
     "@h1y/loader-config": "workspace:*",
     "@h1y/loader-core": "workspace:*",
     "@types/node": "catalog:",
-    "@types/react": ">=18.2.0",
-    "@types/react-dom": "^18.2.0",
+    "@types/react": ">=18.3.0",
     "eslint": "catalog:",
     "jest": "catalog:",
     "prettier": "catalog:",
@@ -56,11 +55,8 @@
     "tsup": "catalog:",
     "typescript": "catalog:"
   },
-  "peerDependencies": {
-    "react": ">=18.2.0",
-    "react-dom": ">=18.2.0"
-  },
   "dependencies": {
+    "react": ">=18.3.0",
     "react-error-boundary": "^6.0.0"
   }
 }
