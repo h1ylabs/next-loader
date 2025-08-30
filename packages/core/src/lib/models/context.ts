@@ -3,7 +3,6 @@ import {
   type BackoffContextInput,
   createBackoffContext,
 } from "./backoff";
-import { createMetadataContext, type MetadataContext } from "./metadata";
 import {
   createRetryContext,
   type RetryContext,
@@ -22,7 +21,6 @@ export type LoaderCoreInput<Result> = {
 };
 
 export type LoaderCoreContext<Result> = {
-  readonly __core__metadata: MetadataContext;
   readonly __core__timeout: TimeoutContext;
   readonly __core__retry: RetryContext<Result>;
   readonly __core__backoff: BackoffContext;
@@ -34,7 +32,6 @@ export function createLoaderCoreContext<Result>({
   backoff,
 }: LoaderCoreInput<Result>): LoaderCoreContext<Result> {
   return {
-    __core__metadata: createMetadataContext(),
     __core__timeout: createTimeoutContext(timeout),
     __core__retry: createRetryContext(retry),
     __core__backoff: createBackoffContext(backoff),
