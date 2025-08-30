@@ -21,3 +21,5 @@ jobs:
 
       - name: Install Dependencies
         run: yarn install
+        env:
+          YARN_ENABLE_IMMUTABLE_INSTALLS: false

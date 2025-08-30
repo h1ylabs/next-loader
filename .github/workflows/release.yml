@@ -26,6 +26,8 @@ jobs:
 
       - name: Install Dependencies
         run: yarn install
+        env:
+          YARN_ENABLE_IMMUTABLE_INSTALLS: false
 
       # 라이브러리를 빌드합니다.
       # 이때, Testing, Linting, Formatting 과정이 선행됩니다.
