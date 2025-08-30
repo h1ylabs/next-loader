@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   createCommonAdvices,
   createCommonTarget,
@@ -80,96 +79,132 @@ describe("adviceTasks", () => {
   });
 
   describe("aroundAdviceTask", () => {
-    it.each([
-      {
-        name: "wrapper composition",
-        resolver:
-          (target: Target<TestResult>) =>
-          (nextChain: (t: Target<TestResult>) => Target<TestResult>) => {
-            const wrappedTarget = async () => {
-              const result = await target();
-              return result + 1;
-            };
-            return nextChain(wrappedTarget);
-          },
-        targetValue: 10,
-        expectedResult: 11,
-      },
-      {
-        name: "identity resolver",
-        resolver:
-          (target: Target<TestResult>) =>
-          (nextChain: (t: Target<TestResult>) => Target<TestResult>) => {
-            return nextChain(target);
-          },
-        targetValue: 5,
-        expectedResult: 5,
-      },
-      {
-        name: "double resolver",
-        resolver:
-          (target: Target<TestResult>) =>
-          (nextChain: (t: Target<TestResult>) => Target<TestResult>) => {
-            const wrappedTarget = async () => {
-              const result = await target();
-              return result * 2;
-            };
-            return nextChain(wrappedTarget);
-          },
-        targetValue: 3,
-        expectedResult: 6,
-      },
-    ])(
-      "should process around advice with $name",
-      async ({ resolver, targetValue, expectedResult }) => {
-        const mockProcessAroundAdvice = jest.fn().mockResolvedValue(resolver);
-        const chainContext = createMockChainContext({
-          target: createMockTarget(targetValue),
-        });
-
-        const task = aroundAdviceTask(chainContext, mockProcessAroundAdvice);
-        const result = await task();
-
-        expect(mockProcessAroundAdvice).toHaveBeenCalledWith({
-          context: { id: "test", data: 42 },
-          around: expect.any(Function),
-        });
-
-        expect(typeof result).toBe("function");
-        // Ensure non-null resolver, then pass a nextChain
-        if (result === null) {
-          throw new Error("Expected non-null AroundAdviceResolver");
-        }
-        const nextChain = (target: Target<TestResult>) => target;
-        const finalTarget = result(nextChain);
-        const wrappedResult = await finalTarget();
-        expect(wrappedResult).toBe(expectedResult);
-      },
-    );
-
-    it("should handle fallback resolver correctly", async () => {
-      const fallbackValue = -999;
-      const mockProcessAroundAdvice = jest
+    it("should process around advice with attachToResult wrapper", async () => {
+      const targetValue = 10;
+      const expectedResult = 11;
+      const mockAroundAdvice = jest
         .fn()
-        .mockResolvedValue(
-          (_: Target<TestResult>) =>
-            (_: (t: Target<TestResult>) => Target<TestResult>) =>
-            async () =>
-              fallbackValue,
-        );
-      const chainContext = createMockChainContext();
+        .mockImplementation(async (_context, { attachToResult }) => {
+          attachToResult((target: Target<TestResult>) => async () => {
+            const result = await target();
+            return result + 1;
+          });
+        });
 
-      const task = aroundAdviceTask(chainContext, mockProcessAroundAdvice);
-      const result = await task();
+      const mockAdvices = createMockAdvices({ around: mockAroundAdvice });
+      const chainContext = createMockChainContext({
+        target: createMockTarget(targetValue),
+        advices: mockAdvices,
+      });
 
-      expect(typeof result).toBe("function");
+      const task = aroundAdviceTask(chainContext);
+      const resolver = await task();
+
+      expect(mockAroundAdvice).toHaveBeenCalledWith(
+        { id: "test", data: 42 },
+        {
+          attachToResult: expect.any(Function),
+          attachToTarget: expect.any(Function),
+        },
+      );
+
+      expect(typeof resolver).toBe("function");
+      const propagateChain = (target: Target<TestResult>) => target;
       const nextChain = (target: Target<TestResult>) => target;
-      if (result === null) {
-        throw new Error("Expected non-null AroundAdviceResolver");
-      }
-      const finalTarget = result(nextChain);
+      const finalTarget = resolver(propagateChain, nextChain);
       const wrappedResult = await finalTarget();
-      expect(wrappedResult).toBe(fallbackValue);
+      expect(wrappedResult).toBe(expectedResult);
+    });
+
+    it("should process around advice with attachToTarget wrapper", async () => {
+      const targetValue = 5;
+      const expectedResult = 10;
+      const mockAroundAdvice = jest
+        .fn()
+        .mockImplementation(async (_context, { attachToTarget }) => {
+          attachToTarget((target: Target<TestResult>) => async () => {
+            const result = await target();
+            return result * 2;
+          });
+        });
+
+      const mockAdvices = createMockAdvices({ around: mockAroundAdvice });
+      const chainContext = createMockChainContext({
+        target: createMockTarget(targetValue),
+        advices: mockAdvices,
+      });
+
+      const task = aroundAdviceTask(chainContext);
+      const resolver = await task();
+
+      expect(typeof resolver).toBe("function");
+      const propagateChain = (target: Target<TestResult>) => target;
+      const nextChain = (target: Target<TestResult>) => target;
+      const finalTarget = resolver(propagateChain, nextChain);
+      const wrappedResult = await finalTarget();
+      expect(wrappedResult).toBe(expectedResult);
+    });
+
+    it("should handle identity resolver when no wrappers are attached", async () => {
+      const targetValue = 5;
+      const mockAroundAdvice = jest.fn().mockImplementation(async () => {
+        // No wrappers attached
+      });
+
+      const mockAdvices = createMockAdvices({ around: mockAroundAdvice });
+      const chainContext = createMockChainContext({
+        target: createMockTarget(targetValue),
+        advices: mockAdvices,
+      });
+
+      const task = aroundAdviceTask(chainContext);
+      const resolver = await task();
+
+      expect(typeof resolver).toBe("function");
+      const propagateChain = (target: Target<TestResult>) => target;
+      const nextChain = (target: Target<TestResult>) => target;
+      const finalTarget = resolver(propagateChain, nextChain);
+      const wrappedResult = await finalTarget();
+      expect(wrappedResult).toBe(targetValue);
+    });
+
+    it("should combine multiple attachToResult wrappers in correct order", async () => {
+      const targetValue = 1;
+      const expectedResult = 5; // ((1 + 1) * 2) + 1 = 5
+      const mockAroundAdvice = jest
+        .fn()
+        .mockImplementation(async (_context, { attachToResult }) => {
+          // First wrapper: add 1
+          attachToResult((target: Target<TestResult>) => async () => {
+            const result = await target();
+            return result + 1;
+          });
+          // Second wrapper: multiply by 2
+          attachToResult((target: Target<TestResult>) => async () => {
+            const result = await target();
+            return result * 2;
+          });
+          // Third wrapper: add 1
+          attachToResult((target: Target<TestResult>) => async () => {
+            const result = await target();
+            return result + 1;
+          });
+        });
+
+      const mockAdvices = createMockAdvices({ around: mockAroundAdvice });
+      const chainContext = createMockChainContext({
+        target: createMockTarget(targetValue),
+        advices: mockAdvices,
+      });
+
+      const task = aroundAdviceTask(chainContext);
+      const resolver = await task();
+
+      const propagateChain = (target: Target<TestResult>) => target;
+      const nextChain = (target: Target<TestResult>) => target;
+      const finalTarget = resolver(propagateChain, nextChain);
+      const wrappedResult = await finalTarget();
+      expect(wrappedResult).toBe(expectedResult);
     });
   });
 
