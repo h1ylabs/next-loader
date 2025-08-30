@@ -40,7 +40,7 @@ Get started with @h1y/next-loader in three simple steps:
 ```typescript
 import { revalidateTag } from "next/cache";
 import { cache } from "react";
-import { createLoader, NextJSAdapter } from "@h1y/next-loader";
+import { loaderFactory, NextJSAdapter } from "@h1y/next-loader";
 
 // Define data types
 interface User {
@@ -57,7 +57,7 @@ interface Post {
 }
 
 // Create once at module level and reuse everywhere
-const loader = createLoader({
+const loader = loaderFactory({
   memo: cache, // Request deduplication
 });
 ```
@@ -65,9 +65,9 @@ const loader = createLoader({
 ### 2. Define your resources
 
 ```typescript
-import { createResourceBuilder } from "@h1y/next-loader";
+import { resourceFactory } from "@h1y/next-loader";
 
-const User = createResourceBuilder({
+const User = resourceFactory({
   tags: (req: { id: string }) => ({ id: `user-${req.id}` }),
   options: { staleTime: 300000 }, // Cache for 5 minutes
   load: async ({ req, fetcher }): Promise<User> => {
@@ -77,7 +77,7 @@ const User = createResourceBuilder({
   },
 });
 
-const UserPosts = createResourceBuilder({
+const UserPosts = resourceFactory({
   tags: (req: { userId: string }) => ({ id: `user-${req.userId}-posts` }),
   options: { staleTime: 180000 }, // Cache for 3 minutes
   load: async ({ req, fetcher }): Promise<Post[]> => {
@@ -150,7 +150,7 @@ That's it! Your data is now automatically cached, batch-loaded, revalidated, and
 Resources are declarative definitions that tell @h1y/next-loader how to fetch, cache, and manage your data:
 
 ```typescript
-const BlogPost = createResourceBuilder({
+const BlogPost = resourceFactory({
   // Define cache tags
   tags: (req: { slug: string }) => ({
     id: `post-${req.slug}`,
@@ -185,12 +185,12 @@ const BlogPost = createResourceBuilder({
 
 @h1y/next-loader provides two distinct approaches for different use cases:
 
-#### `createLoader()` - For Data Fetching with Caching
+#### `loaderFactory()` - For Data Fetching with Caching
 
 **When to use**: Loading external data in server components (most common use case)
 
 ```typescript
-const loader = createLoader({ memo: cache });
+const loader = loaderFactory({ memo: cache });
 
 async function UserPage() {
   // Single resource
@@ -219,12 +219,12 @@ async function UserPage() {
 - ❌ No component-level retry/fallback
 - 🔧 Default: 60s timeout, no retries
 
-#### `createComponentLoader()` - For Component Resilience
+#### `componentLoaderFactory()` - For Component Resilience
 
 **When to use**: Adding retry/timeout/state management to components themselves
 
 ```typescript
-const { componentLoader } = createComponentLoader({
+const { componentLoader } = componentLoaderFactory({
   retry: { maxCount: 3, canRetryOnError: true },
   timeout: { delay: 5000 }
 });
@@ -263,20 +263,20 @@ export const ErrorSafeComponent = componentLoader(UserProfile).withErrorBoundary
 - ✅ **State persistence** across retries (`componentState`)
 - ✅ **Boundary management** (Suspense + Error Boundary)
 - ✅ **Middleware context access** via `{name}MiddlewareOptions()` within components
-- ✅ **Integrates with `createLoader()`** - automatic retry signal propagation
+- ✅ **Integrates with `loaderFactory()`** - automatic retry signal propagation
 - ✅ **Best Practice**: Use `loader()` for data fetching within `componentLoader()` components
 - 🔧 Default: 60s timeout, no retries
 
 ### Key Integration: loader + componentLoader
 
-**Important**: You can use `createLoader()` inside `createComponentLoader()` components, and retry signals automatically propagate:
+**Important**: You can use `loaderFactory()` inside `componentLoaderFactory()` components, and retry signals automatically propagate:
 
 ```typescript
-const loader = createLoader(dependencies, {
+const loader = loaderFactory(dependencies, {
   retry: { maxCount: 2, canRetryOnError: true }
 });
 
-const { componentLoader } = createComponentLoader({
+const { componentLoader } = componentLoaderFactory({
   retry: { maxCount: 3, canRetryOnError: (err) => err.status >= 500 }
 });
 
@@ -314,7 +314,7 @@ Organize your cache invalidation strategy with hierarchical tags for precise con
 ```typescript
 import { hierarchyTag } from "@h1y/next-loader";
 
-const UserComments = createResourceBuilder({
+const UserComments = resourceFactory({
   tags: (req: { userId: string; postId: string }) => ({
     id: hierarchyTag("user", req.userId, "posts", req.postId, "comments"),
   }),
@@ -383,7 +383,7 @@ Build complex data flows by composing resources:
 
 ```typescript
 // Base user resource
-const User = createResourceBuilder({
+const User = resourceFactory({
   tags: (req: { id: string }) => ({ id: `user-${req.id}` }),
   options: { staleTime: 300000 },
   load: async ({ req, fetcher }) => {
@@ -393,7 +393,7 @@ const User = createResourceBuilder({
 });
 
 // Posts that depend on user data
-const UserPosts = createResourceBuilder({
+const UserPosts = resourceFactory({
   tags: (req: { userId: string }) => ({
     id: hierarchyTag('user', req.userId, 'posts'),
     effects: ['activity-feed'] // Invalidate activity feed when posts change
@@ -445,13 +445,13 @@ async function UserDashboard({ userId }: { userId: string }) {
 Use `componentState` to maintain state across retry cycles and integrate with `loader()` for data fetching. Unlike React useState, componentState persists across retries.
 
 ```typescript
-const loader = createLoader({ memo: cache });
-const { componentLoader, componentState, componentOptions } = createComponentLoader({
+const loader = loaderFactory({ memo: cache });
+const { componentLoader, componentState, componentOptions } = componentLoaderFactory({
   retry: { maxCount: 3, canRetryOnError: true }
 });
 
 // Define resources
-const UserProfile = createResourceBuilder({
+const UserProfile = resourceFactory({
   tags: (req: { userId: string }) => ({ id: `user-profile-${req.userId}` }),
   load: async ({ req, fetcher }) => {
     const response = await fetcher(NextJSAdapter).load(`/api/users/${req.userId}/profile`);
@@ -459,7 +459,7 @@ const UserProfile = createResourceBuilder({
   },
 });
 
-const UserSettings = createResourceBuilder({
+const UserSettings = resourceFactory({
   tags: (req: { userId: string }) => ({ id: `user-settings-${req.userId}` }),
   load: async ({ req, fetcher }) => {
     const response = await fetcher(NextJSAdapter).load(`/api/users/${req.userId}/settings`);
@@ -513,7 +513,7 @@ Use advanced retry functions for fine-grained control over retry behavior and us
 #### `retryImmediately()` - Immediate Retry
 
 ```typescript
-const { componentLoader, retryImmediately } = createComponentLoader({
+const { componentLoader, retryImmediately } = componentLoaderFactory({
   retry: { maxCount: 3, canRetryOnError: true }
 });
 
@@ -536,7 +536,7 @@ export default componentLoader(PaymentProcessor).withBoundary(<div>Loading...</d
 Unlike `retryImmediately()`, `retryFallback()` doesn't trigger immediate retry. Instead, it registers conditional fallbacks that are shown when specific error conditions are met, then allows automatic retry to proceed.
 
 ```typescript
-const { componentLoader, retryFallback } = createComponentLoader({
+const { componentLoader, retryFallback } = componentLoaderFactory({
   retry: { maxCount: 3, canRetryOnError: true }
 });
 
@@ -568,7 +568,7 @@ export default componentLoader(CheckoutForm).withBoundary(<div>Loading...</div>)
 ### Error Handling
 
 ```typescript
-const Product = createResourceBuilder({
+const Product = resourceFactory({
   tags: (req: { id: string }) => ({ id: `product-${req.id}` }),
   load: async ({ req, fetcher }) => {
     const response = await fetcher(NextJSAdapter).load(`/api/products/${req.id}`);
@@ -588,10 +588,10 @@ async function ProductPage({ id }: { id: string }) {
 ## 🎛️ Middleware System
 
 ```typescript
-import { createLoaderMiddleware } from "@h1y/next-loader";
+import { loaderMiddleware } from "@h1y/next-loader";
 
 // Logging middleware
-const loggingMiddleware = createLoaderMiddleware({
+const loggingMiddleware = loaderMiddleware({
   name: "logging",
   contextGenerator: () => ({ startTime: 0 }),
   before: async (context) => {
@@ -604,16 +604,16 @@ const loggingMiddleware = createLoaderMiddleware({
   },
 });
 
-const loader = createLoader({ memo: cache }, config, [loggingMiddleware]);
+const loader = loaderFactory({ memo: cache }, config, [loggingMiddleware]);
 ```
 
 #### Component Middleware with Context Access
 
 ```typescript
-import { createComponentMiddleware } from "@h1y/next-loader";
+import { componentMiddleware } from "@h1y/next-loader";
 
 // Performance monitoring for component rendering
-const performanceMiddleware = createComponentMiddleware({
+const performanceMiddleware = componentMiddleware({
   name: "performance",
   contextGenerator: () => ({ startTime: 0, componentName: '' }),
   before: async (context) => {
@@ -625,7 +625,7 @@ const performanceMiddleware = createComponentMiddleware({
   },
 });
 
-const { componentLoader, performanceMiddlewareOptions } = createComponentLoader({
+const { componentLoader, performanceMiddlewareOptions } = componentLoaderFactory({
   retry: { maxCount: 2, canRetryOnError: true }
 }, [performanceMiddleware]);
 
@@ -748,10 +748,10 @@ async function MyComponent() {
 
 ## 📖 API Reference
 
-### `createLoader(dependencies, options?, middlewares?)`
+### `loaderFactory(dependencies, options?, middlewares?)`
 
 ```typescript
-const loader = createLoader(
+const loader = loaderFactory(
   {
     memo: cache, // Request deduplication
   },
@@ -773,10 +773,10 @@ const [load, revalidation] = loader(SomeResource({ id: '123' }));
 </form>
 ```
 
-### `createComponentLoader(options?, middlewares?)`
+### `componentLoaderFactory(options?, middlewares?)`
 
 ```typescript
-const { componentLoader } = createComponentLoader({
+const { componentLoader } = componentLoaderFactory({
   retry: { maxCount: 3, canRetryOnError: true }
 });
 
@@ -809,11 +809,11 @@ type AsyncErrorBoundaryProps = {
 };
 ```
 
-#### Integration with createLoader
+#### Integration with loaderFactory
 
 ```typescript
-const loader = createLoader({ memo: cache });
-const { componentLoader } = createComponentLoader({
+const loader = loaderFactory({ memo: cache });
+const { componentLoader } = componentLoaderFactory({
   retry: { maxCount: 2, canRetryOnError: true }
 });
 
@@ -829,10 +829,10 @@ async function Dashboard({ userId }: { userId: string }) {
 export default componentLoader(Dashboard).withBoundary(<div>Loading...</div>);
 ```
 
-### `createResourceBuilder(config)`
+### `resourceFactory(config)`
 
 ```typescript
-const UserPosts = createResourceBuilder({
+const UserPosts = resourceFactory({
   tags: (req: { userId: string }) => ({
     id: hierarchyTag("user", req.userId, "posts"),
     effects: ["activity-feed"],
@@ -857,7 +857,7 @@ const UserPosts = createResourceBuilder({
 // Creates: ['user', 'user/123', 'user/123/posts']
 const tags = hierarchyTag("user", "123", "posts");
 
-const UserPosts = createResourceBuilder({
+const UserPosts = resourceFactory({
   tags: (req: { userId: string }) => ({
     id: hierarchyTag("user", req.userId, "posts"),
     effects: hierarchyTag("user", req.userId), // Parent levels
@@ -877,7 +877,7 @@ import {
 } from "@h1y/next-loader";
 
 // Fixed delay: always wait 2 seconds between retries
-const loader = createLoader(dependencies, {
+const loader = loaderFactory(dependencies, {
   retry: { maxCount: 3, canRetryOnError: true },
   backoff: {
     strategy: FIXED_BACKOFF,
@@ -886,7 +886,7 @@ const loader = createLoader(dependencies, {
 });
 
 // Linear backoff: 1s, 3s, 5s delays
-const loader = createLoader(dependencies, {
+const loader = loaderFactory(dependencies, {
   retry: { maxCount: 3, canRetryOnError: true },
   backoff: {
     strategy: LINEAR_BACKOFF(2000), // Add 2 seconds each retry
@@ -895,7 +895,7 @@ const loader = createLoader(dependencies, {
 });
 
 // Exponential backoff: 500ms, 1s, 2s, 4s delays
-const loader = createLoader(dependencies, {
+const loader = loaderFactory(dependencies, {
   retry: { maxCount: 4, canRetryOnError: true },
   backoff: {
     strategy: EXPONENTIAL_BACKOFF(2), // Double delay each retry
@@ -925,7 +925,7 @@ const externalAdapter = createExternalResourceAdapter({
   },
 });
 
-const ExternalResource = createResourceBuilder({
+const ExternalResource = resourceFactory({
   tags: (req: { url: string }) => ({ id: `external-${req.url}` }),
   load: async ({ req, fetcher }) => {
     const { load } = fetcher(externalAdapter);
@@ -1002,14 +1002,14 @@ async function DynamicComponent() {
 
 **A:**
 
-- **Use `createLoader()`** for data fetching with caching and **batch loading** (most common use case)
-- **Use `createComponentLoader()`** when you need component-level retry/timeout behavior and state management
+- **Use `loaderFactory()`** for data fetching with caching and **batch loading** (most common use case)
+- **Use `componentLoaderFactory()`** when you need component-level retry/timeout behavior and state management
 
 **Best Practice:** Use both together:
 
 ```typescript
-const loader = createLoader({ memo: cache }); // Global data loading
-const { componentLoader } = createComponentLoader(config); // Component resilience
+const loader = loaderFactory({ memo: cache }); // Global data loading
+const { componentLoader } = componentLoaderFactory(config); // Component resilience
 
 async function MyComponent() {
   const [load, revalidation] = loader(SomeResource({ id: '123' }));
