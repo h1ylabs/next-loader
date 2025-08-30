@@ -1,5 +1,16 @@
 # @h1y/loader-core
 
+## 6.0.0
+
+### Major Changes
+
+- [#62](https://github.com/h1ylabs/next-loader/pull/62) [`1202b47`](https://github.com/h1ylabs/next-loader/commit/1202b47c1f188a1e21b5f8ffb377b181868757a6) Thanks [@cutehammond772](https://github.com/cutehammond772)! - v6.0.0
+
+### Patch Changes
+
+- Updated dependencies [[`1202b47`](https://github.com/h1ylabs/next-loader/commit/1202b47c1f188a1e21b5f8ffb377b181868757a6)]:
+  - @h1y/promise-aop@6.0.0
+
 ## 5.0.0
 
 ### Major Changes
