@@ -2,7 +2,7 @@
 import { middleware } from "@h1y/loader-core";
 import type { TargetWrapper } from "@h1y/promise-aop";
 
-import { createBaseComponentLoader } from "@/lib/loaders/createBaseComponentLoader";
+import { componentLoaderFactory } from "@/lib/factories/componentLoaderFactory";
 import type { ComponentFunction } from "@/lib/models/component";
 
 // mock element types for testing without react
@@ -59,7 +59,7 @@ const createMockComponent = <Props>(
   };
 };
 
-describe("createBaseComponentLoader", () => {
+describe("componentLoaderFactory", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -67,7 +67,7 @@ describe("createBaseComponentLoader", () => {
   describe("Basic Operations", () => {
     it("should execute component successfully", async () => {
       const mockWrapper = createSimpleMockWrapper();
-      const loader = createBaseComponentLoader<MockElement, []>({
+      const loader = componentLoaderFactory<MockElement, []>({
         wrapper: mockWrapper,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -91,7 +91,7 @@ describe("createBaseComponentLoader", () => {
 
     it("should retry on error", async () => {
       const mockWrapper = createSimpleMockWrapper();
-      const loader = createBaseComponentLoader<MockElement, []>({
+      const loader = componentLoaderFactory<MockElement, []>({
         wrapper: mockWrapper,
         props: {
           retry: { maxCount: 2, canRetryOnError: true },
@@ -126,7 +126,7 @@ describe("createBaseComponentLoader", () => {
 
     it("should fail when max retry count exceeded", async () => {
       const mockWrapper = createSimpleMockWrapper();
-      const loader = createBaseComponentLoader<MockElement, []>({
+      const loader = componentLoaderFactory<MockElement, []>({
         wrapper: mockWrapper,
         props: {
           retry: { maxCount: 1, canRetryOnError: true },
@@ -164,7 +164,7 @@ describe("createBaseComponentLoader", () => {
 
     it("should handle initial failure → automatic retry → success (suspense wrapper)", async () => {
       const mockWrapper = createSuspenseLikeMockWrapper();
-      const loader = createBaseComponentLoader<MockElement, []>({
+      const loader = componentLoaderFactory<MockElement, []>({
         wrapper: mockWrapper,
         props: {
           retry: { maxCount: 2, canRetryOnError: true },
@@ -210,7 +210,7 @@ describe("createBaseComponentLoader", () => {
 
     it("should complete successfully within timeout", async () => {
       const mockWrapper = createSuspenseLikeMockWrapper();
-      const loader = createBaseComponentLoader<MockElement, []>({
+      const loader = componentLoaderFactory<MockElement, []>({
         wrapper: mockWrapper,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -250,7 +250,7 @@ describe("createBaseComponentLoader", () => {
       jest.useRealTimers(); // use real timers
 
       const mockWrapper = createSuspenseLikeMockWrapper();
-      const loader = createBaseComponentLoader<MockElement, []>({
+      const loader = componentLoaderFactory<MockElement, []>({
         wrapper: mockWrapper,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -284,7 +284,7 @@ describe("createBaseComponentLoader", () => {
 
     it("should handle manual retryComponent() call", async () => {
       const mockWrapper = createSuspenseLikeMockWrapper();
-      const loader = createBaseComponentLoader<MockElement, []>({
+      const loader = componentLoaderFactory<MockElement, []>({
         wrapper: mockWrapper,
         props: {
           retry: { maxCount: 1, canRetryOnError: true },
@@ -374,7 +374,7 @@ describe("createBaseComponentLoader", () => {
         };
       };
 
-      const loader = createBaseComponentLoader<MockElement, []>({
+      const loader = componentLoaderFactory<MockElement, []>({
         wrapper: streamingWrapper,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -432,7 +432,7 @@ describe("createBaseComponentLoader", () => {
         };
       };
 
-      const customLoader = createBaseComponentLoader<CustomElement, []>({
+      const customLoader = componentLoaderFactory<CustomElement, []>({
         wrapper: customWrapper,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -479,7 +479,7 @@ describe("createBaseComponentLoader", () => {
         return (target) => target;
       };
 
-      const specificLoader = createBaseComponentLoader<SpecificElement, []>({
+      const specificLoader = componentLoaderFactory<SpecificElement, []>({
         wrapper: specificWrapper,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -515,7 +515,7 @@ describe("createBaseComponentLoader", () => {
   describe("Component State Management", () => {
     it("should handle componentState basic operations", async () => {
       const mockWrapper = createSimpleMockWrapper();
-      const loader = createBaseComponentLoader<MockElement, []>({
+      const loader = componentLoaderFactory<MockElement, []>({
         wrapper: mockWrapper,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -553,7 +553,7 @@ describe("createBaseComponentLoader", () => {
 
     it("should guarantee componentState() call order (suspense wrapper)", async () => {
       const mockWrapper = createSuspenseLikeMockWrapper();
-      const loader = createBaseComponentLoader<MockElement, []>({
+      const loader = componentLoaderFactory<MockElement, []>({
         wrapper: mockWrapper,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -597,7 +597,7 @@ describe("createBaseComponentLoader", () => {
 
     it("should handle multiple states simultaneously and update (including retry) - temporarily skipped due to architecture issues", async () => {
       const mockWrapper = createSuspenseLikeMockWrapper();
-      const loader = createBaseComponentLoader<MockElement, []>({
+      const loader = componentLoaderFactory<MockElement, []>({
         wrapper: mockWrapper,
         props: {
           retry: { maxCount: 5, canRetryOnError: true }, // allow sufficient count for component state testing
@@ -666,7 +666,7 @@ describe("createBaseComponentLoader", () => {
 
     it("should handle state update dispatcher operations (including retry) - temporarily skipped due to architecture issues", async () => {
       const mockWrapper = createSuspenseLikeMockWrapper();
-      const loader = createBaseComponentLoader<MockElement, []>({
+      const loader = componentLoaderFactory<MockElement, []>({
         wrapper: mockWrapper,
         props: {
           retry: { maxCount: 5, canRetryOnError: true }, // allow sufficient count for component state testing
@@ -739,7 +739,7 @@ describe("createBaseComponentLoader", () => {
     it("should throw appropriate error for invalid timeout when component is executed", async () => {
       const mockWrapper = createSimpleMockWrapper();
 
-      const loader = createBaseComponentLoader<MockElement, []>({
+      const loader = componentLoaderFactory<MockElement, []>({
         wrapper: mockWrapper,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -765,7 +765,7 @@ describe("createBaseComponentLoader", () => {
 
     it("should access componentOptions", async () => {
       const mockWrapper = createSimpleMockWrapper();
-      const loader = createBaseComponentLoader<MockElement, []>({
+      const loader = componentLoaderFactory<MockElement, []>({
         wrapper: mockWrapper,
         props: {
           retry: { maxCount: 2, canRetryOnError: true },
@@ -801,7 +801,7 @@ describe("createBaseComponentLoader", () => {
 
     it("should access componentOptions (suspense wrapper)", async () => {
       const mockWrapper = createSuspenseLikeMockWrapper();
-      const loader = createBaseComponentLoader<MockElement, []>({
+      const loader = componentLoaderFactory<MockElement, []>({
         wrapper: mockWrapper,
         props: {
           retry: { maxCount: 2, canRetryOnError: true },
@@ -902,7 +902,7 @@ describe("createBaseComponentLoader", () => {
     describe("Single Middleware", () => {
       it("should work with LoggingMiddleware", async () => {
         const mockWrapper = createSimpleMockWrapper();
-        const loader = createBaseComponentLoader<
+        const loader = componentLoaderFactory<
           MockElement,
           [ReturnType<typeof LoggingMiddleware>]
         >({
@@ -937,7 +937,7 @@ describe("createBaseComponentLoader", () => {
 
       it("should work with CacheMiddleware", async () => {
         const mockWrapper = createSimpleMockWrapper();
-        const loader = createBaseComponentLoader<
+        const loader = componentLoaderFactory<
           MockElement,
           [ReturnType<typeof CacheMiddleware>]
         >({
@@ -974,7 +974,7 @@ describe("createBaseComponentLoader", () => {
 
       it("should work with MetricsMiddleware", async () => {
         const mockWrapper = createSimpleMockWrapper();
-        const loader = createBaseComponentLoader<
+        const loader = componentLoaderFactory<
           MockElement,
           [ReturnType<typeof MetricsMiddleware>]
         >({
@@ -1027,7 +1027,7 @@ describe("createBaseComponentLoader", () => {
     describe("Multiple Middlewares", () => {
       it("should work with combined middlewares", async () => {
         const mockWrapper = createSimpleMockWrapper();
-        const loader = createBaseComponentLoader<
+        const loader = componentLoaderFactory<
           MockElement,
           [
             ReturnType<typeof LoggingMiddleware>,
@@ -1068,7 +1068,7 @@ describe("createBaseComponentLoader", () => {
 
       it("should execute middlewares in correct order during retry", async () => {
         const mockWrapper = createSimpleMockWrapper();
-        const loader = createBaseComponentLoader<
+        const loader = componentLoaderFactory<
           MockElement,
           [
             ReturnType<typeof LoggingMiddleware>,
@@ -1125,7 +1125,7 @@ describe("createBaseComponentLoader", () => {
     describe("ComponentStateMiddleware Integration", () => {
       it("should work with both ComponentState and custom middleware", async () => {
         const mockWrapper = createSimpleMockWrapper();
-        const loader = createBaseComponentLoader<
+        const loader = componentLoaderFactory<
           MockElement,
           [ReturnType<typeof LoggingMiddleware>]
         >({
@@ -1184,7 +1184,7 @@ describe("createBaseComponentLoader", () => {
 
       it("should handle complex state operations with retry", async () => {
         const mockWrapper = createSimpleMockWrapper();
-        const loader = createBaseComponentLoader<MockElement, []>({
+        const loader = componentLoaderFactory<MockElement, []>({
           wrapper: mockWrapper,
           props: {
             retry: { maxCount: 3, canRetryOnError: true },
@@ -1255,7 +1255,7 @@ describe("createBaseComponentLoader", () => {
 
       it("should handle state initialization patterns correctly", async () => {
         const mockWrapper = createSimpleMockWrapper();
-        const loader = createBaseComponentLoader<MockElement, []>({
+        const loader = componentLoaderFactory<MockElement, []>({
           wrapper: mockWrapper,
           props: {
             retry: { maxCount: 0, canRetryOnError: false },

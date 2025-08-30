@@ -1,21 +1,21 @@
+import {
+  componentLoaderFactory as baseComponentLoaderFactory,
+  type ComponentLoaderProps,
+} from "./lib/factories/componentLoaderFactory";
 import { ReactComponentLoaderWrapper } from "./lib/integrations/react/componentLoaderWrapper";
 import { ReactComponentLoaderMiddleware } from "./lib/integrations/react/types";
 import {
   withBoundary,
   withErrorBoundary,
 } from "./lib/integrations/react/withBoundary";
-import {
-  type ComponentLoaderProps,
-  createBaseComponentLoader,
-} from "./lib/loaders/createBaseComponentLoader";
 import { ComponentFunction } from "./lib/models/component";
 import { AsyncErrorBoundaryProps } from "./lib/utils/AsyncErrorBoundary";
 
-export function createComponentLoader<
+export function componentLoaderFactory<
   const Middlewares extends readonly ReactComponentLoaderMiddleware[],
 >(props?: ComponentLoaderProps<React.ReactElement>, middlewares?: Middlewares) {
   const { componentLoader: baseComponentLoader, ...others } =
-    createBaseComponentLoader<React.ReactElement, Middlewares>({
+    baseComponentLoaderFactory<React.ReactElement, Middlewares>({
       wrapper: ReactComponentLoaderWrapper,
       props,
       middlewares,

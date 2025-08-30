@@ -59,7 +59,6 @@ export function loader<const Result>() {
     // 1. check for duplicate middleware names.
     const middlewareNames = new Set<string>([
       "__core__backoff",
-      "__core__metadata",
       "__core__retry",
       "__core__timeout",
     ] satisfies (keyof LoaderCoreContext<Result>)[]);
@@ -194,11 +193,8 @@ export function loader<const Result>() {
       },
 
       loaderOptions: (): LoaderCoreOptions => {
-        const {
-          __core__retry: retry,
-          __core__timeout: timeout,
-          __core__metadata: metadata,
-        } = loaderContext.context();
+        const { __core__retry: retry, __core__timeout: timeout } =
+          loaderContext.context();
 
         return {
           retry: {
@@ -207,9 +203,6 @@ export function loader<const Result>() {
             resetRetryCount: () => {
               retry.count = 0;
             },
-          },
-          metadata: {
-            ...metadata,
           },
           timeout: {
             delay: timeout.delay,

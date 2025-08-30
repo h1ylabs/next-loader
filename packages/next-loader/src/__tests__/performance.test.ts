@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createBaseLoader } from "@/lib/loaders/createBaseLoader";
-import { createResourceBuilder } from "@/lib/loaders/createResourceBuilder";
+import { loaderFactory } from "@/lib/factories/loaderFactory";
+import { resourceFactory } from "@/lib/factories/resourceFactory";
 
 import { createCounterMiddleware } from "./__helpers__/mockMiddleware";
 import { createMockAdapter } from "./__helpers__/mockResourceBuilder";
@@ -19,7 +19,7 @@ describe("Performance and Concurrency Tests", () => {
 
   describe("High Load Performance", () => {
     it("should handle large numbers of resources efficiently", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -58,7 +58,7 @@ describe("Performance and Concurrency Tests", () => {
     });
 
     it("should handle memory efficiently with repeated operations", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -101,7 +101,7 @@ describe("Performance and Concurrency Tests", () => {
   describe("Concurrent Access Patterns", () => {
     it("should handle concurrent loading of different resources", async () => {
       const counterMiddleware = createCounterMiddleware();
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         middlewares: [counterMiddleware],
         props: {
@@ -143,7 +143,7 @@ describe("Performance and Concurrency Tests", () => {
     });
 
     it("should handle concurrent access to same resource efficiently", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -190,7 +190,7 @@ describe("Performance and Concurrency Tests", () => {
     });
 
     it("should handle mixed concurrent patterns", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 1, canRetryOnError: true },
@@ -286,7 +286,7 @@ describe("Performance and Concurrency Tests", () => {
         dependency?: any,
         delay = 10,
       ) =>
-        createResourceBuilder({
+        resourceFactory({
           tags: () => ({ id: name }),
           options: { staleTime: 1000 },
           use: dependency ? () => [dependency] : undefined,
@@ -313,7 +313,7 @@ describe("Performance and Concurrency Tests", () => {
       const resourceD = createDependentBuilder("D", resourceC, 10);
       const resourceE = createDependentBuilder("E", resourceD, 10);
 
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -342,7 +342,7 @@ describe("Performance and Concurrency Tests", () => {
 
     it("should handle wide dependency trees efficiently", async () => {
       // Create a root dependency
-      const rootBuilder = createResourceBuilder({
+      const rootBuilder = resourceFactory({
         tags: () => ({ id: "root" }),
         options: { staleTime: 2000 },
         load: async ({ fetcher }) => {
@@ -356,7 +356,7 @@ describe("Performance and Concurrency Tests", () => {
 
       // Create multiple resources that depend on the root
       const dependentFactories = Array.from({ length: 20 }, (_, i) =>
-        createResourceBuilder({
+        resourceFactory({
           tags: () => ({ id: `branch-${i}` }),
           options: { staleTime: 1000 },
           use: () => [root],
@@ -373,7 +373,7 @@ describe("Performance and Concurrency Tests", () => {
         })({ id: `branch-${i}` }),
       );
 
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -408,7 +408,7 @@ describe("Performance and Concurrency Tests", () => {
 
   describe("Error Handling Performance", () => {
     it("should handle errors efficiently without blocking other operations", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 1, canRetryOnError: true },
@@ -480,7 +480,7 @@ describe("Performance and Concurrency Tests", () => {
 
   describe("Memory and Resource Management", () => {
     it("should not leak memory with repeated cache operations", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },

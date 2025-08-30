@@ -40,7 +40,7 @@ pnpm add @h1y/next-loader
 ```typescript
 import { revalidateTag } from "next/cache";
 import { cache } from "react";
-import { createLoader, NextJSAdapter } from "@h1y/next-loader";
+import { loaderFactory, NextJSAdapter } from "@h1y/next-loader";
 
 // 데이터 타입 정의
 interface User {
@@ -57,7 +57,7 @@ interface Post {
 }
 
 // 모듈 레벨에서 한 번 생성하여 어디서나 재사용
-const loader = createLoader({
+const loader = loaderFactory({
   memo: cache, // 요청 중복 제거
 });
 ```
@@ -65,9 +65,9 @@ const loader = createLoader({
 ### 2. 리소스 정의
 
 ```typescript
-import { createResourceBuilder } from "@h1y/next-loader";
+import { resourceFactory } from "@h1y/next-loader";
 
-const User = createResourceBuilder({
+const User = resourceFactory({
   tags: (req: { id: string }) => ({ id: `user-${req.id}` }),
   options: { staleTime: 300000 }, // 5분 캐시
   load: async ({ req, fetcher }): Promise<User> => {
@@ -77,7 +77,7 @@ const User = createResourceBuilder({
   },
 });
 
-const UserPosts = createResourceBuilder({
+const UserPosts = resourceFactory({
   tags: (req: { userId: string }) => ({ id: `user-${req.userId}-posts` }),
   options: { staleTime: 180000 }, // 3분 캐시
   load: async ({ req, fetcher }): Promise<Post[]> => {
@@ -150,7 +150,7 @@ async function UserDashboard({ params }: { params: { id: string } }) {
 리소스는 @h1y/next-loader에게 데이터를 어떻게 페치하고, 캐시하고, 관리할지를 알려주는 선언적 정의입니다:
 
 ```typescript
-const BlogPost = createResourceBuilder({
+const BlogPost = resourceFactory({
   // 캐시 태그 정의
   tags: (req: { slug: string }) => ({
     id: `post-${req.slug}`,
@@ -185,12 +185,12 @@ const BlogPost = createResourceBuilder({
 
 @h1y/next-loader는 서로 다른 용도에 따라 두 가지 접근법을 제공합니다:
 
-#### `createLoader()` - 데이터 페칭용
+#### `loaderFactory()` - 데이터 페칭용
 
 **언제 사용**: 서버 컴포넌트에서 데이터 로딩 (가장 일반적인 사용 사례)
 
 ```typescript
-const loader = createLoader(dependencies);
+const loader = loaderFactory(dependencies);
 
 async function UserPage() {
   // 단일 리소스
@@ -219,12 +219,12 @@ async function UserPage() {
 - ❌ 컴포넌트 레벨 재시도/폴백 없음
 - 🔧 기본값: 60초 타임아웃, 재시도 없음
 
-#### `createComponentLoader()` - 컴포넌트 복원력용
+#### `componentLoaderFactory()` - 컴포넌트 복원력용
 
 **언제 사용**: 컴포넌트 자체에 재시도/타임아웃/상태 관리 추가
 
 ```typescript
-const { componentLoader } = createComponentLoader({
+const { componentLoader } = componentLoaderFactory({
   retry: { maxCount: 3, canRetryOnError: true },
   timeout: { delay: 5000 }
 });
@@ -263,7 +263,7 @@ export const ErrorSafeComponent = componentLoader(UserProfile).withErrorBoundary
 - ✅ **상태 지속성** (`componentState()`)을 통한 재시도 전반에 걸친 상태 유지
 - ✅ **경계 관리** (Suspense + Error Boundary)
 - ✅ **미들웨어 컨텍스트 접근** 컴포넌트 내에서 `{name}MiddlewareOptions()`를 통해 가능
-- ✅ **createLoader()와 통합** - 자동 재시도 신호 전파
+- ✅ **loaderFactory()와 통합** - 자동 재시도 신호 전파
 - ✅ **모범 사례**: `componentLoader()` 컴포넌트 내에서 데이터 페칭에 `loader()` 사용
 - 🔧 기본값: 60초 타임아웃, 재시도 없음
 
@@ -272,11 +272,11 @@ export const ErrorSafeComponent = componentLoader(UserProfile).withErrorBoundary
 **중요**: `loader()`를 `componentLoader()` 컴포넌트 내부에서 사용할 수 있으며, 재시도 신호가 자동으로 전파됩니다:
 
 ```typescript
-const loader = createLoader(dependencies, {
+const loader = loaderFactory(dependencies, {
   retry: { maxCount: 2, canRetryOnError: true }
 });
 
-const { componentLoader } = createComponentLoader({
+const { componentLoader } = componentLoaderFactory({
   retry: { maxCount: 3, canRetryOnError: (err) => err.status >= 500 }
 });
 
@@ -314,7 +314,7 @@ export default componentLoader(IntegratedDashboard).withBoundary(<DashboardLoadi
 ```typescript
 import { hierarchyTag } from "@h1y/next-loader";
 
-const UserComments = createResourceBuilder({
+const UserComments = resourceFactory({
   tags: (req: { userId: string; postId: string }) => ({
     id: hierarchyTag("user", req.userId, "posts", req.postId, "comments"),
   }),
@@ -382,7 +382,7 @@ async function ComprehensiveDashboard({ userId }: { userId: string }) {
 
 ```typescript
 // 기본 사용자 리소스
-const User = createResourceBuilder({
+const User = resourceFactory({
   tags: (req: { id: string }) => ({ id: `user-${req.id}` }),
   options: { staleTime: 300000 },
   use: [],
@@ -393,7 +393,7 @@ const User = createResourceBuilder({
 });
 
 // 사용자 데이터에 의존하는 게시물
-const UserPosts = createResourceBuilder({
+const UserPosts = resourceFactory({
   tags: (req: { userId: string }) => ({
     id: hierarchyTag('user', req.userId, 'posts'),
     effects: ['activity-feed'] // 게시물 변경 시 활동 피드 무효화
@@ -445,13 +445,13 @@ async function UserDashboard({ userId }: { userId: string }) {
 `componentState`를 사용하여 재시도 사이클 동안 상태를 유지하고 `loader()`와 통합하여 데이터를 페칭하세요. React useState와 달리 componentState는 재시도 전반에 걸쳐 유지됩니다.
 
 ```typescript
-const loader = createLoader({ memo: cache });
-const { componentLoader, componentState, componentOptions } = createComponentLoader({
+const loader = loaderFactory({ memo: cache });
+const { componentLoader, componentState, componentOptions } = componentLoaderFactory({
   retry: { maxCount: 3, canRetryOnError: true }
 });
 
 // 리소스 정의
-const UserProfile = createResourceBuilder({
+const UserProfile = resourceFactory({
   tags: (req: { userId: string }) => ({ id: `user-profile-${req.userId}` }),
   load: async ({ req, fetcher }) => {
     const response = await fetcher(NextJSAdapter).load(`/api/users/${req.userId}/profile`);
@@ -459,7 +459,7 @@ const UserProfile = createResourceBuilder({
   },
 });
 
-const UserSettings = createResourceBuilder({
+const UserSettings = resourceFactory({
   tags: (req: { userId: string }) => ({ id: `user-settings-${req.userId}` }),
   load: async ({ req, fetcher }) => {
     const response = await fetcher(NextJSAdapter).load(`/api/users/${req.userId}/settings`);
@@ -513,7 +513,7 @@ export default componentLoader(StatefulDashboard).withBoundary(<div>로딩 중..
 #### `retryImmediately()` - 즉시 재시도
 
 ```typescript
-const { componentLoader, retryImmediately } = createComponentLoader({
+const { componentLoader, retryImmediately } = componentLoaderFactory({
   retry: { maxCount: 3, canRetryOnError: true }
 });
 
@@ -536,7 +536,7 @@ export default componentLoader(PaymentProcessor).withBoundary(<div>Loading...</d
 `retryImmediately()`와 달리 `retryFallback()`은 즉시 재시도를 트리거하지 않습니다. 대신 특정 오류 조건이 충족될 때 표시되는 조건부 폴백을 등록한 다음 자동 재시도가 계속 진행되도록 합니다.
 
 ```typescript
-const { componentLoader, retryFallback } = createComponentLoader({
+const { componentLoader, retryFallback } = componentLoaderFactory({
   retry: { maxCount: 3, canRetryOnError: true }
 });
 
@@ -568,7 +568,7 @@ export default componentLoader(CheckoutForm).withBoundary(<div>Loading...</div>)
 ### 오류 처리
 
 ```typescript
-const Product = createResourceBuilder({
+const Product = resourceFactory({
   tags: (req: { id: string }) => ({ id: `product-${req.id}` }),
   load: async ({ req, fetcher }) => {
     const response = await fetcher(NextJSAdapter).load(`/api/products/${req.id}`);
@@ -588,10 +588,10 @@ async function ProductPage({ id }: { id: string }) {
 ## 🎛️ 미들웨어 시스템
 
 ```typescript
-import { createLoaderMiddleware } from "@h1y/next-loader";
+import { loaderMiddleware } from "@h1y/next-loader";
 
 // 로깅 미들웨어
-const loggingMiddleware = createLoaderMiddleware({
+const loggingMiddleware = loaderMiddleware({
   name: "logging",
   contextGenerator: () => ({ startTime: 0 }),
   before: async (context) => {
@@ -604,16 +604,16 @@ const loggingMiddleware = createLoaderMiddleware({
   },
 });
 
-const loader = createLoader(dependencies, config, [loggingMiddleware]);
+const loader = loaderFactory(dependencies, config, [loggingMiddleware]);
 ```
 
 #### 컴포넌트 미들웨어와 컨텍스트 접근
 
 ```typescript
-import { createComponentMiddleware } from "@h1y/next-loader";
+import { componentMiddleware } from "@h1y/next-loader";
 
 // 컴포넌트 렌더링을 위한 성능 모니터링
-const performanceMiddleware = createComponentMiddleware({
+const performanceMiddleware = componentMiddleware({
   name: "performance",
   contextGenerator: () => ({ startTime: 0, componentName: '' }),
   before: async (context) => {
@@ -625,7 +625,7 @@ const performanceMiddleware = createComponentMiddleware({
   },
 });
 
-const { componentLoader, performanceMiddlewareOptions } = createComponentLoader({
+const { componentLoader, performanceMiddlewareOptions } = componentLoaderFactory({
   retry: { maxCount: 2, canRetryOnError: true }
 }, [performanceMiddleware]);
 
@@ -748,10 +748,10 @@ async function MyComponent() {
 
 ## 📖 API 참조
 
-### `createLoader(dependencies, options?, middlewares?)`
+### `loaderFactory(dependencies, options?, middlewares?)`
 
 ```typescript
-const loader = createLoader(
+const loader = loaderFactory(
   {
     memo: cache, // 요청 중복 제거
   },
@@ -773,10 +773,10 @@ const [load, revalidation] = loader(SomeResource({ id: '123' }));
 </form>
 ```
 
-### `createComponentLoader(options?, middlewares?)`
+### `componentLoaderFactory(options?, middlewares?)`
 
 ```typescript
-const { componentLoader } = createComponentLoader({
+const { componentLoader } = componentLoaderFactory({
   retry: { maxCount: 3, canRetryOnError: true }
 });
 
@@ -793,11 +793,11 @@ export const WithErrorHandling = componentLoader(UserProfile).withErrorBoundary(
 });
 ```
 
-#### createLoader와의 통합
+#### loaderFactory와의 통합
 
 ```typescript
-const loader = createLoader(dependencies);
-const { componentLoader } = createComponentLoader({
+const loader = loaderFactory(dependencies);
+const { componentLoader } = componentLoaderFactory({
   retry: { maxCount: 2, canRetryOnError: true }
 });
 
@@ -813,10 +813,10 @@ async function Dashboard({ userId }: { userId: string }) {
 export default componentLoader(Dashboard).withBoundary(<div>Loading...</div>);
 ```
 
-### `createResourceBuilder(config)`
+### `resourceFactory(config)`
 
 ```typescript
-const UserPosts = createResourceBuilder({
+const UserPosts = resourceFactory({
   tags: (req: { userId: string }) => ({
     id: hierarchyTag("user", req.userId, "posts"),
     effects: ["activity-feed"],
@@ -841,7 +841,7 @@ const UserPosts = createResourceBuilder({
 // ['user', 'user/123', 'user/123/posts'] 생성
 const tags = hierarchyTag("user", "123", "posts");
 
-const UserPosts = createResourceBuilder({
+const UserPosts = resourceFactory({
   tags: (req: { userId: string }) => ({
     id: hierarchyTag("user", req.userId, "posts"),
     effects: hierarchyTag("user", req.userId), // 상위 레벨
@@ -861,7 +861,7 @@ import {
 } from "@h1y/next-loader";
 
 // 고정 지연: 재시도 간 항상 2초 대기
-const loader = createLoader(dependencies, {
+const loader = loaderFactory(dependencies, {
   retry: { maxCount: 3, canRetryOnError: true },
   backoff: {
     strategy: FIXED_BACKOFF,
@@ -870,7 +870,7 @@ const loader = createLoader(dependencies, {
 });
 
 // 선형 백오프: 1초, 3초, 5초 지연
-const loader = createLoader(dependencies, {
+const loader = loaderFactory(dependencies, {
   retry: { maxCount: 3, canRetryOnError: true },
   backoff: {
     strategy: LINEAR_BACKOFF(2000), // 재시도마다 2초 추가
@@ -879,7 +879,7 @@ const loader = createLoader(dependencies, {
 });
 
 // 지수 백오프: 500ms, 1초, 2초, 4초 지연
-const loader = createLoader(dependencies, {
+const loader = loaderFactory(dependencies, {
   retry: { maxCount: 4, canRetryOnError: true },
   backoff: {
     strategy: EXPONENTIAL_BACKOFF(2), // 재시도마다 2배로 곱함
@@ -909,7 +909,7 @@ const externalAdapter = createExternalResourceAdapter({
   },
 });
 
-const ExternalResource = createResourceBuilder({
+const ExternalResource = resourceFactory({
   tags: (req: { url: string }) => ({ id: `external-${req.url}` }),
   load: async ({ req, fetcher }) => {
     const { load } = fetcher(externalAdapter);
@@ -968,14 +968,14 @@ async function DynamicComponent() {
 
 **A:**
 
-- **캐싱을 통한 데이터 페칭에는 `createLoader()` 사용** (가장 일반적인 사용 사례)
-- **컴포넌트 레벨 재시도/타임아웃 동작이나 컴포넌트 내 미들웨어 컨텍스트 접근이 필요할 때 `createComponentLoader()` 사용**
+- **캐싱을 통한 데이터 페칭에는 `loaderFactory()` 사용** (가장 일반적인 사용 사례)
+- **컴포넌트 레벨 재시도/타임아웃 동작이나 컴포넌트 내 미들웨어 컨텍스트 접근이 필요할 때 `componentLoaderFactory()` 사용**
 
 **모범 사례:** 함께 사용하세요:
 
 ```typescript
-const loader = createLoader(dependencies); // 전역 데이터 로딩
-const { componentLoader } = createComponentLoader(config); // 컴포넌트 복원력
+const loader = loaderFactory(dependencies); // 전역 데이터 로딩
+const { componentLoader } = componentLoaderFactory(config); // 컴포넌트 복원력
 
 async function MyComponent() {
   const [load] = loader(SomeResource({ id: '123' }));

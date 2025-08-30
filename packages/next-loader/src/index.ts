@@ -1,13 +1,13 @@
-// loader functions
-export { createComponentLoader } from "./createComponentLoader";
-export { createLoader } from "./createLoader";
+// loader factory functions
+export { componentLoaderFactory } from "./componentLoaderFactory";
+export { loaderFactory } from "./loaderFactory";
 
 // middleware functions
-export { createComponentMiddleware } from "./createComponentMiddleware";
-export { createLoaderMiddleware } from "./createLoaderMiddleware";
+export { componentMiddleware } from "./componentMiddleware";
+export { loaderMiddleware } from "./loaderMiddleware";
 
 // resource
-export { createResourceBuilder } from "./createResourceBuilder";
+export { resourceFactory } from "./lib/factories/resourceFactory";
 export { hierarchyTag } from "./lib/features/hierarchyTag";
 
 // adapters

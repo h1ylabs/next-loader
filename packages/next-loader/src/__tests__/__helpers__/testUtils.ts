@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-function-type */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createResourceBuilder } from "@/lib/loaders/createResourceBuilder";
+import { resourceFactory } from "@/lib/factories/resourceFactory";
+import type { LoaderID } from "@/lib/models/loader";
 import type { Resource, ResourceFactory } from "@/lib/models/resource";
 import type { ResourceTag } from "@/lib/models/resourceTag";
 
@@ -31,7 +32,7 @@ export const createTestResourceBuilder = (options?: {
   ResourceTag,
   readonly string[]
 > => {
-  return createResourceBuilder({
+  return resourceFactory({
     tags: (req) => ({
       id: `test-resource-${req.id}`,
       effects: options?.effects,
@@ -62,7 +63,7 @@ export const createTestResourceBuilder = (options?: {
 };
 
 export const createHierarchicalResourceBuilder = () => {
-  return createResourceBuilder({
+  return resourceFactory({
     tags: (req: { path: string[] }) => ({
       id: req.path,
       effects: [`${req.path.join("-")}-cache`],
@@ -91,7 +92,7 @@ export const createDependentResourceBuilder = (
   parentResources: Resource<any, any, any>[],
   options?: { staleTime?: number },
 ) => {
-  return createResourceBuilder({
+  return resourceFactory({
     tags: (req: { id: string }) => ({
       id: `dependent-${req.id}`,
       effects: ["dependent-cache"],
@@ -148,14 +149,11 @@ const createReactCacheStyleMemo = () => {
     const fnCache = globalCache.get(fn)!;
 
     return ((...args: any[]) => {
-      // 인자를 기반으로 캐시 키 생성 (React.cache 스타일)
       const cacheKey = JSON.stringify(args, (key, value) => {
-        // 함수와 객체의 경우 toString을 사용하여 참조 문제 해결
         if (typeof value === "function") {
           return `[Function: ${value.name || "anonymous"}]`;
         }
         if (typeof value === "object" && value !== null) {
-          // 순환참조 방지를 위한 간단한 직렬화
           try {
             return JSON.stringify(value);
           } catch {
@@ -166,26 +164,26 @@ const createReactCacheStyleMemo = () => {
       });
 
       if (fnCache.has(cacheKey)) {
-        // 캐시된 결과 반환 (React.cache와 동일한 동작)
         return fnCache.get(cacheKey);
       }
 
-      // 새로운 결과 계산 및 캐시 저장
       const result = fn(...args);
       fnCache.set(cacheKey, result);
       return result;
-    }) as T;
+    }) as unknown as T;
   };
 
-  // Jest spy 기능 추가
   return jest.fn(memoFn);
 };
 
 export const createMockDependencies = () => ({
-  memo: createReactCacheStyleMemo(),
-  adapter: createMockAdapter(),
-  revalidate: jest.fn(),
+  lifeCycleCache: createReactCacheStyleMemo(),
 });
 
 export const delay = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
+
+// Create mock LoaderID for testing (replaces createMockContextID)
+export const createMockLoaderID = (): LoaderID => {
+  return { __loaderID: Symbol("mock-loader-id") } as LoaderID;
+};
