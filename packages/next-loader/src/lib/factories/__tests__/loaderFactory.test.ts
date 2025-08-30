@@ -12,15 +12,11 @@ import {
   createTestResourceBuilder,
   TestResourceResponse,
 } from "@/__tests__/__helpers__/testUtils";
-import {
-  createBaseLoader,
-  MSG_ERR_IDENTIFIER_TAG_MISMATCH,
-  MSG_WARN_IDENTIFIER_TAG_DUPLICATE,
-} from "@/lib/loaders/createBaseLoader";
-import { createResourceBuilder } from "@/lib/loaders/createResourceBuilder";
+import { loaderFactory } from "@/lib/factories/loaderFactory";
+import { resourceFactory } from "@/lib/factories/resourceFactory";
 import { idTag } from "@/lib/models/resourceTag";
 
-describe("createBaseLoader", () => {
+describe("loaderFactory", () => {
   let mockDependencies: ReturnType<typeof createMockDependencies>;
   let consoleWarnSpy: jest.SpyInstance;
 
@@ -36,7 +32,7 @@ describe("createBaseLoader", () => {
 
   describe("Basic Functionality", () => {
     it("should create loader with correct structure", () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -48,7 +44,7 @@ describe("createBaseLoader", () => {
     });
 
     it("should return load function and revalidation tags from loader", () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -66,7 +62,7 @@ describe("createBaseLoader", () => {
     });
 
     it("should load single resource successfully", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -89,7 +85,7 @@ describe("createBaseLoader", () => {
 
   describe("Caching Mechanism", () => {
     it("should apply memo function for caching", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -110,7 +106,7 @@ describe("createBaseLoader", () => {
     });
 
     it("should warn about duplicate id tags", () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -140,7 +136,7 @@ describe("createBaseLoader", () => {
         memo: memoSpy,
       };
 
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: dependenciesWithMemo,
       });
 
@@ -160,7 +156,7 @@ describe("createBaseLoader", () => {
         memo: undefined,
       };
 
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: dependenciesWithoutMemo,
       });
 
@@ -178,7 +174,7 @@ describe("createBaseLoader", () => {
 
   describe("Parallel Loading", () => {
     it("should load multiple resources in parallel", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -201,7 +197,7 @@ describe("createBaseLoader", () => {
     });
 
     it("should handle partial failures in parallel loading", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -227,7 +223,7 @@ describe("createBaseLoader", () => {
     });
 
     it("should maintain correct result order", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -269,7 +265,7 @@ describe("createBaseLoader", () => {
 
   describe("Revalidation", () => {
     it("should collect tags from resources", () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -288,7 +284,7 @@ describe("createBaseLoader", () => {
     });
 
     it("should collect tags from multiple resources", () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -326,7 +322,7 @@ describe("createBaseLoader", () => {
         },
       };
 
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -346,7 +342,7 @@ describe("createBaseLoader", () => {
   describe("Middleware Integration", () => {
     it("should work with middlewares from baseLoader", async () => {
       const mockMiddleware = createMockMiddleware("integration");
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 1, canRetryOnError: true },
@@ -370,7 +366,7 @@ describe("createBaseLoader", () => {
       const middleware1 = createMockMiddleware("first");
       const middleware2 = createCounterMiddleware();
 
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -396,7 +392,7 @@ describe("createBaseLoader", () => {
 
   describe("Complex Scenarios", () => {
     it("should handle resource dependencies in createBaseLoader context", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -422,7 +418,7 @@ describe("createBaseLoader", () => {
     });
 
     it("should handle mixed resource types with caching", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -450,7 +446,7 @@ describe("createBaseLoader", () => {
     });
 
     it("should maintain cache consistency across multiple loader calls", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -493,7 +489,7 @@ describe("createBaseLoader", () => {
     });
 
     it("should maintain cache isolation between different resource IDs", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -546,7 +542,7 @@ describe("createBaseLoader", () => {
         memo: memoSpy,
       };
 
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: dependenciesWithSpy,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -577,7 +573,7 @@ describe("createBaseLoader", () => {
 
   describe("Type Safety", () => {
     it("should maintain correct result types for multiple resources", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -601,7 +597,7 @@ describe("createBaseLoader", () => {
     });
 
     it("should handle empty resource array", () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -618,7 +614,7 @@ describe("createBaseLoader", () => {
 
   describe("Error Handling", () => {
     it("should handle errors in individual resource loading", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -659,7 +655,7 @@ describe("createBaseLoader", () => {
 
   describe("LoaderOptions and Retry Integration in Full Flow", () => {
     it("should pass loader configuration to resource load functions", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 2, canRetryOnError: true },
@@ -668,7 +664,7 @@ describe("createBaseLoader", () => {
       });
 
       // Create a resource that captures loader options during loading
-      const factory = createResourceBuilder({
+      const factory = resourceFactory({
         tags: (req: { id: string }) => ({
           id: `config-test-${req.id}`,
         }),
@@ -703,7 +699,7 @@ describe("createBaseLoader", () => {
     });
 
     it("should provide consistent loaderOptions across multiple resources", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 1, canRetryOnError: false },
@@ -712,7 +708,7 @@ describe("createBaseLoader", () => {
       });
 
       // Create multiple resources that capture loader options
-      const factory1 = createResourceBuilder({
+      const factory1 = resourceFactory({
         tags: () => ({ id: "consistency-test-1" }),
         load: async ({ req, fetcher, loaderOptions }) => {
           const config = loaderOptions();
@@ -728,7 +724,7 @@ describe("createBaseLoader", () => {
         },
       });
 
-      const factory2 = createResourceBuilder({
+      const factory2 = resourceFactory({
         tags: () => ({ id: "consistency-test-2" }),
         load: async ({ req, fetcher, loaderOptions }) => {
           const config = loaderOptions();
@@ -767,7 +763,7 @@ describe("createBaseLoader", () => {
         throw new Error("Manual retry triggered");
       };
 
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 3, canRetryOnError: true },
@@ -778,7 +774,7 @@ describe("createBaseLoader", () => {
       // Override the retry behavior for testing
       const originalLoadResource = (loader as any).loadResource;
 
-      const factory = createResourceBuilder({
+      const factory = resourceFactory({
         tags: () => ({ id: "retry-from-resource" }),
         load: async ({ req, fetcher, retry, loaderOptions }) => {
           const config = loaderOptions();
@@ -816,7 +812,7 @@ describe("createBaseLoader", () => {
     });
 
     it("should maintain loaderOptions through resource dependency chains", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 2, canRetryOnError: true },
@@ -825,7 +821,7 @@ describe("createBaseLoader", () => {
       });
 
       // Create parent resource
-      const parentFactory = createResourceBuilder({
+      const parentFactory = resourceFactory({
         tags: () => ({ id: "chain-parent" }),
         load: async ({ req, fetcher, loaderOptions }) => {
           const config = loaderOptions();
@@ -848,7 +844,7 @@ describe("createBaseLoader", () => {
       const parentResource = parentFactory({ id: "parent" });
 
       // Create child resource that depends on parent
-      const childFactory = createResourceBuilder({
+      const childFactory = resourceFactory({
         tags: () => ({ id: "chain-child" }),
         options: {},
         use: () => [parentResource],
@@ -891,7 +887,7 @@ describe("createBaseLoader", () => {
     });
 
     it("should work correctly with updated test helper functions", async () => {
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 1, canRetryOnError: true },

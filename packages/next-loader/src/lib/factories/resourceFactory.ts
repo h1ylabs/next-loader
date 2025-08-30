@@ -1,5 +1,6 @@
-import { LoaderContextID, LoaderCoreOptions } from "@h1y/loader-core";
+import { LoaderCoreOptions } from "@h1y/loader-core";
 
+import { LoaderID } from "../models/loader";
 import {
   type PrefetchedResources,
   type ResourceDeps,
@@ -17,7 +18,7 @@ import {
   validateTag,
 } from "../models/resourceTag";
 
-export function createResourceBuilder<
+export function resourceFactory<
   const Request,
   const Response,
   const Tag extends ResourceTag,
@@ -52,10 +53,10 @@ export function createResourceBuilder<
     readonly retry: () => never;
   }) => Promise<Response>;
 }): ResourceFactory<Request, Response, ResourceTag, ResourceDeps<Resources>> {
-  // memoized functions
-  const memoizations = new WeakMap<
-    LoaderContextID,
-    Map<string, () => unknown>
+  // cache
+  const loaderResourceCache = new WeakMap<
+    LoaderID,
+    Map<string, Promise<unknown>>
   >();
 
   return (req) => {
@@ -98,55 +99,49 @@ export function createResourceBuilder<
         dependencies: dependencyTags,
       },
 
-      load: async (
-        loaderOptions,
-        retry,
-        contextID,
-        memo,
-      ): Promise<Response> => {
-        let resourceContext = memoizations.get(contextID);
+      load: async (loaderOptions, retry, loaderID): Promise<Response> => {
+        let resourceContext = loaderResourceCache.get(loaderID);
 
         if (!resourceContext) {
-          memoizations.set(contextID, (resourceContext = new Map()));
+          loaderResourceCache.set(loaderID, (resourceContext = new Map()));
         }
 
         const resourceID = idTag(resourceTag);
-        let memoizedLoadFn = resourceContext.get(
-          resourceID,
-        ) as () => ReturnType<typeof props.load>;
+        let cachePromise = resourceContext.get(resourceID) as ReturnType<
+          typeof props.load
+        >;
 
         if (!resourceContext.has(resourceID)) {
-          memoizedLoadFn = async () =>
-            props.load({
-              // request parameter.
-              req,
+          cachePromise = props.load({
+            // request parameter.
+            req,
 
-              use: resources.map(({ load }) =>
-                load(loaderOptions, retry, contextID, memo),
-              ) as PrefetchedResources<Resources>,
+            use: resources.map(({ load }) =>
+              load(loaderOptions, retry, loaderID),
+            ) as PrefetchedResources<Resources>,
 
-              // fetcher function.
-              fetcher: (adapter) => {
-                const { load, validate } = adapter({
-                  tags: revalidationTags,
-                  options: props.options ?? {},
-                });
+            // fetcher function.
+            fetcher: (adapter) => {
+              const { load, validate } = adapter({
+                tags: revalidationTags,
+                options: props.options ?? {},
+              });
 
-                return {
-                  load: async (param) => {
-                    validate?.(param);
-                    return load(param);
-                  },
-                };
-              },
+              return {
+                load: async (param) => {
+                  validate?.(param);
+                  return load(param);
+                },
+              };
+            },
 
-              loaderOptions,
-              retry,
-            });
-          resourceContext.set(resourceID, memoizedLoadFn);
+            loaderOptions,
+            retry,
+          });
+          resourceContext.set(resourceID, cachePromise);
         }
 
-        return memoizedLoadFn();
+        return cachePromise;
       },
     };
   };

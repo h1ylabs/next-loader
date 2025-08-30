@@ -19,7 +19,7 @@ import {
   normalizeOptions,
 } from "../utils/normalizeOptions";
 
-export function createBaseComponentLoader<
+export function componentLoaderFactory<
   Element,
   const Middlewares extends readonly LoaderMiddleware<
     Element,

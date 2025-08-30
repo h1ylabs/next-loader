@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createBaseLoader } from "@/lib/loaders/createBaseLoader";
-import { createResourceBuilder } from "@/lib/loaders/createResourceBuilder";
+import { loaderFactory } from "@/lib/factories/loaderFactory";
+import { resourceFactory } from "@/lib/factories/resourceFactory";
 
 import {
   createMockAdapter,
@@ -20,7 +20,7 @@ describe("Memoization and Caching Tests", () => {
 
   describe("WeakMap-based Internal Memoization", () => {
     it("should cache resources within the same context", async () => {
-      const resourceBuilder = createResourceBuilder({
+      const resourceBuilder = resourceFactory({
         tags: (req: { id: string }) => ({ id: `test-${req.id}` }),
         options: { staleTime: 1000 },
         load: async ({ req, fetcher }) => {
@@ -33,7 +33,7 @@ describe("Memoization and Caching Tests", () => {
       });
 
       const resource = resourceBuilder({ id: "cache-test" });
-      const loader = createBaseLoader({ dependencies: mockDependencies });
+      const loader = loaderFactory({ dependencies: mockDependencies });
 
       // Load the same resource twice in the same batch - should be cached
       const [load] = loader(resource, resource);
@@ -61,7 +61,7 @@ describe("Memoization and Caching Tests", () => {
     });
 
     it("should handle multiple resources with individual caching", async () => {
-      const resourceBuilder = createResourceBuilder({
+      const resourceBuilder = resourceFactory({
         tags: (req: { id: string }) => ({ id: `multi-${req.id}` }),
         options: { staleTime: 1000 },
         load: async ({ req, fetcher }) => {
@@ -77,7 +77,7 @@ describe("Memoization and Caching Tests", () => {
       const resource2 = resourceBuilder({ id: "2" });
       const resource3 = resourceBuilder({ id: "3" });
 
-      const loader = createBaseLoader({ dependencies: mockDependencies });
+      const loader = loaderFactory({ dependencies: mockDependencies });
 
       // Load all resources
       const [load] = loader(resource1, resource2, resource3);
@@ -105,7 +105,7 @@ describe("Memoization and Caching Tests", () => {
 
     it("should cache shared dependencies efficiently", async () => {
       // Create a shared dependency
-      const sharedBuilder = createResourceBuilder({
+      const sharedBuilder = resourceFactory({
         tags: () => ({ id: "shared-dep" }),
         options: { staleTime: 2000 },
         load: async ({ fetcher }) => {
@@ -121,7 +121,7 @@ describe("Memoization and Caching Tests", () => {
 
       // Create multiple resources that depend on the shared one
       const createDependentBuilder = (id: string) =>
-        createResourceBuilder({
+        resourceFactory({
           tags: () => ({ id: `dependent-${id}` }),
           options: { staleTime: 1000 },
           use: () => [sharedResource],
@@ -139,7 +139,7 @@ describe("Memoization and Caching Tests", () => {
       const dependent2 = createDependentBuilder("2");
       const dependent3 = createDependentBuilder("3");
 
-      const loader = createBaseLoader({ dependencies: mockDependencies });
+      const loader = loaderFactory({ dependencies: mockDependencies });
 
       // Load all dependents
       const [load] = loader(dependent1, dependent2, dependent3);
@@ -172,7 +172,7 @@ describe("Memoization and Caching Tests", () => {
     });
 
     it("should handle concurrent access to same resource", async () => {
-      const resourceBuilder = createResourceBuilder({
+      const resourceBuilder = resourceFactory({
         tags: () => ({ id: "concurrent-test" }),
         options: { staleTime: 1000 },
         load: async ({ fetcher }) => {
@@ -187,7 +187,7 @@ describe("Memoization and Caching Tests", () => {
       });
 
       const resource = resourceBuilder({});
-      const loader = createBaseLoader({ dependencies: mockDependencies });
+      const loader = loaderFactory({ dependencies: mockDependencies });
 
       // Fire multiple concurrent requests
       const concurrentPromises = Array.from({ length: 10 }, () => {
@@ -198,7 +198,7 @@ describe("Memoization and Caching Tests", () => {
       const results = await Promise.all(concurrentPromises);
 
       // All results should have consistent data
-      const firstResult = results[0][0];
+      const firstResult = results[0]![0];
       results.forEach(([result]) => {
         expect((result as any).data).toBe((firstResult as any).data);
         expect(typeof (result as any).timestamp).toBe("number");
@@ -212,7 +212,7 @@ describe("Memoization and Caching Tests", () => {
 
   describe("Context Isolation", () => {
     it("should isolate memoization between different loader contexts", async () => {
-      const resourceBuilder = createResourceBuilder({
+      const resourceBuilder = resourceFactory({
         tags: () => ({ id: "context-test" }),
         options: { staleTime: 1000 },
         load: async ({ fetcher }) => {
@@ -227,8 +227,8 @@ describe("Memoization and Caching Tests", () => {
       const resource = resourceBuilder({});
 
       // Create two separate loader instances
-      const loader1 = createBaseLoader({ dependencies: mockDependencies });
-      const loader2 = createBaseLoader({ dependencies: mockDependencies });
+      const loader1 = loaderFactory({ dependencies: mockDependencies });
+      const loader2 = loaderFactory({ dependencies: mockDependencies });
 
       // Load from first context
       const [load1] = loader1(resource);
@@ -251,7 +251,7 @@ describe("Memoization and Caching Tests", () => {
 
   describe("Cache Performance", () => {
     it("should demonstrate caching performance benefits", async () => {
-      const resourceBuilder = createResourceBuilder({
+      const resourceBuilder = resourceFactory({
         tags: (req: { id: string }) => ({ id: `perf-${req.id}` }),
         options: { staleTime: 1000 },
         load: async ({ req, fetcher }) => {
@@ -266,7 +266,7 @@ describe("Memoization and Caching Tests", () => {
       });
 
       const resource = resourceBuilder({ id: "perf-test" });
-      const loader = createBaseLoader({ dependencies: mockDependencies });
+      const loader = loaderFactory({ dependencies: mockDependencies });
 
       // First load (uncached) - should take time
       const startTime1 = Date.now();

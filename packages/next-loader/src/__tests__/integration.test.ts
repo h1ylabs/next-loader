@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createBaseLoader } from "@/lib/loaders/createBaseLoader";
-import { createResourceBuilder } from "@/lib/loaders/createResourceBuilder";
+import { loaderFactory } from "@/lib/factories/loaderFactory";
+import { resourceFactory } from "@/lib/factories/resourceFactory";
 
 import { createMockMiddleware } from "./__helpers__/mockMiddleware";
 import { createMockAdapter } from "./__helpers__/mockResourceBuilder";
@@ -17,7 +17,7 @@ describe("Integration Tests", () => {
   describe("Full Stack Integration", () => {
     it("should integrate createResourceBuilder + createBaseLoader", async () => {
       // Step 1: Create resources using createResourceBuilder
-      const userResourceBuilder = createResourceBuilder({
+      const userResourceBuilder = resourceFactory({
         tags: (req: { userId: string }) => ({
           id: `user-${req.userId}`,
           effects: ["user-cache"],
@@ -38,7 +38,7 @@ describe("Integration Tests", () => {
         },
       });
 
-      const profileResourceBuilder = createResourceBuilder({
+      const profileResourceBuilder = resourceFactory({
         tags: (req: { userId: string }) => ({
           id: `profile-${req.userId}`,
           effects: ["profile-cache"],
@@ -67,7 +67,7 @@ describe("Integration Tests", () => {
       // Step 3: Create loaders with middleware
       const mockMiddleware = createMockMiddleware("integration");
 
-      const baseLoader = createBaseLoader({
+      const baseLoader = loaderFactory({
         dependencies: mockDependencies,
         middlewares: [mockMiddleware],
         props: {
@@ -76,7 +76,7 @@ describe("Integration Tests", () => {
         },
       });
 
-      const batchLoader = createBaseLoader({
+      const batchLoader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 1, canRetryOnError: true },
@@ -120,7 +120,7 @@ describe("Integration Tests", () => {
 
     it("should handle complex dependency chains", async () => {
       // Create a chain: Organization -> Department -> User
-      const orgResourceBuilder = createResourceBuilder({
+      const orgResourceBuilder = resourceFactory({
         tags: (req: { orgId: string }) => ({
           id: `org-${req.orgId}`,
           effects: ["org-cache"],
@@ -137,7 +137,7 @@ describe("Integration Tests", () => {
 
       const orgResource = orgResourceBuilder({ orgId: "acme" });
 
-      const deptResourceBuilder = createResourceBuilder({
+      const deptResourceBuilder = resourceFactory({
         tags: (req: { deptId: string }) => ({
           id: `dept-${req.deptId}`,
           effects: ["dept-cache"],
@@ -158,7 +158,7 @@ describe("Integration Tests", () => {
 
       const deptResource = deptResourceBuilder({ deptId: "engineering" });
 
-      const userResourceBuilder = createResourceBuilder({
+      const userResourceBuilder = resourceFactory({
         tags: (req: { userId: string }) => ({
           id: `user-${req.userId}`,
           effects: ["user-cache"],
@@ -180,7 +180,7 @@ describe("Integration Tests", () => {
       const userResource = userResourceBuilder({ userId: "john" });
 
       // Test the full chain
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
       });
       const [load] = loader(userResource);
@@ -212,7 +212,7 @@ describe("Integration Tests", () => {
 
     it("should handle error propagation across components", async () => {
       // Create a resource that will fail
-      const failingResourceBuilder = createResourceBuilder({
+      const failingResourceBuilder = resourceFactory({
         tags: () => ({ id: "failing-resource" }),
         options: {},
         load: async ({ fetcher }) => {
@@ -227,7 +227,7 @@ describe("Integration Tests", () => {
       const failingResource = failingResourceBuilder({ id: "test" });
 
       // Create a dependent resource
-      const dependentResourceBuilder = createResourceBuilder({
+      const dependentResourceBuilder = resourceFactory({
         tags: () => ({ id: "dependent-resource" }),
         options: {},
         use: () => [failingResource],
@@ -241,7 +241,7 @@ describe("Integration Tests", () => {
       const dependentResource = dependentResourceBuilder({ id: "dependent" });
 
       // Test error propagation with createBaseLoader
-      const baseLoaderInstance = createBaseLoader({
+      const baseLoaderInstance = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 0, canRetryOnError: false },
@@ -253,7 +253,7 @@ describe("Integration Tests", () => {
       await expect(failLoad()).rejects.toThrow("Resource loading failed");
 
       // Test error propagation with createBaseLoader
-      const createBaseLoaderInstance = createBaseLoader({
+      const createBaseLoaderInstance = loaderFactory({
         dependencies: mockDependencies,
       });
       const [load] = createBaseLoaderInstance(dependentResource);
@@ -265,7 +265,7 @@ describe("Integration Tests", () => {
   describe("Performance and Concurrency Integration", () => {
     it("should handle concurrent loading with shared dependencies", async () => {
       // Create shared dependency
-      const sharedResourceBuilder = createResourceBuilder({
+      const sharedResourceBuilder = resourceFactory({
         tags: () => ({ id: "shared-resource", effects: ["shared"] }),
         options: { staleTime: 5000 },
         load: async ({ fetcher }) => {
@@ -280,7 +280,7 @@ describe("Integration Tests", () => {
 
       // Create multiple resources that depend on the shared one
       const createDependentResource = (id: string) =>
-        createResourceBuilder({
+        resourceFactory({
           tags: () => ({ id: `dependent-${id}` }),
           options: {},
           use: () => [sharedResource],
@@ -301,7 +301,7 @@ describe("Integration Tests", () => {
       const dependent3 = createDependentResource("3");
 
       // Load all dependents concurrently
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
       });
       const [load] = loader(dependent1, dependent2, dependent3);
@@ -324,7 +324,7 @@ describe("Integration Tests", () => {
     });
 
     it("should maintain consistency under rapid successive calls", async () => {
-      const createResourceBuilder1 = createResourceBuilder({
+      const createResourceBuilder1 = resourceFactory({
         tags: (req: { id: string }) => ({ id: `rapid-${req.id}` }),
         options: { staleTime: 1000 },
         load: async ({ req, fetcher }) => {
@@ -336,7 +336,7 @@ describe("Integration Tests", () => {
         },
       });
 
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
       });
       const resource = createResourceBuilder1({ id: "test" });
@@ -385,7 +385,7 @@ describe("Integration Tests", () => {
   describe("Real-world Scenario Simulation", () => {
     it("should simulate a typical Next.js data loading pattern", async () => {
       // Simulate a page that needs to load user data, user posts, and user settings
-      const userBuilder = createResourceBuilder({
+      const userBuilder = resourceFactory({
         tags: (req: { userId: string }) => ({
           id: `user-${req.userId}`,
           effects: ["user-cache", "auth-cache"],
@@ -402,7 +402,7 @@ describe("Integration Tests", () => {
 
       const user = userBuilder({ userId: "123" });
 
-      const postsBuilder = createResourceBuilder({
+      const postsBuilder = resourceFactory({
         tags: (req: { userId: string }) => ({
           id: `posts-${req.userId}`,
           effects: ["posts-cache"],
@@ -426,7 +426,7 @@ describe("Integration Tests", () => {
         },
       });
 
-      const settingsBuilder = createResourceBuilder({
+      const settingsBuilder = resourceFactory({
         tags: (req: { userId: string }) => ({
           id: `settings-${req.userId}`,
           effects: ["settings-cache"],
@@ -457,7 +457,7 @@ describe("Integration Tests", () => {
 
       // Simulate server-side rendering scenario
       const middleware = createMockMiddleware("ssr");
-      const loader = createBaseLoader({
+      const loader = loaderFactory({
         dependencies: mockDependencies,
         props: {
           retry: { maxCount: 2, canRetryOnError: true },
@@ -507,7 +507,7 @@ describe("Integration Tests", () => {
 
   describe("Validation Tests", () => {
     it("should throw an error for invalid hierarchy tags", () => {
-      const invalidResourceBuilder = createResourceBuilder({
+      const invalidResourceBuilder = resourceFactory({
         tags: () => ({
           id: [], // Invalid empty hierarchy
         }),

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { LoaderContextID, LoaderCoreOptions } from "@h1y/loader-core";
+import type { LoaderCoreOptions } from "@h1y/loader-core";
 
-import { MemoFunction } from "../utils/memoFn";
+import { LoaderID } from "./loader";
 import type { Dependencies, ResourceTag } from "./resourceTag";
 
 export type Resource<
@@ -19,8 +19,7 @@ export type Resource<
   load: (
     loaderOptions: () => LoaderCoreOptions,
     retry: () => never,
-    contextID: LoaderContextID,
-    memo: MemoFunction,
+    loaderID: LoaderID,
   ) => Promise<Response>;
 };
 

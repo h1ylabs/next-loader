@@ -1,12 +1,12 @@
 import type { LoaderMiddleware } from "@h1y/loader-core";
 
 import {
-  createBaseLoader,
+  loaderFactory as baseLoaderFactory,
   type LoaderProps,
-} from "./lib/loaders/createBaseLoader";
+} from "./lib/factories/loaderFactory";
 import type { LoaderDependencies } from "./lib/models/loader";
 
-export function createLoader<
+export function loaderFactory<
   const Middlewares extends readonly LoaderMiddleware<
     unknown,
     unknown,
@@ -17,7 +17,7 @@ export function createLoader<
   props?: LoaderProps,
   middlewares?: Middlewares,
 ) {
-  return createBaseLoader({
+  return baseLoaderFactory({
     props,
     middlewares,
     dependencies,

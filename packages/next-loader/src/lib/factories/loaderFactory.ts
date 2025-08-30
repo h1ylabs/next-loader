@@ -5,7 +5,11 @@ import {
   type LoaderMiddleware,
 } from "@h1y/loader-core";
 
-import { DEFAULT_LOADER_PROPS, LoaderDependencies } from "../models/loader";
+import {
+  DEFAULT_LOADER_PROPS,
+  LoaderDependencies,
+  LoaderID,
+} from "../models/loader";
 import type { Resource } from "../models/resource";
 import {
   resourceRevalidationTags,
@@ -16,7 +20,7 @@ import {
   normalizeOptions,
 } from "../utils/normalizeOptions";
 
-export function createBaseLoader<
+export function loaderFactory<
   Middlewares extends readonly LoaderMiddleware<unknown, unknown, string>[],
 >({
   props,
@@ -25,9 +29,10 @@ export function createBaseLoader<
 }: {
   readonly props?: LoaderProps;
   readonly middlewares?: Middlewares;
-  readonly dependencies?: LoaderDependencies;
+  readonly dependencies: LoaderDependencies;
 }) {
   const input = normalizeProps(props);
+  const loaderID = dependencies.lifeCycleCache(() => ({}) as LoaderID);
   const { retryImmediately, loaderOptions, execute } = loaderCore().withOptions(
     {
       input,
@@ -40,12 +45,7 @@ export function createBaseLoader<
     resource: Resource<Response>,
   ) => {
     return execute(async () =>
-      resource.load(
-        loaderOptions,
-        retryImmediately,
-        loaderOptions().metadata.contextID,
-        dependencies?.memo ?? ((fn) => fn),
-      ),
+      resource.load(loaderOptions, retryImmediately, loaderID()),
     );
   };
 
