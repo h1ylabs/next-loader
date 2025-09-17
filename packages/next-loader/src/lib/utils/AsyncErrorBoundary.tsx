@@ -3,7 +3,7 @@ import { ErrorBoundary } from "react-error-boundary";
 
 export type AsyncErrorBoundaryProps = {
   pendingFallback?: React.ReactElement;
-  errorFallback: (props: { error: unknown }) => React.ReactElement;
+  errorFallback: <T>(props: { error: T }) => React.ReactElement;
 };
 
 export function AsyncErrorBoundary({

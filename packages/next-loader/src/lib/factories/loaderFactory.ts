@@ -69,13 +69,6 @@ export function loaderFactory<
 export type RequiredLoaderProps = LoaderCoreInput<unknown>;
 export type LoaderProps = NormalizableOptions<RequiredLoaderProps>;
 
-// not used!
-export const MSG_ERR_IDENTIFIER_TAG_MISMATCH = (tag1: string, tag2: string) =>
-  `identifier tag mismatch at same resource: ${tag1} and ${tag2}`;
-
-export const MSG_WARN_IDENTIFIER_TAG_DUPLICATE = (tag: string) =>
-  `identifier tag duplicate: ${tag}`;
-
 function normalizeProps(
   props?: LoaderProps,
   defaultProps: RequiredLoaderProps = DEFAULT_LOADER_PROPS,

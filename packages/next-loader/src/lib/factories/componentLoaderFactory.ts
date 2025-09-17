@@ -51,7 +51,7 @@ export function componentLoaderFactory<
           props?.retry?.onRetryEach?.();
 
           // determine retry fallback
-          // PRIORITY: initial < retryWhen < retryImmediately
+          // PRIORITY: initial < retryFallback < retryImmediately
         },
         // the loader's fallback is different from Suspense's fallback.
         fallback: wrapper(options.retry.fallback),

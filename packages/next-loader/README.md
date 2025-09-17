@@ -1,6 +1,6 @@
 # @h1y/next-loader
 
-**Latest version: v6.0.0**
+**Latest version: v6.0.1**
 
 A powerful, type-safe resource loading library specifically designed for Next.js applications. Build efficient data fetching with built-in caching, revalidation, retry logic, and seamless integration with Next.js server components.
 
@@ -8,6 +8,28 @@ A powerful, type-safe resource loading library specifically designed for Next.js
 
 [![npm version](https://badge.fury.io/js/%40h1y%2Fnext-loader.svg)](https://badge.fury.io/js/%40h1y%2Fnext-loader)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## 📑 Table of Contents
+
+- [✨ Key Features](#-key-features)
+- [📦 Installation](#-installation)
+- [🔧 Compatibility](#-compatibility)
+- [🚀 Quick Start](#-quick-start)
+- [🧩 Core Concepts](#-core-concepts)
+  - [Resource Builder Pattern](#resource-builder-pattern)
+  - [Loading Approaches: When to Use What](#loading-approaches-when-to-use-what)
+  - [Smart Cache Invalidation with Hierarchical Tags](#smart-cache-invalidation-with-hierarchical-tags)
+- [🎯 Examples](#-examples)
+  - [Minimal](#-examples)
+- [🎛️ Middleware System](#middleware-system)
+- [🎛️ Middleware System](#middleware-system)
+- [📖 API Reference](#-api-reference)
+- [🔄 Next.js Integration](#-nextjs-integration)
+- [⚠️ Best Practices & Important Guidelines](#best-practices--important-guidelines)
+- [🤔 FAQ](#-faq)
+- [🛠️ Dependencies](#dependencies)
+- [🔍 Troubleshooting](#-troubleshooting)
+- [📄 License](#-license)
 
 ## ✨ Key Features
 
@@ -31,6 +53,15 @@ yarn add @h1y/next-loader
 pnpm add @h1y/next-loader
 ```
 
+## 🔧 Compatibility
+
+- **React**: 18.3+ (peer dependency)
+- **Next.js**: 14+ (App Router recommended)
+- **Node.js**: 18+
+- **TypeScript**: 5+ (optional but recommended)
+
+**Note**: Works best with Next.js App Router and Server Components. For non-Next.js environments, use custom adapters via `createExternalResourceAdapter()`.
+
 ## 🚀 Quick Start
 
 Get started with @h1y/next-loader in three simple steps:
@@ -38,23 +69,8 @@ Get started with @h1y/next-loader in three simple steps:
 ### 1. Set up dependencies and create a global loader
 
 ```typescript
-import { revalidateTag } from "next/cache";
 import { cache } from "react";
-import { loaderFactory, NextJSAdapter } from "@h1y/next-loader";
-
-// Define data types
-interface User {
-  id: string;
-  name: string;
-  email: string;
-}
-
-interface Post {
-  id: string;
-  title: string;
-  content: string;
-  authorId: string;
-}
+import { loaderFactory } from "@h1y/next-loader";
 
 // Create once at module level and reuse everywhere
 const loader = loaderFactory({
@@ -65,26 +81,52 @@ const loader = loaderFactory({
 ### 2. Define your resources
 
 ```typescript
-import { resourceFactory } from "@h1y/next-loader";
+import { resourceFactory, NextJSAdapter } from "@h1y/next-loader";
 
-const User = resourceFactory({
-  tags: (req: { id: string }) => ({ id: `user-${req.id}` }),
-  options: { staleTime: 300000 }, // Cache for 5 minutes
-  load: async ({ req, fetcher }): Promise<User> => {
-    const response = await fetcher(NextJSAdapter).load(`/api/users/${req.id}`);
-    if (!response.ok) throw new Error(`Failed to fetch user`);
-    return response.json();
+// Define your data types for a project management app
+interface Project {
+  id: string;
+  name: string;
+  description: string;
+  status: "active" | "completed" | "archived";
+  ownerId: string;
+  teamId: string;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  status: "todo" | "in-progress" | "done";
+  assigneeId: string;
+  projectId: string;
+  dueDate?: string;
+  priority: "low" | "medium" | "high";
+}
+
+const Project = resourceFactory({
+  tags: (req: { id: string }) => ({ id: `project-${req.id}` }),
+  options: { staleTime: 300000 }, // 5 minutes - project info changes less frequently
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/projects/${req.id}`,
+    );
+    if (!response.ok) throw new Error(`Failed to fetch project`);
+    return response.json() as Project;
   },
 });
 
-const UserPosts = resourceFactory({
-  tags: (req: { userId: string }) => ({ id: `user-${req.userId}-posts` }),
-  options: { staleTime: 180000 }, // Cache for 3 minutes
-  load: async ({ req, fetcher }): Promise<Post[]> => {
+const ProjectTasks = resourceFactory({
+  tags: (req: { projectId: string }) => ({
+    id: `project-${req.projectId}-tasks`,
+  }),
+  options: { staleTime: 60000 }, // 1 minute - tasks change frequently
+  load: async ({ req, fetcher }) => {
     const response = await fetcher(NextJSAdapter).load(
-      `/api/users/${req.userId}/posts`,
+      `/api/projects/${req.projectId}/tasks`,
     );
-    return response.json();
+    if (!response.ok) throw new Error(`Failed to fetch tasks`);
+    return response.json() as Task[];
   },
 });
 ```
@@ -94,19 +136,25 @@ const UserPosts = resourceFactory({
 **Single Resource:**
 
 ```typescript
-async function UserProfile({ params }: { params: { id: string } }) {
-  const [load, revalidation] = loader(User({ id: params.id }));
-  const [user] = await load();
+import { revalidateTag } from "next/cache";
+
+async function ProjectDetails({ params }: { params: { id: string } }) {
+  const [load, revalidation] = loader(Project({ id: params.id }));
+  const [project] = await load();
 
   return (
-    <div>
-      <h1>{user.name}</h1>
-      <p>{user.email}</p>
+    <div className="project-details">
+      <div className="flex justify-between items-center">
+        <h1>{project.name}</h1>
+        <span className={`status ${project.status}`}>{project.status}</span>
+      </div>
+      <p>{project.description}</p>
+
       <form action={async () => {
         "use server";
         revalidation.forEach(revalidateTag);
       }}>
-        <button>Refresh</button>
+        <button>Refresh Project</button>
       </form>
     </div>
   );
@@ -116,25 +164,49 @@ async function UserProfile({ params }: { params: { id: string } }) {
 **Batch Loading (Multiple Resources):**
 
 ```typescript
-async function UserDashboard({ params }: { params: { id: string } }) {
-  // Load multiple resources in parallel with full type safety
+async function ProjectDashboard({ params }: { params: { id: string } }) {
+  // Load project info and tasks in parallel with full type safety
   const [load, revalidation] = loader(
-    User({ id: params.id }),
-    UserPosts({ userId: params.id })
+    Project({ id: params.id }),
+    ProjectTasks({ projectId: params.id })
   );
 
-  // Results are type-safe: [User, Post[]]
-  const [user, posts] = await load();
+  // Results are type-safe: [Project, Task[]]
+  const [project, tasks] = await load();
+
+  const taskStats = {
+    total: tasks.length,
+    todo: tasks.filter(t => t.status === 'todo').length,
+    inProgress: tasks.filter(t => t.status === 'in-progress').length,
+    done: tasks.filter(t => t.status === 'done').length,
+  };
 
   return (
-    <div>
-      <h1>{user.name}'s Dashboard</h1>
-      <p>{posts.length} posts</p>
+    <div className="project-dashboard">
+      <h1>{project.name} Dashboard</h1>
+
+      <div className="task-stats">
+        <div>Total: {taskStats.total}</div>
+        <div>To Do: {taskStats.todo}</div>
+        <div>In Progress: {taskStats.inProgress}</div>
+        <div>Done: {taskStats.done}</div>
+      </div>
+
+      <div className="recent-tasks">
+        <h3>Recent Tasks</h3>
+        {tasks.slice(0, 5).map(task => (
+          <div key={task.id} className={`task-item priority-${task.priority}`}>
+            <span>{task.title}</span>
+            <span className={`status ${task.status}`}>{task.status}</span>
+          </div>
+        ))}
+      </div>
+
       <form action={async () => {
         "use server";
         revalidation.forEach(revalidateTag);
       }}>
-        <button>Refresh All</button>
+        <button>Refresh All Data</button>
       </form>
     </div>
   );
@@ -147,536 +219,828 @@ That's it! Your data is now automatically cached, batch-loaded, revalidated, and
 
 ### Resource Builder Pattern
 
-Resources are declarative definitions that tell @h1y/next-loader how to fetch, cache, and manage your data:
+Think of resources as "smart API calls" that know how to cache themselves and handle errors. Instead of writing fetch() calls everywhere, you define your data requirements once:
+
+See Quick Start for a minimal resource definition and usage example.
+
+**Why this is better than regular fetch():**
+
+- ✅ **Automatic caching** - Same data won't be fetched twice
+- ✅ **Error handling** - Built-in retry logic for failed requests
+- ✅ **Type safety** - Full TypeScript support
+- ✅ **Reusable** - Define once, use anywhere in your app
+
+### Loading Approaches: When to Use What
+
+@h1y/next-loader provides two complementary approaches that work together:
+
+| Feature                       | `loaderFactory()`                 | `componentLoaderFactory()`     |
+| ----------------------------- | --------------------------------- | ------------------------------ |
+| **Primary Use Case**          | Data fetching with caching        | Component resilience & state   |
+| **Batch Loading**             | ✅ Multiple resources in parallel | ❌ Single component focus      |
+| **Next.js Cache Integration** | ✅ ISR, revalidateTag             | ❌ Component-level only        |
+| **Request Deduplication**     | ✅ Via React's `cache()`          | ❌ Not applicable              |
+| **Retry & Timeout**           | 🔧 Configurable                   | ✅ Built-in with UI feedback   |
+| **State Persistence**         | ❌ Stateless                      | ✅ Across retry cycles         |
+| **Boundary Management**       | ❌ Manual setup needed            | ✅ Suspense + Error Boundary   |
+| **Best Practice**             | Most data fetching scenarios      | Combine with `loaderFactory()` |
+
+#### When to Use `loaderFactory()`
+
+- **Most common use case** - Loading external data in server components
+- Need to load multiple resources simultaneously (batch loading)
+- Want Next.js cache integration and request deduplication
+- Building standard data fetching patterns
+
+#### When to Use `componentLoaderFactory()`
+
+- Need component-level retry with user feedback
+- Want state that persists across retry attempts
+- Need automatic boundary management (loading/error states)
+- Building resilient UI components
+
+#### Quick Comparison Example
 
 ```typescript
-const BlogPost = resourceFactory({
-  // Define cache tags
-  tags: (req: { slug: string }) => ({
-    id: `post-${req.slug}`,
-    effects: ["blog-content"], // Invalidate related caches
-  }),
+// loaderFactory - Data-focused approach
+const [load] = loader(Project({ id: "proj-123" }), ProjectTasks({ projectId: "proj-123" }));
+const [project, tasks] = await load(); // Batch loading with type safety
 
-  // Configure caching
-  options: { staleTime: 600000 }, // Cache for 10 minutes
-
-  // Define how to load data
-  load: async ({ req, fetcher, retry }) => {
-    const response = await fetcher(NextJSAdapter).load(
-      `/api/posts/${req.slug}`,
-    );
-    if (!response.ok) {
-      if (response.status >= 500) retry(); // Retry on server errors
-      throw new Error("Failed to load post");
-    }
-    return response.json();
-  },
+// componentLoaderFactory - Component-focused approach
+const { componentLoader } = componentLoaderFactory({ retry: { maxCount: 3 } });
+export default componentLoader(ProjectDashboard).withErrorBoundary({
+  fallback: <div>Failed to load project data</div>
 });
 ```
 
-**Key benefits:**
+#### Best Practice: Use Both Together
 
-- **Declarative**: Define what you need, not how to get it
-- **Composable**: Resources can depend on other resources
-- **Cacheable**: Automatic caching with fine-grained control
-- **Resilient**: Built-in retry and error handling
-
-### Two Loading Approaches
-
-@h1y/next-loader provides two distinct approaches for different use cases:
-
-#### `loaderFactory()` - For Data Fetching with Caching
-
-**When to use**: Loading external data in server components (most common use case)
+**Recommended Pattern**: Use `loaderFactory()` for data fetching within `componentLoaderFactory()` components:
 
 ```typescript
 const loader = loaderFactory({ memo: cache });
-
-async function UserPage() {
-  // Single resource
-  const [load] = loader(User({ id: '123' }));
-  const [data] = await load();
-
-  // Batch loading (key feature!)
-  const [batchLoad] = loader(
-    User({ id: '123' }),
-    UserPosts({ userId: '123' }),
-    UserStats({ id: '123' })
-  );
-  const [user, posts, stats] = await batchLoad();
-
-  return <div>{user.name} has {posts.length} posts</div>;
-}
-```
-
-**Characteristics:**
-
-- ✅ **Batch loading** with full type safety
-- ✅ Next.js cache integration (ISR, revalidateTag)
-- ✅ Request deduplication via React's `cache()`
-- ✅ Resource dependency management
-- ❌ No middleware context access
-- ❌ No component-level retry/fallback
-- 🔧 Default: 60s timeout, no retries
-
-#### `componentLoaderFactory()` - For Component Resilience
-
-**When to use**: Adding retry/timeout/state management to components themselves
-
-```typescript
 const { componentLoader } = componentLoaderFactory({
-  retry: { maxCount: 3, canRetryOnError: true },
-  timeout: { delay: 5000 }
+  retry: { maxCount: 3, canRetryOnError: true }
 });
 
-async function UserProfile({ userId }: { userId: string }) {
-  const user = await fetchUserProfile(userId);
-  return <div>Hello, {user.name}!</div>;
-}
-
-// Loading fallback component (Client Component)
-function LoadingFallback() {
-  return <div>Loading...</div>;
-}
-
-// Error fallback component (Client Component)
-function ErrorFallback({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
-  return (
-    <div>
-      <p>Something went wrong: {error.message}</p>
-      <button onClick={resetErrorBoundary}>Retry</button>
-    </div>
+async function RobustProjectDashboard({ projectId }: { projectId: string }) {
+  // Use loader for data fetching - gets caching + batch loading
+  const [load, revalidation] = loader(
+    Project({ id: projectId }),
+    ProjectTasks({ projectId })
   );
-}
 
-// Three boundary options:
-export const NoWrapperComponent = componentLoader(UserProfile).withNoBoundary();
-export const SuspenseComponent = componentLoader(UserProfile).withBoundary(<LoadingFallback />);
-export const ErrorSafeComponent = componentLoader(UserProfile).withErrorBoundary({
-  errorFallback: ErrorFallback
-});
-```
-
-**Characteristics:**
-
-- ✅ Component-level retry and timeout handling
-- ✅ **State persistence** across retries (`componentState`)
-- ✅ **Boundary management** (Suspense + Error Boundary)
-- ✅ **Middleware context access** via `{name}MiddlewareOptions()` within components
-- ✅ **Integrates with `loaderFactory()`** - automatic retry signal propagation
-- ✅ **Best Practice**: Use `loader()` for data fetching within `componentLoader()` components
-- 🔧 Default: 60s timeout, no retries
-
-### Key Integration: loader + componentLoader
-
-**Important**: You can use `loaderFactory()` inside `componentLoaderFactory()` components, and retry signals automatically propagate:
-
-```typescript
-const loader = loaderFactory(dependencies, {
-  retry: { maxCount: 2, canRetryOnError: true }
-});
-
-const { componentLoader } = componentLoaderFactory({
-  retry: { maxCount: 3, canRetryOnError: (err) => err.status >= 500 }
-});
-
-async function IntegratedDashboard({ userId }: { userId: string }) {
   // loader failures automatically trigger componentLoader retries
-  const [loadUser] = loader(User({ id: userId }));
-  const [loadPosts] = loader(UserPosts({ userId }));
+  const [project, tasks] = await load();
 
-  const [user, posts] = await Promise.all([
-    loadUser(),
-    loadPosts()
-  ]);
+  const urgentTasks = tasks.filter(t => t.priority === 'high' && t.status !== 'done');
+  const completionRate = Math.round((tasks.filter(t => t.status === 'done').length / tasks.length) * 100);
 
   return (
-    <div>
-      <h1>{user.name}</h1>
-      <p>{posts.length} posts</p>
+    <div className="robust-dashboard">
+      <header>
+        <h1>{project.name}</h1>
+        <div className="project-metrics">
+          <span>Status: {project.status}</span>
+          <span>Completion: {completionRate}%</span>
+          <span>Urgent Tasks: {urgentTasks.length}</span>
+        </div>
+      </header>
+
+      {urgentTasks.length > 0 && (
+        <div className="urgent-tasks-alert">
+          <h3>⚠️ Urgent Tasks Requiring Attention</h3>
+          {urgentTasks.map(task => (
+            <div key={task.id} className="urgent-task">
+              {task.title} {task.dueDate && `(Due: ${task.dueDate})`}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <form action={async () => {
+        "use server";
+        revalidation.forEach(revalidateTag);
+      }}>
+        <button>Refresh Dashboard</button>
+      </form>
     </div>
   );
 }
 
-// Loading fallback component (Client Component)
-function DashboardLoadingFallback() {
-  return <div>Loading dashboard...</div>;
-}
-
-// Wrapped component gets both loader caching + component resilience
-export default componentLoader(IntegratedDashboard).withBoundary(<DashboardLoadingFallback />);
+// Gets both: data loading efficiency + component resilience
+export default componentLoader(RobustProjectDashboard).withBoundary(<div>Loading project dashboard...</div>);
 ```
 
 ### Smart Cache Invalidation with Hierarchical Tags
 
-Organize your cache invalidation strategy with hierarchical tags for precise control:
+Hierarchical tags provide powerful, resource-based cache invalidation. Understanding how tags connect resources is crucial for building efficient caching strategies.
+
+#### Core Principles
+
+**Tags are Resource Connectors, Not Cache Targets:**
+
+- Tags identify and link resources together
+- Actual invalidation targets are always resources, not tags
+- Never use `revalidateTag("literal-string")` directly
+- Always use `revalidation.forEach(revalidateTag)` from loader
+
+#### Understanding `id` and `effects`
+
+**`id` (Resource Identity):**
+
+- Uniquely identifies this resource in the cache
+- Supports both flat and hierarchical styles
+  - Flat string: "user-123-posts"
+  - Hierarchical identity: use `hierarchyTag()` (e.g., `hierarchyTag("user", userId, "posts")` → ["user", "user/123", "user/123/posts"])
+- Hierarchy is recommended for broad invalidation patterns, but not required for simple cases
+- Other resources or cache tags may be invalidated by matching these identities when appropriate
+
+**`effects` (Cache Invalidation Tags):**
+
+- Lists tag strings that will be invalidated when THIS resource changes
+- These can be any cache tags - they don't need to correspond to other resources
+- Used for custom cache invalidation logic and cross-cutting concerns
+- Never include your own `id` hierarchy levels (forbidden pattern)
+
+#### Basic Hierarchy Example
 
 ```typescript
-import { hierarchyTag } from "@h1y/next-loader";
+// Define related resources first
+const GlobalActivityFeed = resourceFactory({
+  tags: () => ({ id: "global-activity-feed" }),
+  load: async ({ fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load("/api/activity-feed");
+    return response.json();
+  },
+});
 
-const UserComments = resourceFactory({
-  tags: (req: { userId: string; postId: string }) => ({
-    id: hierarchyTag("user", req.userId, "posts", req.postId, "comments"),
+const TrendingTopics = resourceFactory({
+  tags: () => ({ id: "trending-topics" }),
+  load: async ({ fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load("/api/trending");
+    return response.json();
+  },
+});
+
+// Main resource with hierarchy and effects
+const UserPosts = resourceFactory({
+  tags: (req: { userId: string }) => ({
+    id: hierarchyTag("user", req.userId, "posts"), // Creates: ["user", "user/123", "user/123/posts"]
+    effects: [
+      "global-activity-feed", // When UserPosts changes, invalidate GlobalActivityFeed
+      "trending-topics", // When UserPosts changes, invalidate TrendingTopics
+    ],
   }),
-  // ... other config
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/users/${req.userId}/posts`,
+    );
+    if (!response.ok)
+      throw new Error(`Failed to fetch posts: ${response.status}`);
+    return response.json();
+  },
 });
 ```
 
-**How it works:**
+#### How Invalidation Works
+
+**When UserPosts is directly revalidated:**
 
 ```typescript
-// hierarchyTag('user', '123', 'posts', '456', 'comments') creates:
-// ['user', 'user/123', 'user/123/posts', 'user/123/posts/456', 'user/123/posts/456/comments']
+const [load, revalidation] = loader(UserPosts({ userId: "123" }));
+
+// In component:
+<form action={async () => {
+  "use server";
+  revalidation.forEach(revalidateTag); // ✅ Correct way
+}}>
+  <button>Refresh Posts</button>
+</form>
 ```
 
-**Invalidation at any level:**
+**Invalidation cascade:**
+
+1. **Primary invalidation**: `["user", "user/123", "user/123/posts"]` hierarchy levels
+2. **Resource matching**: Any resources with `id` matching these levels get invalidated
+3. **Effects cascade**: Cache tags "global-activity-feed" and "trending-topics" get invalidated
+4. **Chain reaction**: If those cache tags are used by other resources, the cascade continues
+
+#### Multi-Dimensional Hierarchies
+
+For complex applications, create sophisticated invalidation networks:
 
 ```typescript
-revalidateTag("user"); // All user data
-revalidateTag("user/123/posts"); // All posts for user 123
-revalidateTag("user/123/posts/456"); // Specific post
+// E-commerce product hierarchy
+const ProductVariant = resourceFactory({
+  tags: (req: {
+    storeId: string;
+    categoryId: string;
+    productId: string;
+    variantId: string;
+  }) => ({
+    id: hierarchyTag(
+      "store",
+      req.storeId,
+      "category",
+      req.categoryId,
+      "product",
+      req.productId,
+      "variant",
+      req.variantId,
+    ),
+    effects: [
+      `store-${req.storeId}-inventory`, // Matches StoreInventory resource
+      `category-${req.categoryId}-index`, // Matches CategoryIndex resource
+      `product-${req.productId}-recommendations`, // Matches ProductRecommendations resource
+    ],
+  }),
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/stores/${req.storeId}/categories/${req.categoryId}/products/${req.productId}/variants/${req.variantId}`,
+    );
+    return response.json();
+  },
+});
+
+// Multi-tenant SaaS hierarchy
+const ServiceMetrics = resourceFactory({
+  tags: (req: {
+    orgId: string;
+    teamId: string;
+    projectId: string;
+    serviceId: string;
+  }) => ({
+    id: hierarchyTag(
+      "org",
+      req.orgId,
+      "team",
+      req.teamId,
+      "project",
+      req.projectId,
+      "service",
+      req.serviceId,
+    ),
+    effects: [
+      `org-${req.orgId}-billing`, // Matches OrganizationBilling resource
+      `team-${req.teamId}-dashboard`, // Matches TeamDashboard resource
+      `project-${req.projectId}-alerts`, // Matches ProjectAlerts resource
+    ],
+  }),
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/orgs/${req.orgId}/teams/${req.teamId}/projects/${req.projectId}/services/${req.serviceId}/metrics`,
+    );
+    return response.json();
+  },
+});
 ```
 
-## 🎯 Advanced Examples
+#### Cross-Resource Dependencies
 
-### Batch Loading with Type Safety
-
-Load multiple resources simultaneously with full TypeScript support:
+Resources can invalidate each other through strategic `effects`:
 
 ```typescript
-async function ComprehensiveDashboard({ userId }: { userId: string }) {
-  // Load 5 different resources in parallel
-  const [load, revalidation] = loader(
-    User({ id: userId }),           // → User
-    UserPosts({ userId }),          // → Post[]
-    UserStats({ userId }),          // → UserStats
-    RecentActivity({ userId }),     // → Activity[]
-    NotificationSettings({ userId }) // → NotificationSettings
-  );
+const UserProfile = resourceFactory({
+  tags: (req: { userId: string }) => ({
+    id: hierarchyTag("user", req.userId, "profile"),
+    effects: [
+      `user/${req.userId}/posts`, // Matches UserPosts hierarchy level
+      `user-${req.userId}-notifications`, // Matches UserNotifications resource
+      "global-search-index", // Matches GlobalSearchIndex resource
+    ],
+  }),
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/users/${req.userId}/profile`,
+    );
+    return response.json();
+  },
+});
+```
 
-  // TypeScript infers: [User, Post[], UserStats, Activity[], NotificationSettings]
-  const [user, posts, stats, activities, settings] = await load();
+#### ❌ Common Mistakes to Avoid
+
+```typescript
+// ❌ NEVER do direct tag calls
+revalidateTag("user/123/posts"); // Forbidden!
+
+// ❌ NEVER include your own hierarchy in effects
+const UserPosts = resourceFactory({
+  tags: (req) => ({
+    id: hierarchyTag("user", req.userId, "posts"),
+    effects: [
+      "user", // ❌ Your own parent hierarchy
+      `user/${req.userId}`, // ❌ Your own parent hierarchy
+      `user/${req.userId}/profile`, // ✅ Different resource OK
+    ],
+  }),
+});
+
+// ❌ NEVER use arbitrary strings in effects
+const UserPosts = resourceFactory({
+  tags: (req) => ({
+    id: hierarchyTag("user", req.userId, "posts"),
+    effects: ["some-random-string"], // ❌ Use meaningful cache tags
+  }),
+});
+```
+
+#### ✅ Best Practices
+
+```typescript
+// ✅ Clear resource relationships
+const UserPosts = resourceFactory({
+  tags: (req) => ({
+    id: hierarchyTag("user", req.userId, "posts"),
+    effects: [
+      "global-activity-feed", // ✅ Custom cache tag for activity feed
+      "search-index", // ✅ Custom cache tag for search index
+      "recommendation-engine" // ✅ Custom cache tag for recommendations
+    ]
+  })
+});
+
+// ✅ Always use revalidation from loader
+const [load, revalidation] = loader(UserPosts({ userId: "123" }));
+<form action={async () => {
+  "use server";
+  revalidation.forEach(revalidateTag); // ✅ Only correct way
+}}>
+  <button>Update</button>
+</form>
+```
+
+**Real-world invalidation scenarios:**
+
+- **User profile update** → Invalidates profile resource + custom cache tags (analytics, search index)
+- **New post creation** → Invalidates user posts + custom cache tags (activity feed, trending topics)
+- **Product price change** → Invalidates specific product variant + custom cache tags (inventory, recommendations)
+- **Team settings update** → Invalidates team hierarchy + custom cache tags (projects, services)
+
+> For advanced hierarchy patterns and large-scale invalidation strategies, please see the documentation site.
+
+## 🎯 Examples
+
+### Basic Resource Loading
+
+Start with a simple, practical example:
+
+```typescript
+// Define a resource for team member information
+const TeamMember = resourceFactory({
+  tags: (req: { id: string }) => ({ id: `team-member-${req.id}` }),
+  options: { staleTime: 300000 }, // 5 minutes
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(`/api/team/members/${req.id}`);
+    if (!response.ok) throw new Error(`Failed to fetch team member`);
+    return response.json();
+  },
+});
+
+// Load it in a Server Component
+async function TeamMemberProfile({ params }: { params: { id: string } }) {
+  const [load] = loader(TeamMember({ id: params.id }));
+  const [member] = await load();
 
   return (
-    <div>
-      <h1>Welcome, {user.name}!</h1>
-      <div>Posts: {stats.postCount} | Views: {stats.totalViews}</div>
-      <div>Latest post: {posts[0]?.title}</div>
-      <div>Recent activity: {activities.length} items</div>
-      <div>Email notifications: {settings.emailEnabled ? 'On' : 'Off'}</div>
+    <div className="member-profile">
+      <h1>{member.name}</h1>
+      <p>{member.role} • {member.department}</p>
+      <p>📧 {member.email}</p>
+    </div>
+  );
+}
+```
 
-      {/* Revalidate all resources at once */}
+### Real-World Team Dashboard
+
+A practical example showing batch loading with meaningful business logic:
+
+```typescript
+// Resources for a team management dashboard
+const TeamOverview = resourceFactory({
+  tags: (req: { teamId: string }) => ({ id: `team-${req.teamId}-overview` }),
+  options: { staleTime: 120000 }, // 2 minutes
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(`/api/teams/${req.teamId}/overview`);
+    if (!response.ok) throw new Error(`Failed to fetch team overview`);
+    return response.json();
+  },
+});
+
+const ActiveProjects = resourceFactory({
+  tags: (req: { teamId: string }) => ({ id: `team-${req.teamId}-active-projects` }),
+  options: { staleTime: 60000 }, // 1 minute - projects change frequently
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(`/api/teams/${req.teamId}/projects/active`);
+    if (!response.ok) throw new Error(`Failed to fetch active projects`);
+    return response.json();
+  },
+});
+
+const TeamPerformanceMetrics = resourceFactory({
+  tags: (req: { teamId: string; period: string }) => ({
+    id: `team-${req.teamId}-metrics-${req.period}`
+  }),
+  options: { staleTime: 300000 }, // 5 minutes - metrics change slowly
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/teams/${req.teamId}/metrics?period=${req.period}`
+    );
+    if (!response.ok) throw new Error(`Failed to fetch team metrics`);
+    return response.json();
+  },
+});
+
+// Team management dashboard component
+async function TeamManagementDashboard({
+  params
+}: {
+  params: { teamId: string }
+}) {
+  // Load all necessary data in parallel with full type safety
+  const [load, revalidation] = loader(
+    TeamOverview({ teamId: params.teamId }),
+    ActiveProjects({ teamId: params.teamId }),
+    TeamPerformanceMetrics({ teamId: params.teamId, period: '30d' })
+  );
+
+  // TypeScript knows exact types: [TeamOverview, Project[], PerformanceMetrics]
+  const [overview, projects, metrics] = await load();
+
+  const criticalProjects = projects.filter(p =>
+    p.status === 'at-risk' || (p.dueDate && new Date(p.dueDate) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+  );
+
+  return (
+    <div className="team-dashboard">
+      <header className="dashboard-header">
+        <h1>{overview.teamName} Team Dashboard</h1>
+        <div className="team-stats">
+          <div>👥 {overview.memberCount} Members</div>
+          <div>📊 {projects.length} Active Projects</div>
+          <div>⚡ {metrics.velocityScore}/100 Velocity</div>
+        </div>
+      </header>
+
+      {criticalProjects.length > 0 && (
+        <div className="critical-alerts">
+          <h2>🚨 Projects Needing Attention</h2>
+          {criticalProjects.map(project => (
+            <div key={project.id} className="alert-item">
+              <span>{project.name}</span>
+              <span className="status">{project.status}</span>
+              {project.dueDate && (
+                <span>Due: {new Date(project.dueDate).toLocaleDateString()}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="dashboard-grid">
+        <section className="project-overview">
+          <h3>Active Projects</h3>
+          {projects.map(project => (
+            <div key={project.id} className="project-card">
+              <h4>{project.name}</h4>
+              <div className="progress-bar">
+                <div
+                  className="progress-fill"
+                  style={{ width: `${project.completionPercentage}%` }}
+                />
+              </div>
+              <span>{project.completionPercentage}% Complete</span>
+            </div>
+          ))}
+        </section>
+
+        <section className="performance-metrics">
+          <h3>Team Performance (Last 30 Days)</h3>
+          <div className="metrics-grid">
+            <div>Tasks Completed: {metrics.tasksCompleted}</div>
+            <div>Avg. Resolution Time: {metrics.avgResolutionTime}h</div>
+            <div>Team Satisfaction: {metrics.satisfactionScore}/10</div>
+          </div>
+        </section>
+      </div>
+
       <form action={async () => {
         "use server";
+        // Refresh all dashboard data
         revalidation.forEach(revalidateTag);
       }}>
-        <button>Refresh Everything</button>
+        <button className="refresh-btn">🔄 Refresh Dashboard</button>
       </form>
     </div>
   );
 }
 ```
 
-### Resource Dependencies
+### Complex E-commerce Resource Network
 
-Build complex data flows by composing resources:
+Real-world e-commerce example with sophisticated cache relationships:
 
 ```typescript
-// Base user resource
-const User = resourceFactory({
-  tags: (req: { id: string }) => ({ id: `user-${req.id}` }),
-  options: { staleTime: 300000 },
+// Product catalog with multi-dimensional hierarchy
+const Product = resourceFactory({
+  tags: (req: { storeId: string; categoryId: string; productId: string }) => ({
+    id: hierarchyTag("store", req.storeId, "category", req.categoryId, "product", req.productId),
+    effects: [
+      `store-${req.storeId}-search-index`, // Store search index
+      `category-${req.categoryId}-bestsellers`, // Category bestsellers
+      "recommendation-engine-products", // Product recommendations
+      "price-tracking-global" // Price tracking system
+    ]
+  }),
+  options: { staleTime: 600000 },
   load: async ({ req, fetcher }) => {
-    const response = await fetcher(NextJSAdapter).load(`/api/users/${req.id}`);
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/stores/${req.storeId}/categories/${req.categoryId}/products/${req.productId}`
+    );
     return response.json();
   },
 });
 
-// Posts that depend on user data
-const UserPosts = resourceFactory({
-  tags: (req: { userId: string }) => ({
-    id: hierarchyTag('user', req.userId, 'posts'),
-    effects: ['activity-feed'] // Invalidate activity feed when posts change
+// Inventory that affects product availability
+const ProductInventory = resourceFactory({
+  tags: (req: { storeId: string; productId: string; warehouseId: string }) => ({
+    id: hierarchyTag("inventory", "store", req.storeId, "product", req.productId, "warehouse", req.warehouseId),
+    effects: [
+      `store/${req.storeId}/category/*/product/${req.productId}`, // All category instances of this product
+      `warehouse-${req.warehouseId}-capacity`, // Warehouse capacity tracking
+      "inventory-alerts-low-stock", // Low stock alerts
+      "fulfillment-optimization-queue" // Fulfillment optimization
+    ]
   }),
-  options: { staleTime: 180000 },
-  use: (req) => [User({ id: req.userId })], // Declare dependency
-  load: async ({ req, fetcher, use: [user] }) => {
-    const userData = await user;
+  options: { staleTime: 30000 }, // More frequent updates for inventory
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/stores/${req.storeId}/products/${req.productId}/inventory/${req.warehouseId}`
+    );
+    return response.json();
+  },
+});
 
-    // Skip loading if user is inactive
-    if (!userData.isActive) {
-      return { posts: [], reason: 'User inactive' };
-    }
+// Customer cart with session-based hierarchy
+const ShoppingCart = resourceFactory({
+  tags: (req: { customerId: string; sessionId: string }) => ({
+    id: hierarchyTag("customer", req.customerId, "cart", "session", req.sessionId),
+    effects: [
+      `customer-${req.customerId}-recommendations`, // Customer recommendations
+      `session-${req.sessionId}-analytics`, // Session analytics
+      "cart-abandonment-tracking", // Cart abandonment tracking
+      "real-time-inventory-check" // Real-time inventory verification
+    ]
+  }),
+  options: { staleTime: 60000 },
+  use: (req) => [
+    Product({ storeId: "main", categoryId: "electronics", productId: "laptop-123" }), // Example dependency
+  ],
+  load: async ({ req, fetcher, use: [product] }) => {
+    const productData = await product;
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/customers/${req.customerId}/cart?session=${req.sessionId}`
+    );
 
-    const response = await fetcher(NextJSAdapter).load(`/api/users/${req.userId}/posts`);
+    const cartData = await response.json();
+
     return {
-      posts: await response.json(),
-      author: userData.name,
+      ...cartData,
+      recommendations: productData.related || [],
+      totalValue: cartData.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0)
     };
   },
 });
 
-// Use both resources with batch loading
-async function UserDashboard({ userId }: { userId: string }) {
+// Comprehensive e-commerce dashboard
+async function EcommerceDashboard({
+  storeId,
+  categoryId,
+  productId,
+  customerId,
+  sessionId,
+  warehouseId
+}: {
+  storeId: string;
+  categoryId: string;
+  productId: string;
+  customerId: string;
+  sessionId: string;
+  warehouseId: string;
+}) {
+  // Load multiple resources in parallel with full type safety
   const [load, revalidation] = loader(
-    User({ id: userId }),
-    UserPosts({ userId })
+    Product({ storeId, categoryId, productId }),
+    ProductInventory({ storeId, productId, warehouseId }),
+    ShoppingCart({ customerId, sessionId })
   );
 
-  const [user, posts] = await load();
+  // TypeScript knows the exact types: [Product, ProductInventory, ShoppingCart]
+  const [product, inventory, cart] = await load();
 
   return (
-    <div>
-      <h1>{user.name}'s Dashboard</h1>
-      <p>{posts.posts.length} posts by {posts.author}</p>
-      <form action={async () => {
-        "use server";
-        revalidation.forEach(revalidateTag);
-      }}>
-        <button>Refresh</button>
-      </form>
+    <div className="ecommerce-dashboard">
+      <div className="product-section">
+        <h2>{product.name}</h2>
+        <p>Price: ${product.price}</p>
+        <p>In Stock: {inventory.quantity} units</p>
+        <p>Warehouse: {inventory.location}</p>
+      </div>
+
+      <div className="cart-section">
+        <h3>Shopping Cart ({cart.items.length} items)</h3>
+        <p>Total Value: ${cart.totalValue}</p>
+        <p>Recommendations: {cart.recommendations.length} items</p>
+      </div>
+
+      <div className="actions">
+        <form action={async () => {
+          "use server";
+          // This will cascade through all the effects:
+          // - Search indexes get updated
+          // - Recommendations refresh
+          // - Analytics update
+          // - Inventory alerts trigger
+          revalidation.forEach(revalidateTag);
+        }}>
+          <button>Refresh All Data</button>
+        </form>
+      </div>
     </div>
   );
 }
 ```
 
-### Component State Management
+### Component State Management with Real-Time Monitoring
 
-Use `componentState` to maintain state across retry cycles and integrate with `loader()` for data fetching. Unlike React useState, componentState persists across retries.
+Use `componentState` to maintain state across retry cycles - this is particularly powerful for monitoring dashboards where you need to track connection status and retry attempts. Unlike React useState, componentState persists across retries.
 
 ```typescript
 const loader = loaderFactory({ memo: cache });
 const { componentLoader, componentState, componentOptions } = componentLoaderFactory({
-  retry: { maxCount: 3, canRetryOnError: true }
+  retry: { maxCount: 5, canRetryOnError: true }
 });
 
-// Define resources
-const UserProfile = resourceFactory({
-  tags: (req: { userId: string }) => ({ id: `user-profile-${req.userId}` }),
+// Define resources for system monitoring
+const SystemHealth = resourceFactory({
+  tags: (req: { serviceId: string }) => ({ id: `system-health-${req.serviceId}` }),
+  options: { staleTime: 30000 }, // 30 seconds - health data should be fresh
   load: async ({ req, fetcher }) => {
-    const response = await fetcher(NextJSAdapter).load(`/api/users/${req.userId}/profile`);
+    const response = await fetcher(NextJSAdapter).load(`/api/services/${req.serviceId}/health`);
+    if (!response.ok) throw new Error(`Service health check failed: ${response.status}`);
     return response.json();
   },
 });
 
-const UserSettings = resourceFactory({
-  tags: (req: { userId: string }) => ({ id: `user-settings-${req.userId}` }),
+const ServiceMetrics = resourceFactory({
+  tags: (req: { serviceId: string; period: string }) => ({
+    id: `service-metrics-${req.serviceId}-${req.period}`
+  }),
+  options: { staleTime: 60000 }, // 1 minute
   load: async ({ req, fetcher }) => {
-    const response = await fetcher(NextJSAdapter).load(`/api/users/${req.userId}/settings`);
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/services/${req.serviceId}/metrics?period=${req.period}`
+    );
+    if (!response.ok) throw new Error(`Failed to fetch metrics: ${response.status}`);
     return response.json();
   },
 });
 
-async function StatefulDashboard({ userId }: { userId: string }) {
-  // State persists across retries (unlike React useState)
-  const [retryCount, setRetryCount] = componentState(0);
-  const [lastLoadTime, setLastLoadTime] = componentState<Date | null>(null);
+async function SystemMonitoringDashboard({ serviceId }: { serviceId: string }) {
+  // State persists across retries - crucial for monitoring dashboards
+  const [connectionAttempts, setConnectionAttempts] = componentState(0);
+  const [lastSuccessfulUpdate, setLastSuccessfulUpdate] = componentState<Date | null>(null);
+  const [connectionStatus, setConnectionStatus] = componentState<'connected' | 'reconnecting' | 'failed'>('connected');
 
   const options = componentOptions();
 
-  // Track successful retry attempts
-  if (options.retry.count > retryCount) {
-    setRetryCount(options.retry.count);
-    setLastLoadTime(new Date());
+  // Track connection attempts and update status
+  if (options.retry.count > connectionAttempts) {
+    setConnectionAttempts(options.retry.count);
+    setConnectionStatus('reconnecting');
   }
 
-  // Use loader for data fetching - errors will propagate and trigger componentLoader retries
-  const [loadProfile] = loader(UserProfile({ userId }));
-  const [loadSettings] = loader(UserSettings({ userId }));
+  try {
+    // Load system data - failures will trigger automatic retries
+    const [loadHealth] = loader(SystemHealth({ serviceId }));
+    const [loadMetrics] = loader(ServiceMetrics({ serviceId, period: '1h' }));
 
-  const [profile, settings] = await Promise.all([
-    loadProfile(),
-    loadSettings()
-  ]);
+    const [health, metrics] = await Promise.all([
+      loadHealth(),
+      loadMetrics()
+    ]);
 
-  return (
-    <div className={`theme-${settings.theme}`}>
-      <h1>Welcome back, {profile.name}!</h1>
-      <p>Language: {settings.language}</p>
-      {retryCount > 0 && (
-        <small>✅ Successfully loaded after {retryCount} retries</small>
-      )}
-      {lastLoadTime && (
-        <small>Last updated: {lastLoadTime.toLocaleTimeString()}</small>
-      )}
+    // Reset connection status on successful load
+    if (connectionStatus !== 'connected') {
+      setConnectionStatus('connected');
+      setLastSuccessfulUpdate(new Date());
+    }
+
+    const isHealthy = health.status === 'healthy' && health.responseTime < 500;
+    const alertCount = health.alerts?.length || 0;
+
+    return (
+      <div className="monitoring-dashboard">
+        <header className="dashboard-status">
+          <h1>Service Monitor: {health.serviceName}</h1>
+          <div className="connection-info">
+            <div className={`status-indicator ${connectionStatus}`}>
+              {connectionStatus === 'connected' && '🟢 Connected'}
+              {connectionStatus === 'reconnecting' && '🟡 Reconnecting...'}
+              {connectionStatus === 'failed' && '🔴 Connection Failed'}
+            </div>
+            {connectionAttempts > 0 && (
+              <span className="retry-count">Retries: {connectionAttempts}</span>
+            )}
+          </div>
+        </header>
+
+        <div className="health-overview">
+          <div className={`health-status ${isHealthy ? 'healthy' : 'warning'}`}>
+            <h3>System Health</h3>
+            <div>Status: {health.status}</div>
+            <div>Response Time: {health.responseTime}ms</div>
+            <div>CPU Usage: {health.cpuUsage}%</div>
+            <div>Memory Usage: {health.memoryUsage}%</div>
+          </div>
+
+          {alertCount > 0 && (
+            <div className="alerts-panel">
+              <h3>🚨 Active Alerts ({alertCount})</h3>
+              {health.alerts.map((alert: any) => (
+                <div key={alert.id} className={`alert ${alert.severity}`}>
+                  <span>{alert.message}</span>
+                  <time>{new Date(alert.timestamp).toLocaleTimeString()}</time>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="metrics-grid">
+          <div className="metric-card">
+            <h4>Requests/min</h4>
+            <span className="metric-value">{metrics.requestsPerMinute}</span>
+          </div>
+          <div className="metric-card">
+            <h4>Error Rate</h4>
+            <span className={`metric-value ${metrics.errorRate > 5 ? 'warning' : ''}`}>
+              {metrics.errorRate}%
+            </span>
+          </div>
+          <div className="metric-card">
+            <h4>Avg Response</h4>
+            <span className="metric-value">{metrics.avgResponseTime}ms</span>
+          </div>
+        </div>
+
+        <footer className="dashboard-footer">
+          {lastSuccessfulUpdate && (
+            <small>Last updated: {lastSuccessfulUpdate.toLocaleTimeString()}</small>
+          )}
+          {connectionAttempts > 0 && connectionStatus === 'connected' && (
+            <small>✅ Reconnected after {connectionAttempts} attempts</small>
+          )}
+        </footer>
+      </div>
+    );
+  } catch (error) {
+    // This will trigger the retry mechanism
+    setConnectionStatus('failed');
+    throw error;
+  }
+}
+
+export default componentLoader(SystemMonitoringDashboard).withErrorBoundary({
+  errorFallback: ({ error, resetErrorBoundary }) => (
+    <div className="monitoring-error">
+      <h2>🔴 Monitoring System Offline</h2>
+      <p>Unable to connect to monitoring service</p>
+      <button onClick={resetErrorBoundary}>Retry Connection</button>
     </div>
-  );
-}
-
-export default componentLoader(StatefulDashboard).withBoundary(<div>Loading...</div>);
-```
-
-### Advanced Retry Control
-
-Use advanced retry functions for fine-grained control over retry behavior and user feedback.
-
-#### `retryImmediately()` - Immediate Retry
-
-```typescript
-const { componentLoader, retryImmediately } = componentLoaderFactory({
-  retry: { maxCount: 3, canRetryOnError: true }
+  )
 });
-
-async function PaymentProcessor({ amount }: { amount: number }) {
-  const result = await processPayment(amount);
-
-  // If payment requires immediate retry (e.g., rate limited)
-  if (result.needsRetry) {
-    retryImmediately(<div>Payment rate limited, retrying immediately...</div>);
-  }
-
-  return <div>✅ Payment: ${result.amount}</div>;
-}
-
-export default componentLoader(PaymentProcessor).withBoundary(<div>Loading...</div>);
 ```
 
-#### `retryFallback()` - Conditional Fallback
+### Retry (optional)
 
-Unlike `retryImmediately()`, `retryFallback()` doesn't trigger immediate retry. Instead, it registers conditional fallbacks that are shown when specific error conditions are met, then allows automatic retry to proceed.
-
-```typescript
-const { componentLoader, retryFallback } = componentLoaderFactory({
-  retry: { maxCount: 3, canRetryOnError: true }
-});
-
-async function CheckoutForm({ amount }: { amount: number }) {
-  // Show different fallbacks based on error conditions
-  retryFallback({
-    when: (err) => err.code === 'INSUFFICIENT_FUNDS',
-    fallback: <div>❌ Insufficient funds. Please add money to your account.</div>
-  });
-
-  retryFallback({
-    when: (err) => err.code === 'CARD_EXPIRED',
-    fallback: <div>❌ Card expired. Please update your payment method.</div>
-  });
-
-  // Let other errors propagate to trigger automatic retry
-  const result = await processPayment(amount);
-  return <div>✅ Payment: ${result.amount}</div>;
-}
-
-export default componentLoader(CheckoutForm).withBoundary(<div>Loading...</div>);
-```
-
-**Key Differences:**
-
-- `retryImmediately()`: Bypasses automatic retry, triggers immediate retry
-- `retryFallback()`: Registers conditional fallbacks, allows automatic retry to continue
+Resilience features like retries/timeouts are available but optional.
 
 ### Error Handling
 
-```typescript
-const Product = resourceFactory({
-  tags: (req: { id: string }) => ({ id: `product-${req.id}` }),
-  load: async ({ req, fetcher }) => {
-    const response = await fetcher(NextJSAdapter).load(`/api/products/${req.id}`);
-    if (!response.ok) throw new Error(`Product not found`);
-    return response.json();
-  },
-});
+Keep error handling simple and let the library handle retries/timeouts when enabled.
 
-// Errors propagate and trigger retries automatically
-async function ProductPage({ id }: { id: string }) {
-  const [load] = loader(Product({ id }));
-  const [product] = await load();
-  return <div>{product.name}: ${product.price}</div>;
-}
-```
+## 🎛️ Middleware System (optional)
 
-## 🎛️ Middleware System
-
-```typescript
-import { loaderMiddleware } from "@h1y/next-loader";
-
-// Logging middleware
-const loggingMiddleware = loaderMiddleware({
-  name: "logging",
-  contextGenerator: () => ({ startTime: 0 }),
-  before: async (context) => {
-    context.startTime = Date.now();
-    console.log("🚀 Loading started");
-  },
-  complete: async (context) => {
-    const duration = Date.now() - context.startTime;
-    console.log(`✅ Loading completed in ${duration}ms`);
-  },
-});
-
-const loader = loaderFactory({ memo: cache }, config, [loggingMiddleware]);
-```
-
-#### Component Middleware with Context Access
-
-```typescript
-import { componentMiddleware } from "@h1y/next-loader";
-
-// Performance monitoring for component rendering
-const performanceMiddleware = componentMiddleware({
-  name: "performance",
-  contextGenerator: () => ({ startTime: 0, componentName: '' }),
-  before: async (context) => {
-    context.startTime = Date.now();
-  },
-  complete: async (context) => {
-    const renderTime = Date.now() - context.startTime;
-    console.log(`Component ${context.componentName} render time: ${renderTime}ms`);
-  },
-});
-
-const { componentLoader, performanceMiddlewareOptions } = componentLoaderFactory({
-  retry: { maxCount: 2, canRetryOnError: true }
-}, [performanceMiddleware]);
-
-async function MonitoredComponent({ userId }: { userId: string }) {
-  // Access middleware context directly in component
-  const perfContext = performanceMiddlewareOptions();
-  perfContext.componentName = 'MonitoredComponent';
-
-  const [load] = loader(User({ id: userId }));
-  const [user] = await load();
-
-  return (
-    <div>
-      <h1>{user.name}</h1>
-      <p>Render started at: {new Date(perfContext.startTime).toISOString()}</p>
-    </div>
-  );
-}
-
-export default componentLoader(MonitoredComponent).withBoundary(<div>Loading...</div>);
-```
+Keep cross-cutting concerns separate with middlewares.
 
 ## ⚠️ Best Practices & Important Guidelines
 
 ### Fallback Component Guidelines
 
-**Separate Module Creation**: Always create fallback components as separate modules rather than inline definitions for better maintainability and reusability.
-
-**Error Fallback Requirements**: Error fallback components **must** be Client Components since they handle interactive events like `onClick` for retry buttons.
-
-**Context Access Limitation**: Fallback components cannot access (Component)Loader Context. Keep fallback logic independent and stateless.
-
-**retryFallback Usage Pattern**: Like React Hooks, `retryFallback` functions must be called during every component render cycle, not conditionally.
-
-```typescript
-// ❌ Wrong - Conditional fallback registration
-async function MyComponent() {
-  if (someCondition) {
-    retryFallback({ when: () => true, fallback: () => {} }); // Don't do this
-  }
-  return await loadData();
-}
-
-// ✅ Correct - Always register fallbacks
-async function MyComponent() {
-  // Always call retryFallback at component render
-  retryFallback({ when: () => true, fallback: () => {} });
-
-  return await loadData();
-}
-```
+Keep fallbacks simple, self-contained, and client-only when interactive.
 
 **Fallback Component Examples**:
 
@@ -851,19 +1215,179 @@ const UserPosts = resourceFactory({
 });
 ```
 
-### `hierarchyTag(...segments)`
+### Hierarchical Tags with `hierarchyTag()`
+
+Use `hierarchyTag()` to create hierarchical identities that support broad invalidation at multiple levels. Flat strings still work for simple cases.
 
 ```typescript
-// Creates: ['user', 'user/123', 'user/123/posts']
-const tags = hierarchyTag("user", "123", "posts");
+import { hierarchyTag } from "@h1y/next-loader";
 
+// hierarchyTag automatically creates hierarchy levels
 const UserPosts = resourceFactory({
   tags: (req: { userId: string }) => ({
     id: hierarchyTag("user", req.userId, "posts"),
-    effects: hierarchyTag("user", req.userId), // Parent levels
+    effects: [
+      "global-activity-feed",
+      `user-${req.userId}-analytics`,
+      "content-moderation-queue",
+    ],
+  }),
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/users/${req.userId}/posts`,
+    );
+    if (!response.ok)
+      throw new Error(`Failed to fetch posts: ${response.status}`);
+    return response.json();
+  },
+});
+```
+
+#### Advanced Hierarchy Patterns
+
+**Time-based hierarchies:**
+
+```typescript
+const TimeSeriesData = resourceFactory({
+  tags: (req: {
+    metric: string;
+    year: string;
+    month: string;
+    day: string;
+  }) => ({
+    id: hierarchyTag(
+      "metrics",
+      req.metric,
+      "time",
+      req.year,
+      req.month,
+      req.day,
+    ),
+    effects: [
+      `metrics-${req.metric}-aggregates`, // Metric aggregations
+      `time-${req.year}-${req.month}-summary`, // Monthly summary
+      "dashboard-realtime-updates", // Real-time dashboard updates
+    ],
+  }),
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/metrics/${req.metric}/time/${req.year}/${req.month}/${req.day}`,
+    );
+    return response.json();
+  },
+});
+```
+
+**Geographic hierarchies:**
+
+```typescript
+const LocationData = resourceFactory({
+  tags: (req: {
+    continent: string;
+    country: string;
+    region: string;
+    city: string;
+  }) => ({
+    id: hierarchyTag("geo", req.continent, req.country, req.region, req.city),
+    effects: [
+      `geo-${req.country}-statistics`, // Country-level statistics
+      `geo-${req.continent}-regional-data`, // Continental data
+      "global-geography-index", // Global geographic index
+    ],
+  }),
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/geography/${req.continent}/${req.country}/${req.region}/${req.city}`,
+    );
+    return response.json();
+  },
+});
+```
+
+**Conditional hierarchy construction:**
+
+```typescript
+const ConditionalResource = resourceFactory({
+  tags: (req: { userId: string; isAdmin: boolean; teamId?: string }) => {
+    const baseHierarchy = hierarchyTag("user", req.userId);
+
+    if (req.isAdmin && req.teamId) {
+      return {
+        id: hierarchyTag(...baseHierarchy, "admin", "team", req.teamId),
+        effects: [
+          `user-${req.userId}-notifications`,
+          `team-${req.teamId}-admin-actions`,
+          "admin-audit-log",
+          "security-monitoring",
+        ],
+      };
+    }
+
+    return {
+      id: hierarchyTag(...baseHierarchy, "member"),
+      effects: [`user-${req.userId}-notifications`, "member-activity-feed"],
+    };
+  },
+  load: async ({ req, fetcher }) => {
+    const role = req.isAdmin ? "admin" : "member";
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/users/${req.userId}/role/${role}${req.teamId ? `?team=${req.teamId}` : ""}`,
+    );
+    return response.json();
+  },
+});
+```
+
+#### Type Safety and IDE Support
+
+The array syntax provides excellent TypeScript support:
+
+```typescript
+// TypeScript can infer and validate hierarchy segments
+type UserHierarchy = ["user", string, "posts"]; // Type-safe hierarchy structure
+type OrgHierarchy = ["org", string, "team", string, "project", string];
+
+const typedResource = resourceFactory({
+  tags: (req: {
+    userId: string;
+  }): { id: UserHierarchy; effects: string[] } => ({
+    id: hierarchyTag("user", req.userId, "posts"), // TypeScript validates this matches UserHierarchy
+    effects: ["activity-feed", "user-analytics"],
+  }),
+  load: async ({ req, fetcher }) => {
+    const response = await fetcher(NextJSAdapter).load(
+      `/api/users/${req.userId}/posts`,
+    );
+    return response.json();
+  },
+});
+```
+
+#### Migration from `hierarchyTag()`
+
+**Legacy (still supported):**
+
+```typescript
+import { hierarchyTag } from "@h1y/next-loader";
+
+const oldStyle = resourceFactory({
+  tags: (req) => ({
+    id: hierarchyTag("user", req.userId, "posts"), // Function call
+    effects: ["activity-feed"],
   }),
 });
 ```
+
+**Modern (recommended):**
+
+```typescript
+const newStyle = resourceFactory({
+  tags: (req) => ({ id: hierarchyTag("user", req.userId, "posts") }),
+});
+```
+
+- Consistent with modern JavaScript patterns
+- Easier to dynamically construct
 
 ### Backoff Strategies
 
@@ -1043,8 +1567,108 @@ This library is built on top of other packages in the @h1y ecosystem:
 
 **Peer Dependencies:**
 
-- React ≥18.2.0
+- React ≥18.3.0
 - Next.js ≥14.0.0 (for `NextJSAdapter` and cache integration)
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+#### "Resource not found" or Import Errors
+
+```typescript
+// ❌ Wrong
+import { User } from "./resources"; // May not be defined correctly
+
+// ✅ Correct
+const User = resourceFactory({
+  tags: (req: { id: string }) => ({ id: `user-${req.id}` }),
+  load: async ({ req, fetcher }) => {
+    // Make sure your load function is properly implemented
+    const response = await fetcher(NextJSAdapter).load(`/api/users/${req.id}`);
+    if (!response.ok)
+      throw new Error(`Failed to fetch user: ${response.status}`);
+    return response.json();
+  },
+});
+```
+
+#### Retries Not Visible in Development
+
+**Cause**: Next.js caching masks retry attempts  
+**Solution**: Use dynamic rendering to see retry behavior
+
+```typescript
+import { headers } from 'next/headers';
+
+async function MyComponent() {
+  // Force dynamic rendering to see retry behavior in development
+  const headersList = headers();
+  const userAgent = headersList.get('user-agent') || 'unknown';
+
+  const [load] = loader(User({ id: "123" }));
+  const [user] = await load();
+
+  return <div>{user.name} (UA: {userAgent})</div>;
+}
+```
+
+#### TypeScript Errors with Batch Loading
+
+```typescript
+// ❌ Wrong - Missing type inference
+const [load] = loader(User({ id: "123" }), UserPosts({ userId: "123" }));
+const data = await load(); // TypeScript can't infer types
+
+// ✅ Correct - Let TypeScript infer or explicitly type
+const [load] = loader(User({ id: "123" }), UserPosts({ userId: "123" }));
+const [user, posts] = await load(); // TypeScript knows types: [User, Post[]]
+```
+
+#### "Cannot read properties of undefined" in Error Boundaries
+
+**Cause**: Fallback components trying to access loader context  
+**Solution**: Keep fallback components independent
+
+```typescript
+// ❌ Wrong - Trying to access context in fallback
+function ErrorFallback({ error }: { error: Error }) {
+  const options = componentOptions(); // ❌ Not available in fallbacks
+  return <div>Error: {error.message}</div>;
+}
+
+// ✅ Correct - Self-contained fallback
+function ErrorFallback({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
+  return (
+    <div>
+      <h3>Something went wrong</h3>
+      <p>{error.message}</p>
+      <button onClick={resetErrorBoundary}>Try Again</button>
+    </div>
+  );
+}
+```
+
+### Debug Mode
+
+Enable detailed logging for troubleshooting:
+
+```typescript
+const loader = loaderFactory(
+  { memo: cache },
+  {
+    /* options */
+  },
+  [
+    loaderMiddleware({
+      name: "debug",
+      before: async () => console.log("🚀 Loading started"),
+      complete: async () => console.log("✅ Loading completed"),
+      error: async (_, error) => console.error("❌ Loading failed:", error),
+    }),
+  ],
+);
+```
 
 ## 📄 License
 

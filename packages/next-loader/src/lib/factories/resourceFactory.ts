@@ -146,6 +146,3 @@ export function resourceFactory<
     };
   };
 }
-
-export const MSG_ERR_CIRCULAR_DEPENDENCY = (circularDependency: string) =>
-  `circular dependency detected: ${circularDependency}`;
