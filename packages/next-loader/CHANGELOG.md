@@ -1,5 +1,11 @@
 # @h1y/next-loader
 
+## 6.0.1
+
+### Patch Changes
+
+- [#68](https://github.com/h1ylabs/next-loader/pull/68) [`d6dd294`](https://github.com/h1ylabs/next-loader/commit/d6dd2947deade0e64099ffb420f42faf454dea11) Thanks [@cutehammond772](https://github.com/cutehammond772)! - remove unused comments and errors
+
 ## 6.0.0
 
 ### Major Changes
