@@ -6,7 +6,7 @@
   ],
   "commit": "../changesets.commit.mjs",
   "fixed": [],
-  "linked": [["@h1y/next-loader", "@h1y/loader-core", "@h1y/promise-aop"]],
+  "linked": [],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
