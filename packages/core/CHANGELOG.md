@@ -1,15 +1,17 @@
-# @h1y/loader-core
+# @h1ylabs/loader-core
 
-## 6.0.0
+## 0.6.0
 
 ### Major Changes
 
-- [#62](https://github.com/h1ylabs/next-loader/pull/62) [`1202b47`](https://github.com/h1ylabs/next-loader/commit/1202b47c1f188a1e21b5f8ffb377b181868757a6) Thanks [@cutehammond772](https://github.com/cutehammond772)! - v6.0.0
+- Pre-1.0 versioning strategy applied. This library is a core infrastructure component and follows semantic versioning starting from 0.x for API stability iterations before the 1.0.0 stable release.
+
+- [#62](https://github.com/h1ylabs/next-loader/pull/62) [`1202b47`](https://github.com/h1ylabs/next-loader/commit/1202b47c1f188a1e21b5f8ffb377b181868757a6) Thanks [@cutehammond772](https://github.com/cutehammond772)! - Promise AOP-based resilient async operations library with built-in retry, timeout, and backoff strategies.
 
 ### Patch Changes
 
 - Updated dependencies [[`1202b47`](https://github.com/h1ylabs/next-loader/commit/1202b47c1f188a1e21b5f8ffb377b181868757a6)]:
-  - @h1y/promise-aop@6.0.0
+  - @h1ylabs/promise-aop@0.6.0
 
 ## 5.0.0
 
