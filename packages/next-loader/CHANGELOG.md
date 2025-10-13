@@ -1,20 +1,20 @@
-# @h1y/next-loader
+# @h1ylabs/next-loader
 
-## 6.0.1
+## 0.6.1
 
 ### Patch Changes
 
 - [#68](https://github.com/h1ylabs/next-loader/pull/68) [`d6dd294`](https://github.com/h1ylabs/next-loader/commit/d6dd2947deade0e64099ffb420f42faf454dea11) Thanks [@cutehammond772](https://github.com/cutehammond772)! - remove unused comments and errors
 
-## 6.0.0
+## 0.6.0
 
-### Major Changes
+### Minor Changes
 
 - [#62](https://github.com/h1ylabs/next-loader/pull/62) [`1202b47`](https://github.com/h1ylabs/next-loader/commit/1202b47c1f188a1e21b5f8ffb377b181868757a6) Thanks [@cutehammond772](https://github.com/cutehammond772)! - v6.0.0
 
-## 5.0.0
+## 0.5.0
 
-### Major Changes
+### Minor Changes
 
 - [#59](https://github.com/h1ylabs/next-loader/pull/59) [`0fbd95c`](https://github.com/h1ylabs/next-loader/commit/0fbd95c8152d76bcd07641a585ffdc5154205333) Thanks [@cutehammond772](https://github.com/cutehammond772)! - version unification
 
@@ -23,9 +23,9 @@
 - Updated dependencies [[`0fbd95c`](https://github.com/h1ylabs/next-loader/commit/0fbd95c8152d76bcd07641a585ffdc5154205333)]:
   - @h1y/loader-core@5.0.0
 
-## 2.0.0
+## 0.2.0
 
-### Major Changes
+### Minor Changes
 
 - [#57](https://github.com/h1ylabs/next-loader/pull/57) [`69f601c`](https://github.com/h1ylabs/next-loader/commit/69f601caadd682b91db1d5804456b8751047c79e) Thanks [@cutehammond772](https://github.com/cutehammond772)! - Major architectural overhaul with enterprise-grade features:
   - Middleware System: Added AOP-based middleware for loaders
@@ -44,14 +44,14 @@
   - Enhanced Type Safety: Full TypeScript inference for
     resources and middleware
 
-## 1.0.1
+## 0.1.1
 
 ### Patch Changes
 
 - [#15](https://github.com/h1ylabs/next-loader/pull/15) [`0d2f0eb`](https://github.com/h1ylabs/next-loader/commit/0d2f0eb85c0be4be55660ea819ad235c8b84fe34) Thanks [@cutehammond772](https://github.com/cutehammond772)! - support universal environment (node.js, browser), request optimizations using promise.
 
-## 1.0.0
+## 0.1.0
 
-### Major Changes
+### Minor Changes
 
 - [#11](https://github.com/h1ylabs/next-loader/pull/11) [`76ebcf8`](https://github.com/h1ylabs/next-loader/commit/76ebcf8d80e1764a9af6546b31d5b1b393d2cec2) Thanks [@cutehammond772](https://github.com/cutehammond772)! - initial release
