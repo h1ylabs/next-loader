@@ -37,7 +37,7 @@
     "test": "jest --coverage"
   },
   "devDependencies": {
-    "@h1y/loader-config": "workspace:*",
+    "@h1ylabs/loader-config": "workspace:*",
     "@types/jest": "catalog:",
     "@types/node": "catalog:",
     "eslint": "catalog:",
