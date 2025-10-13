@@ -20,4 +20,4 @@ export {
   EXPONENTIAL_BACKOFF,
   FIXED_BACKOFF,
   LINEAR_BACKOFF,
-} from "@h1y/loader-core";
+} from "@h1ylabs/loader-core";

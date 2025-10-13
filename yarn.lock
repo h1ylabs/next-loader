@@ -1186,24 +1186,6 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@h1y/loader-core@workspace:*, @h1y/loader-core@workspace:packages/core":
-  version: 0.0.0-use.local
-  resolution: "@h1y/loader-core@workspace:packages/core"
-  dependencies:
-    "@h1y/loader-config": "workspace:*"
-    "@h1ylabs/promise-aop": "workspace:*"
-    "@types/jest": "catalog:"
-    "@types/node": "catalog:"
-    eslint: "catalog:"
-    jest: "catalog:"
-    prettier: "catalog:"
-    rimraf: "catalog:"
-    ts-jest: "catalog:"
-    tsup: "catalog:"
-    typescript: "catalog:"
-  languageName: unknown
-  linkType: soft
-
 "@h1y/loader-tag@workspace:packages/tag":
   version: 0.0.0-use.local
   resolution: "@h1y/loader-tag@workspace:packages/tag"
@@ -1226,7 +1208,7 @@ __metadata:
   resolution: "@h1y/next-loader@workspace:packages/next-loader"
   dependencies:
     "@h1y/loader-config": "workspace:*"
-    "@h1y/loader-core": "workspace:*"
+    "@h1ylabs/loader-core": "workspace:*"
     "@types/node": "catalog:"
     "@types/react": "npm:>=18.3.0"
     eslint: "catalog:"
@@ -1234,6 +1216,24 @@ __metadata:
     prettier: "catalog:"
     react: "npm:>=18.3.0"
     react-error-boundary: "npm:^6.0.0"
+    rimraf: "catalog:"
+    ts-jest: "catalog:"
+    tsup: "catalog:"
+    typescript: "catalog:"
+  languageName: unknown
+  linkType: soft
+
+"@h1ylabs/loader-core@workspace:*, @h1ylabs/loader-core@workspace:packages/core":
+  version: 0.0.0-use.local
+  resolution: "@h1ylabs/loader-core@workspace:packages/core"
+  dependencies:
+    "@h1y/loader-config": "workspace:*"
+    "@h1ylabs/promise-aop": "workspace:*"
+    "@types/jest": "catalog:"
+    "@types/node": "catalog:"
+    eslint: "catalog:"
+    jest: "catalog:"
+    prettier: "catalog:"
     rimraf: "catalog:"
     ts-jest: "catalog:"
     tsup: "catalog:"

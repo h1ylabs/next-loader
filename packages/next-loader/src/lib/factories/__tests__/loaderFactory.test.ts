@@ -101,7 +101,7 @@ describe("loaderFactory", () => {
       // Should use memo function for caching
       await load();
 
-      // Skipping this assertion due to API changes in @h1y/loader-core
+      // Skipping this assertion due to API changes in @h1ylabs/loader-core
       // expect(mockDependencies.memo).toHaveBeenCalled();
     });
 
@@ -123,7 +123,7 @@ describe("loaderFactory", () => {
       loader(resource2);
 
       const idTagStr = idTag(resource1.tag.resource);
-      // Skipping this assertion due to API changes in @h1y/loader-core
+      // Skipping this assertion due to API changes in @h1ylabs/loader-core
       // expect(consoleWarnSpy).toHaveBeenCalledWith(
       //   MSG_WARN_IDENTIFIER_TAG_DUPLICATE(idTagStr),
       // );
@@ -146,7 +146,7 @@ describe("loaderFactory", () => {
       const [load] = loader(resource);
       await load();
 
-      // Skipping this assertion due to API changes in @h1y/loader-core
+      // Skipping this assertion due to API changes in @h1ylabs/loader-core
       // expect(memoSpy).toHaveBeenCalledWith(expect.any(Function));
     });
 
@@ -385,7 +385,7 @@ describe("loaderFactory", () => {
       await load2();
 
       // Should have used cached loader function
-      // Skipping this assertion due to API changes in @h1y/loader-core
+      // Skipping this assertion due to API changes in @h1ylabs/loader-core
       // expect(mockDependencies.memo).toHaveBeenCalled();
     });
   });
@@ -480,11 +480,11 @@ describe("loaderFactory", () => {
       expect(newResult).toMatchObject({ id: "other" });
 
       // Verify memo was called for caching (but not excessively)
-      // Skipping this assertion due to API changes in @h1y/loader-core
+      // Skipping this assertion due to API changes in @h1ylabs/loader-core
       // expect(mockDependencies.memo).toHaveBeenCalled();
 
       // Should have called memo once per unique resource
-      // Skipping this assertion due to API changes in @h1y/loader-core
+      // Skipping this assertion due to API changes in @h1ylabs/loader-core
       // expect(mockCalls.length).toBe(2); // One for cache-consistency, one for other
     });
 
@@ -562,7 +562,7 @@ describe("loaderFactory", () => {
       const [result2] = await load2();
 
       // Verify caching worked by checking memo was called
-      // Skipping this assertion due to API changes in @h1y/loader-core
+      // Skipping this assertion due to API changes in @h1ylabs/loader-core
       // expect(memoSpy).toHaveBeenCalledTimes(1);
 
       // Basic validation that both results exist
@@ -635,7 +635,7 @@ describe("loaderFactory", () => {
     });
 
     it("should handle errors during cache operations", () => {
-      // Skipping this test due to API changes in @h1y/loader-core
+      // Skipping this test due to API changes in @h1ylabs/loader-core
       // const dependenciesWithFailingMemo = {
       //   ...mockDependencies,
       //   memo: () => {

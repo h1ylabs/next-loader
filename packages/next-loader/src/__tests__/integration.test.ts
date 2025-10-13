@@ -114,7 +114,7 @@ describe("Integration Tests", () => {
       // The fact that the loads completed successfully indicates middleware is working
 
       // Step 7: Verify caching worked
-      // Skipping this assertion due to API changes in @h1y/loader-core
+      // Skipping this assertion due to API changes in @h1ylabs/loader-core
       // expect(mockDependencies.memo).toHaveBeenCalled();
     });
 
@@ -203,7 +203,7 @@ describe("Integration Tests", () => {
       });
 
       // Verify dependency tags were collected correctly
-      // Skipping these assertions due to API changes in @h1y/loader-core
+      // Skipping these assertions due to API changes in @h1ylabs/loader-core
       // expect(userResource.tag.dependencies).toContain("dept-engineering");
       // expect(userResource.tag.dependencies).toContain("dept-cache");
       // expect(deptResource.tag.dependencies).toContain("org-acme");

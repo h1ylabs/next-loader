@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { middleware } from "@h1y/loader-core";
+import { middleware } from "@h1ylabs/loader-core";
 import type { TargetWrapper } from "@h1ylabs/promise-aop";
 
 import { componentLoaderFactory } from "@/lib/factories/componentLoaderFactory";

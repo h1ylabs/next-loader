@@ -1,4 +1,4 @@
-import type { LoaderMiddleware } from "@h1y/loader-core";
+import type { LoaderMiddleware } from "@h1ylabs/loader-core";
 
 import {
   loaderFactory as baseLoaderFactory,
