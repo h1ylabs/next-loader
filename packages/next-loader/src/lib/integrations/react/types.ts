@@ -1,4 +1,4 @@
-import { LoaderMiddleware } from "@h1y/loader-core";
+import { LoaderMiddleware } from "@h1ylabs/loader-core";
 
 export type ReactComponentLoaderMiddleware = LoaderMiddleware<
   React.ReactElement,

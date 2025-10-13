@@ -3,7 +3,7 @@ import {
   loader as loaderCore,
   type LoaderCoreInput,
   type LoaderMiddleware,
-} from "@h1y/loader-core";
+} from "@h1ylabs/loader-core";
 
 import {
   DEFAULT_LOADER_PROPS,

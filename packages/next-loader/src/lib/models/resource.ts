@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { LoaderCoreOptions } from "@h1y/loader-core";
+import type { LoaderCoreOptions } from "@h1ylabs/loader-core";
 
 import { LoaderID } from "./loader";
 import type { Dependencies, ResourceTag } from "./resourceTag";

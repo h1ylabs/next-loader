@@ -1,4 +1,4 @@
-import { LoaderCoreOptions } from "@h1y/loader-core";
+import { LoaderCoreOptions } from "@h1ylabs/loader-core";
 
 import { LoaderID } from "../models/loader";
 import {

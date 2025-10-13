@@ -4,7 +4,7 @@ import {
   type LoaderMiddleware,
   type RetryContextInput,
   type TimeoutContextInput,
-} from "@h1y/loader-core";
+} from "@h1ylabs/loader-core";
 import type { TargetWrapper } from "@h1ylabs/promise-aop";
 
 import {
