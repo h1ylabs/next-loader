@@ -1,4 +1,4 @@
-import { TargetWrapper } from "@h1y/promise-aop";
+import { TargetWrapper } from "@h1ylabs/promise-aop";
 
 import { FIXED_BACKOFF } from "@/lib/features/createBackoff";
 import { createRetryAspect } from "@/lib/features/createRetryAspect";

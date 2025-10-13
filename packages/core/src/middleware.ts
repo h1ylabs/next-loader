@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createAspect } from "@h1y/promise-aop";
+import { createAspect } from "@h1ylabs/promise-aop";
 
 import { MiddlewareInvalidContextSignal } from "@/lib/signals/MiddlewareInvalidContextSignal";
 

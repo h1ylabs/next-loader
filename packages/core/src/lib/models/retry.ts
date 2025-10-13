@@ -1,4 +1,4 @@
-import { TargetWrapper } from "@h1y/promise-aop";
+import { TargetWrapper } from "@h1ylabs/promise-aop";
 
 export type RetryContextInput<Result> = {
   readonly maxCount: number;

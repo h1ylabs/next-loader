@@ -1,4 +1,4 @@
-import { AsyncContext } from "@h1y/promise-aop";
+import { AsyncContext } from "@h1ylabs/promise-aop";
 
 import { LoaderMetadata, type LoaderRetryPropagation } from "../models/loader";
 

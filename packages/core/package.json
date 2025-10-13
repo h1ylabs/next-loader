@@ -49,6 +49,6 @@
     "typescript": "catalog:"
   },
   "dependencies": {
-    "@h1y/promise-aop": "workspace:*"
+    "@h1ylabs/promise-aop": "workspace:*"
   }
 }

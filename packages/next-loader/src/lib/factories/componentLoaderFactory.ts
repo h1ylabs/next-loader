@@ -5,7 +5,7 @@ import {
   type RetryContextInput,
   type TimeoutContextInput,
 } from "@h1y/loader-core";
-import type { TargetWrapper } from "@h1y/promise-aop";
+import type { TargetWrapper } from "@h1ylabs/promise-aop";
 
 import {
   ComponentStateMiddleware,

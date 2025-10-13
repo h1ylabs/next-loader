@@ -1,4 +1,4 @@
-import type { TargetWrapper } from "@h1y/promise-aop";
+import type { TargetWrapper } from "@h1ylabs/promise-aop";
 import { Suspense } from "react";
 
 export function ReactComponentLoaderWrapper(
