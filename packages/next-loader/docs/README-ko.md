@@ -4,7 +4,7 @@
 
 Next.js 애플리케이션을 위한 강력하고 타입 안전한 리소스 로딩 라이브러리입니다. 내장된 캐싱, 배치 로딩, 재시도 로직, 그리고 Next.js App Router와의 원활한 통합을 통해 효율적인 데이터 페칭을 구현할 수 있습니다.
 
-[![npm version](https://badge.fury.io/js/%40h1y%2Fnext-loader.svg)](https://badge.fury.io/js/%40h1y%2Fnext-loader)
+[![npm version](https://badge.fury.io/js/%40h1y%2Fnext-loader.svg)](https://badge.fury.io/js/%40h1ylabs%2Fnext-loader)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 [English Documentation](https://github.com/h1ylabs/next-loader/tree/main/packages/next-loader/README.md)

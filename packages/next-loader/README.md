@@ -4,7 +4,7 @@
 
 A powerful, type-safe resource loading library for Next.js applications. Build efficient data fetching with built-in caching, batch loading, retry logic, and seamless integration with Next.js App Router.
 
-[![npm version](https://badge.fury.io/js/%40h1y%2Fnext-loader.svg)](https://badge.fury.io/js/%40h1y%2Fnext-loader)
+[![npm version](https://badge.fury.io/js/%40h1y%2Fnext-loader.svg)](https://badge.fury.io/js/%40h1ylabs%2Fnext-loader)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 [한국어 문서 (Korean Documentation)](./docs/README-ko.md)
