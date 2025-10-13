@@ -1,44 +1,84 @@
 # Promise-AOP
 
-**Latest version: v6.0.0**
+**Latest version: v0.6.0**
 
-A TypeScript-first, zero-dependency AOP (Aspect-Oriented Programming) framework for robust and maintainable asynchronous code. It provides a structured way to manage cross-cutting concerns like logging, caching, and error handling with a strong emphasis on type safety and explicit context management.
+A TypeScript-first AOP (Aspect-Oriented Programming) framework designed as a core infrastructure component for building robust asynchronous applications. Promise-AOP provides a type-safe, zero-dependency foundation for managing cross-cutting concerns with explicit context management and thread-safe execution.
+
+**Note**: This is a core library intended for use as a building block in other frameworks and applications. The API prioritizes technical precision and extensibility over simplicity.
 
 [한국어 문서 (Korean Documentation)](./docs/README-ko.md)
 
-## 🏗️ Architecture Overview
+---
 
-Promise-AOP follows a clear execution model where **Aspects** define cross-cutting concerns, **Processes** compile them into execution chains, and **Context** provides thread-safe data access.
+## Design Principles
+
+Promise-AOP is built on the following technical foundations:
+
+### 1. Type Safety First
+
+- Full TypeScript support with generic type inference
+- Context access restricted by declared sections at compile-time
+- No runtime type coercion or dynamic property access
+
+### 2. Explicit Context Management
+
+- Section-based context system prevents concurrent access conflicts
+- Thread-safe execution using Node.js `AsyncLocalStorage`
+- Dependency graph resolution for advice ordering
+
+### 3. Composable Architecture
+
+- Aspects as first-class, reusable units
+- Process compilation separates configuration from execution
+- Advice chaining with configurable execution strategies
+
+### 4. Zero Dependencies
+
+- Built entirely on Node.js standard library
+- No external runtime dependencies
+- Minimal surface area for security and compatibility
+
+---
+
+## Architecture Overview
+
+Promise-AOP implements a three-layer execution model:
 
 ```mermaid
 flowchart TD
-    A["🎯 Target Function<br/>(Your Business Logic)"]
-    B["📦 Aspect<br/>(Cross-cutting Concern)"]
-    C["⚙️ Process<br/>(Compiled Execution Chain)"]
-    D["🔄 runProcess<br/>(Execute with Context)"]
-    E["📊 Context<br/>(Shared Data)"]
+    A["Aspect Definition<br/>(Cross-cutting Concern)"]
+    B["Process Compilation<br/>(Dependency Resolution)"]
+    C["Runtime Execution<br/>(AsyncContext + Advice Chain)"]
 
+    A --> B
     B --> C
-    A --> D
-    C --> D
-    E --> D
 
-    subgraph "Advice Types"
-        F["before"]
-        G["around"]
-        H["after"]
-        I["afterReturning"]
-        J["afterThrowing"]
+    subgraph "Layer 1: Definition"
+        D["createAspect()"]
+        E["Advice Metadata"]
+        F["Section Dependencies"]
     end
 
-    B --> F
-    B --> G
-    B --> H
-    B --> I
-    B --> J
+    subgraph "Layer 2: Compilation"
+        G["organizeAspect()"]
+        H["Dependency Graph"]
+        I["Execution Plan"]
+    end
+
+    subgraph "Layer 3: Runtime"
+        J["AsyncLocalStorage"]
+        K["Section Locking"]
+        L["Error Propagation"]
+    end
+
+    A -.-> D
+    B -.-> G
+    C -.-> J
 ```
 
 ### Execution Flow
+
+The framework executes advice in a well-defined order with configurable error handling:
 
 ```mermaid
 sequenceDiagram
@@ -50,211 +90,52 @@ sequenceDiagram
     participant AfterThrowing
     participant After
 
-    Context->>Before: Execute (parallel)
-    Before->>Around: Setup wrappers
-    Around->>Target: Execute wrapped
+    Context->>Before: Execute (parallel by default)
+    Before->>Around: Setup wrappers (sequential)
+    Around->>Target: Execute wrapped target
 
     alt Success
-        Target->>AfterReturning: Result
+        Target->>AfterReturning: Pass result
         AfterReturning->>After: Continue
     else Error
-        Target->>AfterThrowing: Error
+        Target->>AfterThrowing: Pass error
         AfterThrowing->>After: Continue
     end
 
-    After->>Context: Complete
+    After->>Context: Complete (always runs)
 ```
+
+**Key Execution Properties:**
+
+- `before` advice executes in parallel unless dependencies specified
+- `around` advice wraps target with two composition points (target/result)
+- Error handling uses specialized `Rejection` types for control flow
+- Context access is protected by section-based locking mechanism
 
 ---
 
-## 📦 Installation
+## Installation
 
 ```bash
 # npm
-npm install @h1y/promise-aop
+npm install @h1ylabs/promise-aop
 
 # yarn
-yarn add @h1y/promise-aop
+yarn add @h1ylabs/promise-aop
 
 # pnpm
-pnpm add @h1y/promise-aop
+pnpm add @h1ylabs/promise-aop
 ```
 
 **Requirements**: Node.js 16+ (uses `AsyncLocalStorage`)
 
 ---
 
-## 🚀 Quick Start
+## Core Concepts
 
-This example demonstrates a simple logging aspect applied to a business logic function.
+### Aspect
 
-```typescript
-import { createAspect, createProcess, runProcess } from "@h1y/promise-aop";
-
-// Define shared context for your application
-type AppContext = { logger: Console };
-
-// 1. Create an Aspect for a cross-cutting concern (e.g., logging)
-const LoggingAspect = createAspect<string, AppContext>((createAdvice) => ({
-  name: "logging",
-  before: createAdvice({
-    use: ["logger"], // Declare which parts of the context you need
-    advice: async ({ logger }) => logger.info("🚀 Starting operation..."),
-  }),
-  after: createAdvice({
-    use: ["logger"],
-    advice: async ({ logger }) => logger.info("✅ Operation completed!"),
-  }),
-}));
-
-// 2. Create a Process to compose your aspects
-const process = createProcess<string, AppContext>({ aspects: [LoggingAspect] });
-
-// 3. Run your target function with the process
-const result = await runProcess({
-  process,
-  context: () => ({ logger: console }),
-  target: async () => {
-    // Your actual business logic
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    return "Hello, AOP World!";
-  },
-});
-
-console.log(result); // "Hello, AOP World!"
-
-// Console Output:
-// 🚀 Starting operation...
-// ✅ Operation completed!
-```
-
-**What happened here?**
-
-1. **Aspect Definition**: Created a reusable logging concern with `before` and `after` advice
-2. **Process Compilation**: Combined aspects into an executable process
-3. **Context Provision**: Provided shared services (logger) to all aspects
-4. **Automatic Weaving**: Framework automatically executed advice around your target function
-
----
-
-## 🧐 Understanding AOP Concepts
-
-Before diving into Promise-AOP, let's understand the core concepts:
-
-### What is Aspect-Oriented Programming?
-
-**Aspect-Oriented Programming (AOP)** is a programming paradigm that separates **cross-cutting concerns** (like logging, security, caching) from your main business logic.
-
-```mermaid
-graph LR
-    A["Business Logic<br/>(What your app does)"]
-    B["Cross-cutting Concerns<br/>(How it's monitored/secured/cached)"]
-    C["AOP Framework<br/>(Weaves them together)"]
-    D["Clean, Maintainable Code"]
-
-    A --> C
-    B --> C
-    C --> D
-```
-
-### Key Terminology
-
-| Term        | Definition                                               | Example                             |
-| ----------- | -------------------------------------------------------- | ----------------------------------- |
-| **Aspect**  | A modular unit that encapsulates a cross-cutting concern | `LoggingAspect`, `CachingAspect`    |
-| **Advice**  | The actual code that gets executed (when/how/where)      | `before`, `after`, `around`         |
-| **Target**  | Your original business function                          | `getUserById()`, `processPayment()` |
-| **Context** | Shared data/services available to all aspects            | `{ logger, db, metrics }`           |
-| **Process** | Compiled execution chain of aspects + target             | Result of `createProcess()`         |
-
-### Context & Section-Based Access
-
-Promise-AOP uses a **section-based context system** for thread-safe access:
-
-```mermaid
-graph TD
-    A["Context: { logger, db, metrics, cache }"]
-    B["Aspect A<br/>use: ['logger']"]
-    C["Aspect B<br/>use: ['db', 'metrics']"]
-    D["Aspect C<br/>use: ['cache']"]
-
-    A --> B
-    A --> C
-    A --> D
-
-    E["✅ Parallel Execution<br/>(No overlapping sections)"]
-    B --> E
-    C --> E
-    D --> E
-```
-
-## ✨ Why Promise-AOP?
-
-Promise-AOP helps you decouple cross-cutting concerns from your core business logic, leading to cleaner, more maintainable, and testable code.
-
-**Before: Scattered Concerns**
-
-```typescript
-// Business logic is cluttered with logging, metrics, and error handling
-async function getUser(id: string) {
-  logger.info(`Fetching user ${id}...`);
-  const startTime = Date.now();
-  try {
-    const user = await db.fetchUser(id);
-    metrics.record("user.fetch.success", Date.now() - startTime);
-    return user;
-  } catch (e) {
-    logger.error(`Failed to fetch user ${id}`, e);
-    metrics.record("user.fetch.failure", Date.now() - startTime);
-    throw e;
-  }
-}
-```
-
-**After: Clean Separation**
-
-```typescript
-// Pure business logic, easy to read and test
-const fetchUser = async (id: string) => db.fetchUser(id);
-
-// Apply concerns declaratively
-const processedGetUser = (id: string) =>
-  runProcess({
-    process: createProcess({ aspects: [LoggingAspect, MetricsAspect] }),
-    context: () => ({ logger, metrics, db }),
-    target: async () => fetchUser(id),
-  });
-```
-
-**Key Benefits:**
-
-- **Separation of Concerns**: Isolate business logic from infrastructure code.
-- **Type Safety**: Full TypeScript support with intelligent context inference.
-- **Section-Based Locking**: Safe concurrent access to shared context.
-- **Reduced Boilerplate**: Define concerns once, apply everywhere.
-- **Centralized Control**: Manage application-wide policies in one place.
-- **Enhanced Testability**: Test core logic without mocking unrelated services.
-
----
-
-## 📚 API Reference
-
-### Core Functions
-
-#### `createAspect<Result, Context>(factory)`
-
-Creates an aspect, which is a modular unit for a cross-cutting concern.
-
-**Type Parameters:**
-
-- `Result`: The expected return type of the target function
-- `Context`: A shared object available to all advice (dictionary-like type where keys are section names)
-
-**Parameters:**
-
-- `factory`: `(createAdvice: AdviceGeneratorHelper<Result, Context>) => Aspect<Result, Context>`
-
-**Returns:** `Aspect<Result, Context>`
+A modular unit encapsulating a cross-cutting concern with typed advice:
 
 ```typescript
 type Aspect<Result, Context> = {
@@ -267,68 +148,9 @@ type Aspect<Result, Context> = {
 };
 ```
 
-#### `createAdvice(metadata)` Helper
+### Process
 
-The `createAdvice` helper function defines the behavior of a single piece of advice.
-
-```typescript
-type AdviceMetadata<Result, Context, AdviceType, Sections> = {
-  readonly use?: Sections; // Array of context section names
-  readonly dependsOn?: readonly string[]; // Array of aspect names
-  readonly advice: AdviceFunctionWithContext<Result, Context, AdviceType>;
-};
-```
-
-**Properties:**
-
-| Property     | Type                | Description                                                                          |
-| ------------ | ------------------- | ------------------------------------------------------------------------------------ |
-| `use?`       | `(keyof Context)[]` | Context sections this advice needs. Enables type checking and section-based locking. |
-| `dependsOn?` | `string[]`          | Aspect names this advice must run after (within same phase).                         |
-| `advice`     | `AdviceFunction`    | The actual advice logic. Signature varies by advice type.                            |
-
-#### Advice Function Signatures
-
-| Advice Type      | Signature                                                                       | Purpose                           |
-| ---------------- | ------------------------------------------------------------------------------- | --------------------------------- |
-| `before`         | `(context: Restricted<Context, Sections>) => Promise<void>`                     | Setup, validation, preparation    |
-| `around`         | `(context: Restricted<Context, Sections>, hooks: AroundHooks) => Promise<void>` | Wrapping, transformation, caching |
-| `afterReturning` | `(context: Restricted<Context, Sections>, result: Result) => Promise<void>`     | Success handling, cleanup         |
-| `afterThrowing`  | `(context: Restricted<Context, Sections>, error: unknown) => Promise<void>`     | Error handling, logging           |
-| `after`          | `(context: Restricted<Context, Sections>) => Promise<void>`                     | Always runs, final cleanup        |
-
-**Around Advice Hooks:**
-
-```typescript
-type AroundHooks<Result> = {
-  attachToTarget: (wrapper: TargetWrapper<Result>) => void;
-  attachToResult: (wrapper: TargetWrapper<Result>) => void;
-};
-
-type TargetWrapper<Result> = (target: Target<Result>) => Target<Result>;
-type Target<Result> = () => Promise<Result>;
-```
-
-#### `createProcess<Result, Context>(config)`
-
-Compiles a set of aspects into an executable process.
-
-**Type Parameters:**
-
-- `Result`: Expected return type of target functions
-- `Context`: Shared context type
-
-**Parameters:**
-
-```typescript
-type CreateProcessConfig<Result, Context> = {
-  readonly aspects: readonly Aspect<Result, Context>[];
-  readonly buildOptions?: BuildOptions;
-  readonly processOptions?: ProcessOptions<Result, Context>;
-};
-```
-
-**Returns:** `Process<Result, Context>`
+Compiled execution chain with resolved dependencies and error handling configuration:
 
 ```typescript
 type Process<Result, Context> = (
@@ -338,192 +160,208 @@ type Process<Result, Context> = (
 ) => Promise<Result>;
 ```
 
-#### `runProcess<Result, Context>(props)`
+### Context & Sections
 
-Executes a process with a target function and context.
+Thread-safe shared state accessed through declared sections:
+
+```typescript
+// Context is split into sections for fine-grained access control
+type AppContext = {
+  logger: Logger;
+  db: Database;
+  cache: Cache;
+};
+
+// Advice declares which sections it needs
+const aspect = createAspect<Data, AppContext>((createAdvice) => ({
+  name: "example",
+  before: createAdvice({
+    use: ["logger", "db"], // Type-checked access
+    advice: async ({ logger, db }) => {
+      // Only logger and db are accessible
+      // cache is not available (compile error if accessed)
+    },
+  }),
+}));
+```
+
+---
+
+## Quick Start
+
+```typescript
+import { createAspect, createProcess, runProcess } from "@h1ylabs/promise-aop";
+
+// 1. Define context type
+type AppContext = { logger: Console };
+
+// 2. Create aspect
+const LoggingAspect = createAspect<string, AppContext>((createAdvice) => ({
+  name: "logging",
+  before: createAdvice({
+    use: ["logger"],
+    advice: async ({ logger }) => logger.info("Start"),
+  }),
+  after: createAdvice({
+    use: ["logger"],
+    advice: async ({ logger }) => logger.info("Complete"),
+  }),
+}));
+
+// 3. Compile process
+const process = createProcess<string, AppContext>({
+  aspects: [LoggingAspect],
+});
+
+// 4. Execute
+const result = await runProcess({
+  process,
+  context: () => ({ logger: console }),
+  target: async () => "Hello, AOP!",
+});
+```
+
+---
+
+## API Reference
+
+### Core Functions
+
+#### `createAspect<Result, Context>(factory)`
+
+Creates an aspect with typed advice definitions.
+
+**Parameters:**
+
+- `factory`: `(createAdvice: AdviceHelper) => Aspect<Result, Context>`
+
+**Returns:** `Aspect<Result, Context>`
+
+**Type Parameters:**
+
+- `Result`: Return type of target functions
+- `Context`: Shared context object (section-based)
+
+#### `createProcess<Result, Context>(config)`
+
+Compiles aspects into an executable process with dependency resolution.
 
 **Parameters:**
 
 ```typescript
-type RunProcessProps<Result, Context> = {
-  readonly process: Process<Result, Context>;
-  readonly target: Target<Result>; // () => Promise<Result>
-  readonly context: ContextGenerator<Context> | AsyncContext<Context>;
-};
-
-type ContextGenerator<Context> = () => Context;
-```
-
-**Returns:** `Promise<Result>`
-
-**Context Types:**
-
-- `ContextGenerator<Context>`: Simple function that returns context
-- `AsyncContext<Context>`: For automatic propagation across async boundaries
-
-**Example:**
-
-```typescript
-// Using context generator
-const result = await runProcess({
-  process,
-  target: async () => fetchUserData(id),
-  context: () => ({ logger: console, db }),
-});
-
-// Using AsyncContext for propagation
-const asyncCtx = AsyncContext.create(() => ({ logger, db }));
-const result = await runProcess({
-  process,
-  target: async () => fetchUserData(id),
-  context: asyncCtx,
-});
-```
-
-#### `runProcessWith<Result, Context>(props)`
-
-Executes a process with an existing AsyncContext instance and a separate context generator. This function provides more precise control over context management and enables AsyncContext reuse for better performance.
-
-**Parameters:**
-
-```typescript
-type RunProcessWithProps<Result, Context> = {
-  readonly process: Process<Result, Context>;
-  readonly target: Target<Result>; // () => Promise<Result>
-  readonly context: AsyncContext<Context>; // Pre-created AsyncContext instance
-  readonly contextGenerator: ContextGenerator<Context>; // () => Context
-};
-```
-
-**Returns:** `Promise<Result>`
-
-**Key Differences from `runProcess`:**
-
-- **Separation of Concerns**: Takes a pre-created `AsyncContext` instance and a separate `contextGenerator`
-- **Performance Optimization**: Allows reuse of AsyncContext instances across multiple executions
-- **Advanced Control**: Enables complex context management scenarios
-
-**Use Cases:**
-
-- **Context Reuse**: When you need to reuse the same AsyncContext across multiple operations
-- **Performance Critical**: Reduce overhead by pre-creating and reusing AsyncContext instances
-- **Complex Scenarios**: Advanced context propagation patterns
-
-**Example:**
-
-```typescript
-// Pre-create AsyncContext for reuse
-const sharedAsyncContext = AsyncContext.create();
-
-// Execute multiple operations with the same context instance
-const results = await Promise.all([
-  runProcessWith({
-    process: userProcess,
-    target: async () => fetchUser("user1"),
-    context: sharedAsyncContext,
-    contextGenerator: () => ({ logger: console, db: userDb }),
-  }),
-
-  runProcessWith({
-    process: userProcess,
-    target: async () => fetchUser("user2"),
-    context: sharedAsyncContext, // Same context instance
-    contextGenerator: () => ({ logger: console, db: userDb }),
-  }),
-]);
-
-// Performance optimization pattern
-class ServiceManager {
-  private sharedContext = AsyncContext.create<ServiceContext>();
-
-  async executeOperation<T>(
-    operation: () => Promise<T>,
-    process: Process<T, ServiceContext>,
-  ): Promise<T> {
-    return runProcessWith({
-      process,
-      target: operation,
-      context: this.sharedContext, // Reused across all operations
-      contextGenerator: () => this.createServiceContext(),
-    });
-  }
-
-  private createServiceContext(): ServiceContext {
-    return { logger: this.logger, metrics: this.metrics, db: this.db };
-  }
+{
+  aspects: readonly Aspect<Result, Context>[];
+  buildOptions?: BuildOptions;
+  processOptions?: ProcessOptions<Result, Context>;
 }
 ```
 
-### Configuration Options
+**Returns:** `Process<Result, Context>`
 
-#### `BuildOptions`
+**Compilation Steps:**
 
-Controls execution strategy and error handling for each advice type.
+1. Collect advice by type from all aspects
+2. Resolve dependencies using topological sort
+3. Detect circular dependencies and section conflicts
+4. Generate execution plan based on `BuildOptions`
+
+#### `runProcess<Result, Context>(props)`
+
+Executes a process with target function and context.
+
+**Parameters:**
+
+```typescript
+{
+  process: Process<Result, Context>;
+  target: Target<Result>;
+  context: ContextGenerator<Context> | AsyncContext<Context>;
+}
+```
+
+**Returns:** `Promise<Result>`
+
+#### `runProcessWith<Result, Context>(props)`
+
+Advanced execution with explicit AsyncContext instance for reuse.
+
+**Parameters:**
+
+```typescript
+{
+  process: Process<Result, Context>;
+  target: Target<Result>;
+  context: AsyncContext<Context>; // Pre-created instance
+  contextGenerator: ContextGenerator<Context>;
+}
+```
+
+**Use Case:** Optimize performance by reusing AsyncContext across multiple executions.
+
+### Advice Types & Signatures
+
+| Advice Type      | Signature                                                                       | Execution Timing        |
+| ---------------- | ------------------------------------------------------------------------------- | ----------------------- |
+| `before`         | `(context: Restricted<Context, Sections>) => Promise<void>`                     | Before target execution |
+| `around`         | `(context: Restricted<Context, Sections>, hooks: AroundHooks) => Promise<void>` | Wraps target execution  |
+| `afterReturning` | `(context: Restricted<Context, Sections>, result: Result) => Promise<void>`     | After successful return |
+| `afterThrowing`  | `(context: Restricted<Context, Sections>, error: unknown) => Promise<void>`     | After error thrown      |
+| `after`          | `(context: Restricted<Context, Sections>) => Promise<void>`                     | Always (finally block)  |
+
+### BuildOptions
+
+Controls execution strategy and error handling per advice type:
 
 ```typescript
 type BuildOptions = {
-  readonly advice?: {
-    readonly [AdviceType in Advice]?: {
-      readonly execution?: ExecutionStrategy;
-      readonly error?: {
-        readonly aggregation?: AggregationUnit;
-        readonly runtime?: {
-          readonly afterThrow?: ErrorAfter;
+  advice?: {
+    [AdviceType in Advice]?: {
+      execution?: "parallel" | "sequential";
+      error?: {
+        aggregation?: "unit" | "all"; // Stop on first or collect all
+        runtime?: {
+          afterThrow?: "halt" | "continue"; // Propagate or continue
         };
       };
     };
   };
 };
-
-type ExecutionStrategy = "parallel" | "sequential";
-type AggregationUnit = "unit" | "all";
-type ErrorAfter = "halt" | "continue";
 ```
 
 **Default Configuration:**
 
-| Advice Type      | Execution    | Aggregation | After Throw | Notes                     |
-| ---------------- | ------------ | ----------- | ----------- | ------------------------- |
-| `before`         | `parallel`   | `unit`      | `halt`      | Fails fast on first error |
-| `around`         | `sequential` | `unit`      | `halt`      | Wraps in sequence         |
-| `afterReturning` | `parallel`   | `all`       | `continue`  | Collects all errors       |
-| `afterThrowing`  | `parallel`   | `all`       | `continue`  | Collects all errors       |
-| `after`          | `parallel`   | `all`       | `continue`  | Always runs               |
+| Advice Type      | Execution    | Aggregation | After Throw | Rationale                           |
+| ---------------- | ------------ | ----------- | ----------- | ----------------------------------- |
+| `before`         | `parallel`   | `unit`      | `halt`      | Fail fast on validation errors      |
+| `around`         | `sequential` | `unit`      | `halt`      | Preserve wrapper order              |
+| `afterReturning` | `parallel`   | `all`       | `continue`  | Best-effort cleanup                 |
+| `afterThrowing`  | `parallel`   | `all`       | `continue`  | Collect all error handling failures |
+| `after`          | `parallel`   | `all`       | `continue`  | Finally block semantics             |
 
-**Error Configuration Options:**
+### ProcessOptions
 
-- `aggregation: "unit"`: Stop on first error
-- `aggregation: "all"`: Collect all errors
-- `afterThrow: "halt"`: Stop execution on error
-- `afterThrow: "continue"`: Continue despite errors
-
-**Section Locking:** If parallel advice use the same context sections, Promise-AOP throws a runtime error. Resolve by:
-
-1. Making execution `sequential`
-2. Setting `dependsOn` relationships
-3. Using different context sections
-
-#### `ProcessOptions`
-
-Centralized error handling and recovery configuration.
+Centralized error handling with three extension points:
 
 ```typescript
 type ProcessOptions<Result, Context> = {
-  readonly determineError?: (props: {
+  // Select primary error from multiple failures
+  determineError?: (props: {
     context: ContextAccessor<Context>;
     exit: ExecutionOuterContext;
     errors: unknown[];
     info: ErrorInfo;
   }) => Promise<unknown>;
 
-  readonly handleError?: (props: {
+  // Implement recovery logic
+  handleError?: (props: {
     currentTarget: Target<Result>;
     context: ContextAccessor<Context>;
     exit: ExecutionOuterContext;
     error: unknown;
   }) => Promise<Result>;
 
-  readonly handleContinuedErrors?: (props: {
+  // Handle continued errors (non-halting)
+  handleContinuedErrors?: (props: {
     context: ContextAccessor<Context>;
     exit: ExecutionOuterContext;
     errors: readonly (readonly [unknown[], ErrorInfo])[];
@@ -531,304 +369,301 @@ type ProcessOptions<Result, Context> = {
 };
 ```
 
-**Error Handling Flow:**
+**Error Flow:**
 
 ```mermaid
-flowchart TD
-    A["Multiple Errors Occur"] --> B["determineError"]
-    B --> C["Primary Error Selected"]
-    C --> D["handleError"]
-    D --> E{"Recovery Decision"}
-    E -->|"Return Value"| F["Successful Result"]
-    E -->|"Throw Error"| G["Failed Result"]
+flowchart LR
+    A[Errors] --> B[determineError]
+    B --> C[Primary Error]
+    C --> D[handleError]
+    D --> E{Recovery}
+    E -->|Success| F[Result]
+    E -->|Failure| G[Throw]
 
-    A --> H["handleContinuedErrors"]
-    H --> I["Log/Monitor Secondary Errors"]
+    A --> H[handleContinuedErrors]
+    H --> I[Logging/Metrics]
 ```
 
-**Handler Descriptions:**
-
-| Handler                 | Purpose                                      | Return Behavior                           |
-| ----------------------- | -------------------------------------------- | ----------------------------------------- |
-| `determineError`        | Select primary error from multiple failures  | Returns the most important error          |
-| `handleError`           | Core recovery logic with current target info | Return `Result` to recover, throw to fail |
-| `handleContinuedErrors` | Handle secondary errors                      | For logging/monitoring only               |
-
-**Default Behavior:**
-
-- `determineError`: Returns first error
-- `handleError`: Re-throws error (no recovery), `currentTarget` provides target function info for error context
-- `handleContinuedErrors`: No-op
-
-**currentTarget Usage:**
-
-- Provides reference to the target function where the error occurred for precise debugging and logging
-- Enables target-specific recovery strategies
-- Allows including function name or metadata in error context
-
-<details>
-<summary><strong>Advanced Error Handling Example</strong></summary>
-
-```typescript
-class DatabaseError extends Error {
-  name = "DatabaseError";
-}
-class LoggingError extends Error {
-  name = "LoggingError";
-}
-
-const process = createProcess<string, AppContext>({
-  aspects: [DatabaseAspect, LoggingAspect],
-  processOptions: {
-    // Prioritize database errors over logging errors
-    determineError: async ({ errors }) => {
-      return errors.find((e) => e instanceof DatabaseError) ?? errors[0];
-    },
-
-    // Implement recovery strategy
-    handleError: async ({ currentTarget, context, error }) => {
-      const { logger, cache } = context();
-
-      if (error instanceof DatabaseError) {
-        logger.error(
-          `Database failed (target: ${currentTarget.name}), using cache`,
-          error,
-        );
-        return cache.get("fallback-value");
-      }
-
-      // Include target function info in error logging
-      logger.error(
-        `Unrecoverable error in target: ${currentTarget.name}`,
-        error,
-      );
-      throw error; // Re-throw non-recoverable errors
-    },
-
-    // Log secondary errors for monitoring
-    handleContinuedErrors: async ({ context, errors }) => {
-      const { metrics } = context();
-      errors.forEach(([errorList]) => {
-        errorList.forEach((error) => {
-          metrics.incrementCounter("secondary_errors", {
-            type: error.constructor.name,
-          });
-        });
-      });
-    },
-  },
-});
-```
-
-</details>
-
-### Types Reference
-
-#### Core Types
-
-```typescript
-// Main exports
-export {
-  createAspect,
-  createProcess,
-  runProcess,
-  runProcessWith,
-  AsyncContext,
-};
-
-// Error types
-export { Rejection, HaltRejection, ContinuousRejection };
-
-// Configuration types
-export type { BuildOptions, ProcessOptions };
-export type { Aspect, Process, Target };
-export type { Advice, AdviceMetadata };
-```
+### Advanced Types
 
 #### Context Types
 
 ```typescript
+// Context generator (simple function)
 type ContextGenerator<Context> = () => Context;
+
+// Context accessor (read-only access)
 type ContextAccessor<Context> = () => Context;
+
+// Section-based restriction
+type Restricted<Context, Sections> =
+  Pick<Context, Sections[number]> & Readonly<...>;
+
+// Sections declaration
 type SectionsUsed<Context> = readonly (keyof Context)[];
-type Restricted<
-  Context,
-  Sections extends SectionsUsed<Context>,
-> = Context extends object
-  ? { readonly [key in Sections[number]]: Context[key] }
-  : Context;
 ```
 
-#### Utility Types
+#### Target & Wrapper Types
 
 ```typescript
-type ExecutionOuterContext = <SharedContext>(
-  callback: () => SharedContext,
-) => SharedContext;
+// Async target function
+type Target<Result> = () => Promise<Result>;
+
+// Target wrapper (for around advice)
+type TargetWrapper<Result> = (target: Target<Result>) => Target<Result>;
+
+// Around advice resolver
+type AroundAdviceResolver<Result> = (
+  propagateChain: TargetWrapper<Result>,
+  nextChain: TargetWrapper<Result>,
+) => Target<Result>;
 ```
+
+#### Error Types
+
+Promise-AOP uses specialized `Rejection` types for fine-grained error control flow:
+
+```typescript
+// Base rejection type
+class Rejection extends Error {
+  constructor(
+    public readonly errors: unknown[],
+    public readonly info: ErrorInfo,
+  ) {}
+}
+
+// Halting rejection (stops execution)
+class HaltRejection extends Rejection {}
+
+// Continuous rejection (collected, non-halting)
+class ContinuousRejection extends Rejection {}
+
+// Error context information
+type ErrorInfo =
+  | { occurredFrom: "target" }
+  | { occurredFrom: "unknown" }
+  | { occurredFrom: "advice"; advice: Advice };
+```
+
+**Rejection Type Usage:**
+
+- **`Rejection`**: Base class thrown by advice when errors occur. Contains array of errors and context information about where the error originated.
+
+- **`HaltRejection`**: Created when an error should stop execution immediately. Used by advice types with `afterThrow: "halt"` configuration. Triggers `handleError` in `ProcessOptions`.
+
+- **`ContinuousRejection`**: Created when an error should be collected but not halt execution. Used by advice types with `afterThrow: "continue"` configuration. Collected and passed to `handleContinuedErrors`.
+
+**Error Origin Tracking:**
+
+- `occurredFrom: "target"`: Error thrown by the target function itself
+- `occurredFrom: "advice"`: Error thrown during advice execution (includes which advice type)
+- `occurredFrom: "unknown"`: Error from unexpected sources (framework internal)
 
 ---
 
-## 🔬 Advanced Topics
+## Advanced Implementation
 
-<details>
-<summary><strong>🎯 Around Advice Composition</strong></summary>
+### Internal Execution Model
 
-The `around` advice is the most powerful, allowing you to wrap the target function's execution. It provides two hooks:
+Promise-AOP uses a multi-phase execution model with explicit error boundaries:
 
-- `attachToTarget(wrapper)`: Wraps the original target function. These wrappers are executed closest to the target.
-- `attachToResult(wrapper)`: Wraps the _entire_ execution chain, including other `around` advice. These wrappers are executed at the outermost layer.
+1. **Compilation Phase** (`createProcess`):
+   - Aspects are organized by advice type
+   - Dependency graphs are built using topological sort
+   - Section conflicts are detected at compilation time
+   - Execution strategies are frozen into the process
 
-Wrappers are composed like onions: the last one attached is the first one executed (LIFO).
+2. **Setup Phase** (`runProcess`):
+   - AsyncContext is initialized with context generator
+   - Context sections are locked based on advice declarations
+   - Error handlers are attached to execution chain
+
+3. **Execution Phase**:
+   - `before` advice executes with configurable parallelism
+   - `around` advice builds wrapper chains (target then result)
+   - Target executes within composed wrappers
+   - `afterReturning` or `afterThrowing` based on outcome
+   - `after` always executes (finally semantics)
+
+4. **Teardown Phase**:
+   - Continuous rejections are collected
+   - Halt rejection triggers error handlers
+   - AsyncContext is cleaned up
+
+### Around Advice Composition
+
+The `around` advice provides two composition points for maximum flexibility:
 
 ```typescript
-const AdvancedAspect = createAspect<number, { log: Console }>(
-  (createAdvice) => ({
-    name: "advanced",
-    around: createAdvice({
-      use: ["log"],
-      advice: async ({ log }, { attachToTarget, attachToResult }) => {
-        // 1. Result wrapper (outermost)
-        attachToResult((target) => async () => {
-          log.info("Result wrapper: Start");
-          const result = await target(); // Executes target wrappers + original target
-          log.info("Result wrapper: End");
-          return result * 10;
-        });
+const aspect = createAspect<number, Context>((createAdvice) => ({
+  name: "composition",
+  around: createAdvice({
+    use: ["logger"],
+    advice: async ({ logger }, { attachToTarget, attachToResult }) => {
+      // attachToTarget: wraps the original target function
+      // Executes closest to the target
+      attachToTarget((target) => async () => {
+        logger.info("Target wrapper: before");
+        const result = await target();
+        logger.info("Target wrapper: after");
+        return result + 1;
+      });
 
-        // 2. Target wrapper (innermost)
-        attachToTarget((target) => async () => {
-          log.info("Target wrapper: Start");
-          const result = await target(); // Executes original target
-          log.info("Target wrapper: End");
-          return result + 1;
-        });
-      },
-    }),
+      // attachToResult: wraps the entire execution chain
+      // Executes at the outermost layer
+      attachToResult((target) => async () => {
+        logger.info("Result wrapper: before");
+        const result = await target();
+        logger.info("Result wrapper: after");
+        return result * 2;
+      });
+    },
   }),
-);
+}));
 
-// If original target returns 5:
-// Console Output:
-// > Result wrapper: Start
-// > Target wrapper: Start
-// > Target wrapper: End
-// > Result wrapper: End
-// Final result: (5 + 1) * 10 = 60
+// Execution order (LIFO):
+// Result wrapper: before
+//   Target wrapper: before
+//     [original target]
+//   Target wrapper: after
+// Result wrapper: after
+// Final: (originalResult + 1) * 2
 ```
 
 **Composition Visualization:**
 
 ```mermaid
-graph TD
-    A["Result Wrapper (outermost)"] --> B["Target Wrapper"] --> C["Original Target"]
-    C --> D["Return + 1"] --> E["Return * 10"] --> F["Final Result"]
+graph LR
+    A[Result Wrapper] --> B[Next Chain]
+    B --> C[Target Wrapper] --> D[Original Target]
+    D --> E[Return + 1]
+    E --> F[Return * 2]
+    F --> G[Final Result]
 ```
 
-</details>
+### Optimization Guidelines
 
-<details>
-<summary><strong>⚡ Performance & Optimization</strong></summary>
+1. **Process Reuse**: Create process once, reuse across executions
 
-### Context Optimization
+   ```typescript
+   // Good
+   const process = createProcess({ aspects });
+   const execute = (target) => runProcess({ process, target, context });
 
-- **Minimal Context**: Only request sections you need via `use` to reduce overhead and prevent section conflicts
-- **Section Isolation**: Design context with fine-grained sections for better parallelization
+   // Bad
+   const execute = (target) =>
+     runProcess({ process: createProcess({ aspects }), target, context });
+   ```
 
-### Execution Strategy
+2. **Section Granularity**: Use fine-grained sections for better parallelism
 
-- **Parallel by Default**: Most advice types run in parallel for better performance
-- **Strategic Sequential**: Use `execution: "sequential"` only when order matters (e.g., database transactions)
+   ```typescript
+   // Good: separate sections
+   type Context = {
+     readOnlyConfig: Config;
+     logger: Logger;
+     metrics: Metrics;
+   };
 
-### Process Reuse
+   // Bad: coarse sections
+   type Context = {
+     services: { logger: Logger; metrics: Metrics; config: Config };
+   };
+   ```
 
-- **Memoize Processes**: `createProcess` is computationally intensive - create once, reuse everywhere
-- **Stateless Design**: Processes are stateless and thread-safe - safe to share across requests
+3. **AsyncContext Reuse**: Use `runProcessWith` for high-frequency executions
 
-```typescript
-// ✅ Good: Create once, reuse
-const commonProcess = createProcess({
-  aspects: [LoggingAspect, MetricsAspect],
-});
+   ```typescript
+   class ServiceManager {
+     private asyncContext = AsyncContext.create<Context>();
 
-const processUserRequest = (data) =>
-  runProcess({
-    process: commonProcess, // Reuse
-    target: async () => processUser(data),
-    context: () => ({ logger, metrics, db }),
-  });
+     execute<T>(target: Target<T>) {
+       return runProcessWith({
+         process: this.process,
+         target,
+         context: this.asyncContext, // Reused
+         contextGenerator: () => this.buildContext(),
+       });
+     }
+   }
+   ```
 
-// ❌ Bad: Creating process every time
-const processUserRequest = (data) =>
-  runProcess({
-    process: createProcess({ aspects: [LoggingAspect, MetricsAspect] }), // Recreating
-    target: async () => processUser(data),
-    context: () => ({ logger, metrics, db }),
-  });
-```
+### Extension Guide
 
-</details>
+Promise-AOP is designed to be extended for domain-specific frameworks:
 
-<details>
-<summary><strong>🔧 Real-World Patterns</strong></summary>
-
-### Layered Architecture Pattern
-
-```typescript
-// Infrastructure Layer
-const InfrastructureAspects = [LoggingAspect, MetricsAspect, TracingAspect];
-
-// Business Layer
-const BusinessAspects = [ValidationAspect, AuthorizationAspect, CachingAspect];
-
-// Create specialized processes
-const infraProcess = createProcess({ aspects: InfrastructureAspects });
-const businessProcess = createProcess({ aspects: BusinessAspects });
-const fullProcess = createProcess({
-  aspects: [...InfrastructureAspects, ...BusinessAspects],
-});
-```
-
-### Conditional Advice Pattern
+#### Building a Framework
 
 ```typescript
-const ConditionalAspect = createAspect<User, AppContext>((createAdvice) => ({
-  name: "conditional",
+// 1. Define domain-specific context
+type DomainContext = {
+  auth: AuthService;
+  db: DatabaseConnection;
+  logger: Logger;
+};
+
+// 2. Create reusable aspect library
+export const AuthAspect = createAspect<any, DomainContext>((createAdvice) => ({
+  name: "auth",
   before: createAdvice({
-    use: ["config", "logger"],
-    advice: async ({ config, logger }) => {
-      if (config.enableDetailedLogging) {
-        logger.info("Detailed logging enabled");
+    use: ["auth"],
+    advice: async ({ auth }) => {
+      if (!auth.isAuthenticated()) {
+        throw new UnauthorizedError();
       }
+    },
+  }),
+}));
+
+// 3. Provide high-level API
+export class DomainService {
+  private process = createProcess<any, DomainContext>({
+    aspects: [AuthAspect, LoggingAspect, MetricsAspect],
+  });
+
+  async execute<T>(target: Target<T>): Promise<T> {
+    return runProcess({
+      process: this.process,
+      target,
+      context: () => this.buildContext(),
+    });
+  }
+}
+```
+
+#### Custom Advice Types
+
+While the five advice types cover most use cases, you can simulate custom timing:
+
+```typescript
+// Simulated "beforeValidation" using dependsOn
+const ValidationAspect = createAspect(/* ... */);
+const BeforeValidationAspect = createAspect((createAdvice) => ({
+  name: "beforeValidation",
+  before: createAdvice({
+    dependsOn: ["validation"], // Runs before validation
+    advice: async () => {
+      /* ... */
     },
   }),
 }));
 ```
 
-### Error Recovery Pattern
+#### Integration with Other Systems
 
 ```typescript
-const RetryAspect = createAspect<Data, AppContext>((createAdvice) => ({
-  name: "retry",
+// Example: OpenTelemetry integration
+const TracingAspect = createAspect<any, { tracer: Tracer }>((createAdvice) => ({
+  name: "tracing",
   around: createAdvice({
-    use: ["logger"],
-    advice: async ({ logger }, { attachToTarget }) => {
+    use: ["tracer"],
+    advice: async ({ tracer }, { attachToTarget }) => {
       attachToTarget((target) => async () => {
-        let attempts = 0;
-        const maxAttempts = 3;
-
-        while (attempts < maxAttempts) {
-          try {
-            return await target();
-          } catch (error) {
-            attempts++;
-            if (attempts >= maxAttempts) throw error;
-
-            logger.warn(`Attempt ${attempts} failed, retrying...`);
-            await new Promise((resolve) =>
-              setTimeout(resolve, 1000 * attempts),
-            );
-          }
+        const span = tracer.startSpan("operation");
+        try {
+          return await target();
+        } finally {
+          span.end();
         }
       });
     },
@@ -836,11 +671,21 @@ const RetryAspect = createAspect<Data, AppContext>((createAdvice) => ({
 }));
 ```
 
-</details>
+### Design Constraints & Trade-offs
+
+1. **No Dynamic Aspect Composition**: Aspects must be known at process compilation time for performance and type safety
+
+2. **Section-Based Locking**: Prevents data races but requires upfront section declaration
+
+3. **AsyncLocalStorage Dependency**: Requires Node.js 16+, not suitable for browsers
+
+4. **Synchronous Advice Not Supported**: All advice must return `Promise<void>` for consistent async handling
+
+5. **Process Immutability**: Compiled processes are immutable for thread-safety and memoization
 
 ---
 
-## 🔧 Development
+## Development
 
 ```bash
 # Install dependencies
@@ -851,10 +696,16 @@ yarn test
 
 # Build the library
 yarn build
+
+# Type check
+yarn check-types
+
+# Lint
+yarn lint
 ```
 
 ---
 
-## 📝 License
+## License
 
 MIT © [h1ylabs](https://github.com/h1ylabs)
