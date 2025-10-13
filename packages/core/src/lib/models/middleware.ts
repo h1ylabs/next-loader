@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Aspect } from "@h1y/promise-aop";
+import { Aspect } from "@h1ylabs/promise-aop";
 
 export type LoaderMiddleware<Result, Context, MiddlewareName extends string> = {
   readonly name: MiddlewareName;

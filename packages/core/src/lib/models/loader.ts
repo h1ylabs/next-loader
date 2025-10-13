@@ -1,4 +1,4 @@
-import { AsyncContext } from "@h1y/promise-aop";
+import { AsyncContext } from "@h1ylabs/promise-aop";
 
 // boolean: always propagate, or not
 // HAS_OUTER_CONTEXT: propagate if there is an outer context, or not

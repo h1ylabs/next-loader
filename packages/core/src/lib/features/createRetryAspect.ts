@@ -1,4 +1,4 @@
-import { createAspect } from "@h1y/promise-aop";
+import { createAspect } from "@h1ylabs/promise-aop";
 
 import type { LoaderCoreContext } from "../models/context";
 import { LOADER_RETRY_ASPECT, LOADER_TIMEOUT_ASPECT } from "../models/loader";

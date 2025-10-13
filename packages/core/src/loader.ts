@@ -7,7 +7,7 @@ import {
   runProcessWith,
   type Target,
   TargetWrapper,
-} from "@h1y/promise-aop";
+} from "@h1ylabs/promise-aop";
 
 import { createBackoffAspect } from "./lib/features/createBackoffAspect";
 import { createRetryAspect } from "./lib/features/createRetryAspect";
