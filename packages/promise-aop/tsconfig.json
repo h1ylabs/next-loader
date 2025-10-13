@@ -1,5 +1,5 @@
 {
-  "extends": "@h1y/loader-config/typescript/base.json",
+  "extends": "@h1ylabs/loader-config/typescript/base.json",
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",

@@ -1,5 +1,5 @@
 {
-  "extends": "@h1y/loader-config/typescript/react.json",
+  "extends": "@h1ylabs/loader-config/typescript/react.json",
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",

@@ -1159,9 +1159,26 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@h1y/loader-config@workspace:*, @h1y/loader-config@workspace:packages/config":
+"@h1y/loader-tag@workspace:packages/tag":
   version: 0.0.0-use.local
-  resolution: "@h1y/loader-config@workspace:packages/config"
+  resolution: "@h1y/loader-tag@workspace:packages/tag"
+  dependencies:
+    "@h1ylabs/loader-config": "workspace:*"
+    "@types/jest": "catalog:"
+    "@types/node": "catalog:"
+    eslint: "catalog:"
+    jest: "catalog:"
+    prettier: "catalog:"
+    rimraf: "catalog:"
+    ts-jest: "catalog:"
+    tsup: "catalog:"
+    typescript: "catalog:"
+  languageName: unknown
+  linkType: soft
+
+"@h1ylabs/loader-config@workspace:*, @h1ylabs/loader-config@workspace:packages/config":
+  version: 0.0.0-use.local
+  resolution: "@h1ylabs/loader-config@workspace:packages/config"
   dependencies:
     "@eslint/compat": "npm:^1.2.9"
     "@eslint/js": "npm:^9.33.0"
@@ -1186,28 +1203,11 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@h1y/loader-tag@workspace:packages/tag":
-  version: 0.0.0-use.local
-  resolution: "@h1y/loader-tag@workspace:packages/tag"
-  dependencies:
-    "@h1y/loader-config": "workspace:*"
-    "@types/jest": "catalog:"
-    "@types/node": "catalog:"
-    eslint: "catalog:"
-    jest: "catalog:"
-    prettier: "catalog:"
-    rimraf: "catalog:"
-    ts-jest: "catalog:"
-    tsup: "catalog:"
-    typescript: "catalog:"
-  languageName: unknown
-  linkType: soft
-
 "@h1ylabs/loader-core@workspace:*, @h1ylabs/loader-core@workspace:packages/core":
   version: 0.0.0-use.local
   resolution: "@h1ylabs/loader-core@workspace:packages/core"
   dependencies:
-    "@h1y/loader-config": "workspace:*"
+    "@h1ylabs/loader-config": "workspace:*"
     "@h1ylabs/promise-aop": "workspace:*"
     "@types/jest": "catalog:"
     "@types/node": "catalog:"
@@ -1225,7 +1225,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@h1ylabs/next-loader@workspace:packages/next-loader"
   dependencies:
-    "@h1y/loader-config": "workspace:*"
+    "@h1ylabs/loader-config": "workspace:*"
     "@h1ylabs/loader-core": "workspace:*"
     "@types/node": "catalog:"
     "@types/react": "npm:>=18.3.0"
@@ -1245,7 +1245,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@h1ylabs/promise-aop@workspace:packages/promise-aop"
   dependencies:
-    "@h1y/loader-config": "workspace:*"
+    "@h1ylabs/loader-config": "workspace:*"
     "@types/jest": "catalog:"
     "@types/node": "catalog:"
     eslint: "catalog:"

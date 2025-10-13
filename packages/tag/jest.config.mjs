@@ -1,1 +1,1 @@
-export { default } from "@h1y/loader-config/jest/index.mjs";
+export { default } from "@h1ylabs/loader-config/jest/index.mjs";

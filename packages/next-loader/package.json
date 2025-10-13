@@ -43,7 +43,7 @@
     "test": "jest --coverage"
   },
   "devDependencies": {
-    "@h1y/loader-config": "workspace:*",
+    "@h1ylabs/loader-config": "workspace:*",
     "@h1ylabs/loader-core": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": ">=18.3.0",

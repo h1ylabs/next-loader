@@ -1,1 +1,1 @@
-export { default } from "@h1y/loader-config/tsup/index.mjs";
+export { default } from "@h1ylabs/loader-config/tsup/index.mjs";
